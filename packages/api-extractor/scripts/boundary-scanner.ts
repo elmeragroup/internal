@@ -167,6 +167,8 @@ function isTypeOnlySpecifierContext(beforeSpecifier: string): boolean {
   if (/^(?:import|export)\s+type\b/u.test(before)) return true;
   const inline = /\{([^}]*)\}\s*$/u.exec(before)?.[1];
   if (inline === undefined) return false;
+  // A default binding is a runtime value even when every named binding is `type`.
+  if (/^import\s+[A-Za-z_$][\w$]*\s*,/u.test(before)) return false;
   const bindings = inline
     .split(",")
     .map((binding) => binding.trim())
