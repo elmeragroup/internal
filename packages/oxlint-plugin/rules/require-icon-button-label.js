@@ -3,22 +3,70 @@ import { defineRule } from "@oxlint/plugins";
 const ICON_SIZE_PREFIX = "icon";
 const TEXT_CONTENT_NAMES = new Set(["Span", "Text", "ItemTitle", "Title"]);
 
-function hasAriaLabel(node) {
-  return node.attributes.some((attr) => attr.type === "JSXAttribute" && attr.name.name === "aria-label");
+/**
+ * Statically known string from a JSX attribute value or child expression.
+ * Identifiers and interpolated templates stay unknown.
+ *
+ * @param {import("estree").Node | null | undefined} node
+ * @returns {string | null}
+ */
+function getStaticString(node) {
+  if (!node) return null;
+
+  if (node.type === "Literal") {
+    return typeof node.value === "string" ? node.value : null;
+  }
+
+  if (node.type === "TemplateLiteral") {
+    if (node.expressions.length !== 0) return null;
+    const cooked = node.quasis[0]?.value.cooked;
+    return typeof cooked === "string" ? cooked : null;
+  }
+
+  if (node.type === "JSXExpressionContainer") {
+    return getStaticString(node.expression);
+  }
+
+  return null;
+}
+
+/**
+ * Known nonempty strings count. Known empty/whitespace, bare, null, and false do not.
+ * Unresolved expressions stay permissive.
+ *
+ * @param {import("estree").JSXOpeningElement} node
+ */
+function hasUsableAriaLabel(node) {
+  return node.attributes.some((attr) => {
+    if (attr.type !== "JSXAttribute" || attr.name.name !== "aria-label") return false;
+    if (!attr.value) return false;
+
+    const staticString = getStaticString(attr.value);
+    if (staticString !== null) return staticString.trim().length > 0;
+
+    const expr = attr.value.type === "JSXExpressionContainer" ? attr.value.expression : attr.value;
+    if (expr.type === "Literal") return false;
+
+    return true;
+  });
 }
 
 function hasSlot(node) {
   return node.attributes.some((attr) => attr.type === "JSXAttribute" && attr.name.name === "slot");
 }
 
-function getStringAttrValue(attr) {
-  if (!attr.value) return null;
+/**
+ * Size/variant may also use an identifier's name as a heuristic (size={icon}).
+ * That heuristic is not a known runtime string.
+ *
+ * @param {import("estree").JSXAttribute} attr
+ * @returns {string | null}
+ */
+function getSizeOrVariantValue(attr) {
+  const staticValue = getStaticString(attr.value);
+  if (staticValue !== null) return staticValue;
 
-  if (attr.value.type === "Literal") {
-    return typeof attr.value.value === "string" ? attr.value.value : null;
-  }
-
-  if (attr.value.type === "JSXExpressionContainer" && attr.value.expression.type === "Identifier") {
+  if (attr.value?.type === "JSXExpressionContainer" && attr.value.expression.type === "Identifier") {
     return attr.value.expression.name;
   }
 
@@ -29,7 +77,7 @@ function isIconVariant(node) {
   return node.attributes.some((attr) => {
     if (attr.type !== "JSXAttribute" || attr.name.name !== "variant") return false;
 
-    const value = getStringAttrValue(attr);
+    const value = getSizeOrVariantValue(attr);
 
     return value === "icon";
   });
@@ -39,7 +87,7 @@ function isIconSize(node) {
   return node.attributes.some((attr) => {
     if (attr.type !== "JSXAttribute" || attr.name.name !== "size") return false;
 
-    const value = getStringAttrValue(attr);
+    const value = getSizeOrVariantValue(attr);
     if (!value) return false;
 
     return value.startsWith(ICON_SIZE_PREFIX);
@@ -69,7 +117,10 @@ function hasTextContent(node) {
     if (child.type === "JSXExpressionContainer") {
       const expr = child.expression;
       if (expr.type === "CallExpression") return true;
-      if (expr.type === "Literal" && typeof expr.value === "string") return true;
+
+      const staticString = getStaticString(expr);
+      if (staticString !== null) return staticString.trim().length > 0;
+
       if (expr.type === "TemplateLiteral") return true;
     }
 
@@ -98,7 +149,7 @@ export default defineRule({
 
         if (!isIconVariant(node) && !isIconSize(node)) return;
 
-        if (hasAriaLabel(node)) return;
+        if (hasUsableAriaLabel(node)) return;
 
         if (hasSlot(node)) return;
 
@@ -119,7 +170,7 @@ export default defineRule({
     type: "problem",
     docs: {
       description:
-        "Require aria-label on icon-only *Button JSX (any name ending in Button, including InputGroup.Button) whose size starts with icon",
+        "Require a nonempty aria-label on icon-only *Button JSX (any name ending in Button, including InputGroup.Button) whose size starts with icon or variant is icon; static expression strings and templates count",
     },
     schema: [],
     messages: {
