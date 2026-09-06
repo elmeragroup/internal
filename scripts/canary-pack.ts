@@ -4,9 +4,9 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { asRecord, asString, readJsonObject } from "./lib/json-object.mjs";
-import { archiveDirectory, archivePath, canaryVersion, packageNames, repoRoot, run } from "./release.ts";
+import { archiveDirectory, archivePath, packageNames, releaseVersion, repoRoot, run } from "./release.ts";
 
-const version = canaryVersion();
+const version = releaseVersion();
 rmSync(archiveDirectory, { recursive: true, force: true });
 mkdirSync(archiveDirectory, { recursive: true });
 const archives = [];
@@ -34,7 +34,7 @@ for (const name of packageNames) {
     if (/^(?:workspace|catalog|file|link):/.test(specifier))
       throw new Error(`${name}: unresolved dependency ${dependency}`);
     if (dependency.startsWith("@elmeragroup/") && specifier !== version)
-      throw new Error(`${name}: canary dependency version mismatch`);
+      throw new Error(`${name}: release dependency version mismatch`);
   }
   if (name !== "internal" && !dependencies.typescript) throw new Error(`${name}: TypeScript runtime missing`);
   if (

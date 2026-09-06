@@ -8,7 +8,26 @@
       "dependsOn": ["@elmeragroup/internal#build"]
     },
     "//#test:repo-policy": {
-      "inputs": ["test/**", ".oxlintrc.json", "packages/api-extractor/**", "scripts/lib/**"]
+      "inputs": [
+        "test/**",
+        ".oxlintrc.json",
+        "packages/api-extractor/**",
+        "scripts/lib/**",
+        "scripts/release.ts",
+        "scripts/release-version.ts",
+        "scripts/canary-pack.ts",
+        "scripts/canary-publish.ts",
+        "scripts/canary-version.ts",
+        "scripts/packed-consumer.ts",
+        ".changeset/config.json",
+        "packages/api-artifacts/package.json",
+        "packages/internal/package.json",
+        ".github/workflows/merge.yml",
+        ".github/workflows/publish-canary.yml",
+        ".github/workflows/version-packages.yml",
+        "package.json",
+        "pnpm-workspace.yaml"
+      ]
     },
     "build": {
       "dependsOn": ["^build"],

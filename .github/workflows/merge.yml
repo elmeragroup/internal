@@ -38,7 +38,7 @@ jobs:
         run: pnpm exec turbo run ci:checks
 
       - name: Verify packed consumer
-        run: pnpm canary:pack && pnpm test:packed-consumer
+        run: pnpm packages:pack && pnpm test:packed-consumer
 
       - name: Changeset presence
         if: ${{ github.event_name == 'pull_request' && !startsWith(github.head_ref, 'changeset-release/') && !contains(github.event.pull_request.labels.*.name, 'no-changeset') }}

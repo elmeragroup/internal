@@ -13,7 +13,8 @@
     "test:repo-policy": "vitest run --config test/vitest.config.mjs",
     "type-check": "turbo run type-check",
     "canary:version": "node scripts/canary-version.ts",
-    "canary:pack": "pnpm build && node scripts/canary-pack.ts",
+    "packages:pack": "pnpm build && node scripts/canary-pack.ts",
+    "canary:pack": "pnpm packages:pack",
     "test:packed-consumer": "node scripts/packed-consumer.ts",
     "canary:publish": "node scripts/canary-publish.ts",
     "type-check:scripts": "tsc --noEmit -p scripts/tsconfig.json"

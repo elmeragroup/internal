@@ -28,12 +28,13 @@ Run commands from the repository root unless stated otherwise.
 ```sh
 pnpm install --frozen-lockfile
 pnpm ci:checks
-pnpm canary:pack
+pnpm packages:pack
 pnpm test:packed-consumer
 ```
 
-These are the workspace checks used by CI. `canary:pack` builds local archives without publishing.
-Run it before `test:packed-consumer`, which verifies the packages without workspace links.
+These are the workspace checks used by CI. `packages:pack` builds local archives without publishing.
+`canary:pack` is a compatibility alias for that command. Run packing before `test:packed-consumer`,
+which verifies the packages without workspace links.
 
 While iterating, run the affected package's tests with `pnpm --filter <package-name> test`. Build first
 when tests depend on compiled workspace packages. For extractor changes, run
@@ -81,6 +82,8 @@ Preserve the distinction between artifact `check` and `write` modes. Check mode 
 or create directories. Keep generation limited to the explicit output inventory. Update the relevant
 README and tests when changing public options, defaults, diagnostics, or serialized output.
 
-For release preparation, follow the root README. The three public packages share a canary release
-version. CI checks changeset presence for ordinary pull requests unless they carry the `no-changeset`
-label. Include a changeset for publishable changes and explain when a change needs no release.
+For release preparation, follow the root README. The three public packages share one coordinated
+Changesets version. Package verification accepts a coordinated stable or canary version. Publication
+remains canary-only through the manual Publish Canary workflow and does not publish `latest`. CI
+checks changeset presence for ordinary pull requests unless they carry the `no-changeset` label.
+Include a changeset for publishable changes and explain when a change needs no release.
