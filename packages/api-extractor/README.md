@@ -70,7 +70,10 @@ The public model, warnings, errors, provenance, options, and service contain no 
 graphs; `test/boundary.test.ts` pins both the compiler boundary and that Effect-free walk.
 Each `extractModule` call gets an isolated synchronous extraction session, so recursion state and
 warning collection cannot leak between calls. Output ordering and canonicalization are
-deterministic for the pinned toolchain.
+deterministic for the pinned toolchain. Canonicalization compares nested generic signatures by
+structure and lexical bindings rather than rendered text, so distinct constraints, defaults, and
+inner-versus-outer parameter references stay distinct inside objects, arrays, tuples, and type
+arguments.
 
 The ts7 adapter fetches each source file at most once per extraction session and keeps the
 materialized tree for later node lookups; the compiler's project-scoped source-file cache keeps
