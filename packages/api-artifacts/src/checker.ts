@@ -1,13 +1,6 @@
 import path from "node:path";
 import type { SourceFile } from "typescript/unstable/ast";
-import {
-  isBindingElement,
-  isExpressionStatement,
-  isFunctionLikeDeclaration,
-  isIdentifier,
-  isObjectBindingPattern,
-  isStringLiteral,
-} from "typescript/unstable/ast/is";
+import { isExpressionStatement, isStringLiteral } from "typescript/unstable/ast/is";
 import { API, NodeBuilderFlags, SignatureKind, SymbolFlags } from "typescript/unstable/sync";
 import type {
   Checker,
@@ -17,6 +10,8 @@ import type {
   Symbol as TsSymbol,
   Type,
 } from "typescript/unstable/sync";
+
+import type { ComponentSourceResult } from "@elmeragroup/api-extractor";
 
 import type { ProblemLog } from "./errors.ts";
 import type { ApiPart, ApiProp, RscStatus } from "./model.ts";
@@ -129,38 +124,28 @@ export function propOrigin(declarationPaths: readonly string[], synthesized: boo
 }
 
 /**
- * Reads the implementation-side facts of a part: which file declares it (hence its RSC
- * status) and the defaults its props destructuring assigns.
+ * Turns one source-inspection result into artifact source metadata. Unresolved
+ * implementations become an actionable problem instead of React declaration paths.
  */
-export function readPartSource(context: LibraryProject, signature: Signature): PartSource | null {
-  const handle = signature.declaration;
-  if (handle === undefined) {
+export function partSourceFromInspection(
+  context: LibraryProject,
+  partName: string,
+  result: ComponentSourceResult,
+  problems: ProblemLog
+): PartSource | null {
+  if (result.status === "unresolved") {
+    problems.add(`${partName}: could not recover the authored implementation (${result.reason})`);
     return null;
   }
-  const node = handle.resolve(context.project);
-  if (node === undefined) {
+  const sourceFile = context.program.getSourceFile(result.filePath);
+  if (sourceFile === undefined) {
+    problems.add(`${partName}: could not load the authored implementation file (${result.filePath})`);
     return null;
-  }
-  const sourceFile = node.getSourceFile();
-  const defaults = new Map<string, string>();
-  if (isFunctionLikeDeclaration(node)) {
-    const pattern = node.parameters[0]?.name;
-    if (pattern !== undefined && isObjectBindingPattern(pattern)) {
-      for (const element of pattern.elements) {
-        if (!isBindingElement(element) || element.initializer === undefined) {
-          continue;
-        }
-        const name = element.propertyName ?? element.name;
-        if (name !== undefined && isIdentifier(name)) {
-          defaults.set(name.text, element.initializer.getText().trim());
-        }
-      }
-    }
   }
   return {
     sourcePath: path.relative(context.projectRoot, sourceFile.fileName).replaceAll("\\", "/"),
     rsc: readRscStatus(sourceFile),
-    defaults,
+    defaults: new Map(result.defaults.map((entry) => [entry.name, entry.initializerText])),
   };
 }
 
@@ -219,6 +204,10 @@ export function shortTypeOf(propName: string, printedType: string): string | nul
 export type PartRequest = {
   /** Display name, e.g. `Dialog.Content`. */
   name: string;
+  /** Public export that owns this part. */
+  exportName: string;
+  /** Object-member identity when the part is not the exported callable itself. */
+  memberName?: string;
   type: Type;
 };
 
@@ -279,10 +268,10 @@ export type LibraryApiRequest = ComponentApiRequest & { readonly slug: string };
 
 /**
  * Resolves the checker-backed part requests for one public component.  This is
- * the *only* walk of a component's entry: `extractComponentApi` calls it once and
+ * the *only* walk of a component's entry: generation calls it once and
  * every downstream fact is read from the parts it returns.
  */
-function componentPartRequests(
+export function componentPartRequests(
   context: LibraryProject,
   request: ComponentApiRequest,
   problems?: ProblemLog
@@ -312,14 +301,19 @@ function componentPartRequests(
       continue;
     }
     if (callSignature(checker, rootType) !== null) {
-      parts.push({ name: exportName, type: rootType });
+      parts.push({ name: exportName, exportName, type: rootType });
       continue;
     }
     const start = parts.length;
     for (const member of checker.getPropertiesOfType(rootType)) {
       const memberType = checker.getTypeOfSymbol(member);
       if (memberType === undefined || callSignature(checker, memberType) === null) continue;
-      parts.push({ name: `${exportName}.${member.name}`, type: memberType });
+      parts.push({
+        name: `${exportName}.${member.name}`,
+        exportName,
+        memberName: member.name,
+        type: memberType,
+      });
     }
     if (parts.length === start) {
       addProblem(problems, `${exportName}: no renderable parts were found on the exported namespace`);
@@ -401,7 +395,6 @@ function describePart(
     return null;
   }
   if (source === null) {
-    problems.add(`${request.name}: could not resolve the declaring source file`);
     return null;
   }
   if (!hasPropsParameter) {
@@ -465,10 +458,14 @@ function describePart(
 }
 
 /** Reads every fact one part yields, resolving its props type exactly once. */
-function extractPart(context: LibraryProject, request: PartRequest, problems: ProblemLog): LibraryPartApi {
+export function extractPart(
+  context: LibraryProject,
+  request: PartRequest,
+  source: PartSource | null,
+  problems: ProblemLog
+): LibraryPartApi {
   const { checker } = context;
   const signature = callSignature(checker, request.type);
-  const source = signature === null ? null : readPartSource(context, signature);
   const declarationPaths = signature?.declaration === undefined ? [] : [signature.declaration.path];
   const parameter = signature?.getParameters()[0];
   const declared = parameter === undefined ? undefined : checker.getTypeOfSymbol(parameter);
@@ -498,38 +495,4 @@ function extractPart(context: LibraryProject, request: PartRequest, problems: Pr
       problems
     ),
   };
-}
-
-/**
- * Resolves one component's public surface from an explicit list of export names:
- * a single part for a callable, or one part per member for a namespace compound
- * (`Dialog.Root`, `Dialog.Content`, …). Companions (`VerticalTable` next to `Table`)
- * are included only when the caller names them.
- *
- * The entry is walked once and every fact — rows, implementation source, RSC
- * status, forwarded summary, accepted prop symbols — is read from that one walk.
- */
-export function extractComponentApi(
-  context: LibraryProject,
-  request: LibraryApiRequest,
-  problems: ProblemLog
-): ComponentApi {
-  const componentRequest = { entryFile: request.entryFile, exportNames: request.exportNames };
-  const partApis = componentPartRequests(context, componentRequest, problems).map((part) =>
-    extractPart(context, part, problems)
-  );
-  return {
-    slug: request.slug,
-    parts: partApis.flatMap((entry) => (entry.part === null ? [] : [entry.part])),
-    partApis,
-  };
-}
-
-/** Extracts all requested components using one open checker project. */
-export function extractLibraryApi(
-  context: LibraryProject,
-  components: readonly LibraryApiRequest[],
-  problems: ProblemLog
-): readonly ComponentApi[] {
-  return components.map((component) => extractComponentApi(context, component, problems));
 }

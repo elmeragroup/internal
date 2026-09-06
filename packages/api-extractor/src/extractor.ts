@@ -7,6 +7,8 @@ import type {
 } from "./backend/contracts.ts";
 import { disabledTiming } from "./backend/contracts.ts";
 import { CompilerBackend } from "./backend/service.ts";
+import { ComponentSourceResultsSchema } from "./component-sources.ts";
+import type { ComponentSourceRequest, ComponentSourceResult } from "./component-sources.ts";
 import { BackendError, ExtractError, FileNotInProgramError, safeCause } from "./errors.ts";
 import type { ConfigError } from "./errors.ts";
 import { InternalProjectExtractorTiming } from "./internal/project-options.ts";
@@ -14,6 +16,7 @@ import type { InternalOpenProjectOptions, InternalTimedExtraction } from "./inte
 import { ExtractionResultSchema } from "./model.ts";
 import { definedFields } from "./optional-fields.ts";
 import type { ExtractorOptions, OpenProjectOptions } from "./options.ts";
+import { inspectRequestedComponentSources } from "./parse/component-source.ts";
 import { normalizeExternalTypeSelection } from "./parse/external-type-selection.ts";
 import { ResolverFailure } from "./parse/resolver-failure.ts";
 import { readModuleDraft, resolveModuleDraft } from "./parser.ts";
@@ -27,6 +30,10 @@ export type ProjectExtractorService = {
     filePath: string,
     options?: ExtractorOptions
   ) => Effect.Effect<ExtractionResult, ExtractionErrors>;
+  readonly inspectComponentSources: (
+    filePath: string,
+    requests: readonly ComponentSourceRequest[]
+  ) => Effect.Effect<readonly ComponentSourceResult[], ExtractionErrors>;
 };
 
 export class ProjectExtractor extends Context.Service<ProjectExtractor, ProjectExtractorService>()(
@@ -59,6 +66,8 @@ const extractorLayer: Layer.Layer<ProjectExtractor, never, OpenedProject> = Laye
   Effect.map(OpenedProject, (project) => ({
     extractModule: (filePath, options) =>
       extractModule(project, filePath, options).pipe(Effect.map(({ result }) => result)),
+    inspectComponentSources: (filePath, requests) =>
+      requests.length === 0 ? Effect.succeed([]) : inspectComponentSources(project, filePath, requests),
   }))
 );
 
@@ -99,6 +108,28 @@ function openExtraction(project: BackendProject, options: ExtractorOptions | und
     (session) => Effect.try(() => session.close()).pipe(Effect.ignore)
   );
 }
+
+const inspectComponentSources = Effect.fn("ProjectExtractor.inspectComponentSources")(function* (
+  project: BackendProject,
+  filePath: string,
+  requests: readonly ComponentSourceRequest[]
+) {
+  const session = guardedExtractionSession(yield* openExtraction(project, undefined), filePath);
+  const draft = yield* Effect.try({
+    try: () => readModuleDraft(session, filePath),
+    catch: (cause) => classifyThrown(cause, { filePath, operation: "readModule" }),
+  });
+  const results = yield* Effect.try({
+    try: () => inspectRequestedComponentSources(draft, session.compiler, requests),
+    catch: (cause) =>
+      classifyThrown(cause, {
+        filePath,
+        operation: "inspectComponentSources",
+        fallback: "extract",
+      }),
+  });
+  return yield* Schema.decodeUnknownEffect(ComponentSourceResultsSchema)(results).pipe(Effect.orDie);
+}, Effect.scoped);
 
 const extractModule = Effect.fn("ProjectExtractor.extractModule")(function* (
   project: BackendProject,

@@ -224,4 +224,51 @@ describe("ProjectExtractor native compiler lifecycle", () => {
     await waitForProcessExit(child);
     expect(isProcessAlive(nativeChildPid(child))).toBe(false);
   });
+
+  it("inspects component sources, unresolved results, and repeated calls on one project", async () => {
+    const startIndex = nativeChildren.length;
+    const { child, resolved, unresolved, repeated, extracted } = await Effect.runPromise(
+      Effect.scoped(
+        Effect.gen(function* () {
+          const extractor = yield* ProjectExtractor;
+          const child = yield* Effect.sync(() => nativeChildSince(startIndex));
+          const resolved = yield* extractor.inspectComponentSources(inputPath, [{ exportName: "greet" }]);
+          const unresolved = yield* extractor.inspectComponentSources(inputPath, [{ exportName: "missing" }]);
+          const repeated = yield* extractor.inspectComponentSources(inputPath, [
+            { exportName: "greet" },
+            { exportName: "greet" },
+          ]);
+          const extracted = yield* extractor.extractModule(inputPath);
+          return { child, resolved, unresolved, repeated, extracted };
+        }).pipe(Effect.provide(ProjectExtractor.live({ tsconfigPath })))
+      )
+    );
+
+    expect(resolved).toEqual([{ status: "resolved", filePath: inputPath, defaults: [] }]);
+    expect(unresolved).toEqual([{ status: "unresolved", reason: "export-not-found" }]);
+    expect(repeated).toEqual([resolved[0], resolved[0]]);
+    expect(extracted.module.exports.map((entry) => entry.name)).toEqual(["greet"]);
+    await waitForProcessExit(child);
+    expect(isProcessAlive(nativeChildPid(child))).toBe(false);
+  });
+
+  it("closes the compiler child after a thrown source inspection failure", async () => {
+    const startIndex = nativeChildren.length;
+    const { child, exit } = await Effect.runPromise(
+      Effect.scoped(
+        Effect.gen(function* () {
+          const extractor = yield* ProjectExtractor;
+          const child = yield* Effect.sync(() => nativeChildSince(startIndex));
+          const exit = yield* Effect.exit(
+            extractor.inspectComponentSources(missingPath, [{ exportName: "greet" }])
+          );
+          return { child, exit };
+        }).pipe(Effect.provide(ProjectExtractor.live({ tsconfigPath })))
+      )
+    );
+
+    expect(exit._tag).toBe("Failure");
+    await waitForProcessExit(child);
+    expect(isProcessAlive(nativeChildPid(child))).toBe(false);
+  });
 });

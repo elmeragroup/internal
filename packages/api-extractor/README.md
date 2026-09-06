@@ -31,6 +31,14 @@ The scoped lifetime is required: opening a project starts a native compiler proc
 the scope closes it on success, typed failure, interruption, or defect. Reuse the service for every
 file in the same project rather than opening one project per file.
 
+`inspectComponentSources(filePath, requests)` recovers authored implementation files and
+destructuring defaults without running semantic extraction or admitting warnings. It follows React
+`memo` and `forwardRef` wrappers, including nested wrappers, aliased React imports, re-exported
+values, and an implementation in another project file. Each request produces one result at the same
+index. Unsupported wrappers, cycles, missing exports or members, declaration-only sources, and
+unsupported default expressions return `{ status: "unresolved", reason }` instead of guessing.
+Compiler objects never cross this boundary.
+
 `extractModule` returns:
 
 - `module`: the semantic API model. Preserved type operators carry both the authored operand and
