@@ -17,7 +17,7 @@ export function typecheckFixtureProjects(): number {
     if (result.error !== undefined) throw result.error;
     if (result.status !== 0) {
       const detail = [result.stdout, result.stderr].filter((value) => value.length > 0).join("\n");
-      throw new Error(`Fixture type-check failed for ${entry.fixture} (${entry.project}).\n${detail}`);
+      throw new Error(`Fixture type-check failed for ${entry.project}.\n${detail}`);
     }
   }
   return packageFixtureTypecheckPlan.length;
