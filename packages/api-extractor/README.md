@@ -36,8 +36,9 @@ file in the same project rather than opening one project per file.
 - `module`: the semantic API model. Preserved type operators carry both the authored operand and
   the checker's resolved key set. Tuple spread elements retain their own generic substitution
   environments, including repeated instantiations of the same donor alias and nested spreads.
-- `warnings`: recoverable losses. A warning has a stable `code`, location, and code-specific fields;
-  `message` explains what failed, what the extractor did, and what a maintainer can do next.
+- `warnings`: recoverable losses in the returned model. A warning has a stable `code`, location, and
+  code-specific fields; `message` explains what failed, what the extractor did, and what a maintainer
+  can do next. Diagnostics from a discarded speculative candidate are not published.
 - `provenance`: repository-relative declaration and re-export paths for model nodes.
 
 Fatal setup, compiler, missing-file, and resolver failures remain typed Effect errors. Recoverable
