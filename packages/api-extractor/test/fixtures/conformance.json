@@ -1,0 +1,3329 @@
+{
+  "issue": "14-full-conformance",
+  "command": "node scripts/conformance/report.ts --check",
+  "upstream": {
+    "repository": "michaldudak/typescript-api-extractor",
+    "commit": "e14535030957e29ce6e5d870e4ab71740175a0d4",
+    "fixtureCount": 116,
+    "originalOracle": "output.json"
+  },
+  "manifestSha256": "a441d795735df0509d469771da2829818c87b484cc9ef9a2cd837f4507d21598",
+  "totals": {
+    "fixtures": 116,
+    "unchanged": 97,
+    "reviewedDivergences": 19,
+    "failures": 0,
+    "failedFixtureIndices": [],
+    "unclassified": 0,
+    "typecheckPassed": 116,
+    "typecheckFailed": 0
+  },
+  "fixtures": [
+    {
+      "fixture": "alias-with-explicit-type-args",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "8faa918e9626efae93c8969e047c138f688744240ad1309c44bc70a97ded81cc",
+      "upstreamOracleSha256": "eda72a33f79040f7f2d9e8ecf8b5ed13521a41b293bfe79d3b6d3c724785672c",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture alias-with-explicit-type-args --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "eda72a33f79040f7f2d9e8ecf8b5ed13521a41b293bfe79d3b6d3c724785672c",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningOracle": "alias-with-explicit-type-args/warnings.tsgo.json"
+      }
+    },
+    {
+      "fixture": "base-ui-component",
+      "input": "input.tsx",
+      "disposition": "reviewed-ts7",
+      "inputSha256": "e24088d742cb3394606b553522c559aa196844e1f3e7a949a56bc718f2009067",
+      "upstreamOracleSha256": "aa4510d87a79d23e3ff4b347eb19f7e827664db5935b7d27a9188c9c9a0a4485",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture base-ui-component --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.tsgo.json",
+        "selectedOracleSha256": "72e4717837983d299124494d83115bb1efa43e3d1a75197648e8d6ffa6f0c6c1",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 3940,
+        "upstreamDifferenceDigest": "83210bbfac73fd46fcf8ced359e91173614c420f430d42fd6ce9662174b54853",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningOracle": "base-ui-component/warnings.tsgo.json",
+        "divergenceRecord": "base-ui-component/ts7-oracle.json"
+      }
+    },
+    {
+      "fixture": "class-members-visibility-and-signatures",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "3b052dd44426319c7b489b60922eb9fecfc050741de84f5d0506154647026005",
+      "upstreamOracleSha256": "75b5df257bb725ce42b00efe34f82a4b195eba20fa44874add027b1697b176d2",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture class-members-visibility-and-signatures --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "75b5df257bb725ce42b00efe34f82a4b195eba20fa44874add027b1697b176d2",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 2,
+        "warningDetails": [
+          {
+            "message": "The non-class shape at \"test/fixtures/class-members-visibility-and-signatures/input.ts:285:2\" has 1 construct signature at Constructable/constructSignatures, which the output model cannot represent. The extractor omitted it. Use a class declaration or review the generated API.",
+            "filePath": "test/fixtures/class-members-visibility-and-signatures/input.ts",
+            "line": 285,
+            "column": 2,
+            "parsedSymbolStack": [
+              "test/fixtures/class-members-visibility-and-signatures/input.ts",
+              "Constructable"
+            ],
+            "code": "unrepresented-construct-signatures",
+            "structuralPath": [
+              "Constructable",
+              "constructSignatures"
+            ],
+            "signatureCount": 1
+          },
+          {
+            "message": "The non-class shape at \"test/fixtures/class-members-visibility-and-signatures/input.ts:292:2\" has 1 construct signature at ConstructableType/constructSignatures, which the output model cannot represent. The extractor omitted it. Use a class declaration or review the generated API.",
+            "filePath": "test/fixtures/class-members-visibility-and-signatures/input.ts",
+            "line": 292,
+            "column": 2,
+            "parsedSymbolStack": [
+              "test/fixtures/class-members-visibility-and-signatures/input.ts",
+              "ConstructableType"
+            ],
+            "code": "unrepresented-construct-signatures",
+            "structuralPath": [
+              "ConstructableType",
+              "constructSignatures"
+            ],
+            "signatureCount": 1
+          }
+        ],
+        "warningDigest": "60a1e0326fa8a3df697b5c58252e21821dda3881cf0fa9890f7e905ac3f65143",
+        "warningOracle": "class-members-visibility-and-signatures/warnings.tsgo.json"
+      }
+    },
+    {
+      "fixture": "class-method-generic-signatures",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "6c0fc840f6746b50a6f62b5fa119ddf2f35cdf5a10a6576b9c7136b833c166aa",
+      "upstreamOracleSha256": "65747c889e5b8a7af0f822b5b05c36279a8210b4a0ba083d79f7564f7247e613",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture class-method-generic-signatures --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "65747c889e5b8a7af0f822b5b05c36279a8210b4a0ba083d79f7564f7247e613",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "class-method-overload-signatures",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "8f4419cde2a6e67abc3eb4b8c3d41ed8207ca635321e904b44afdbbce5fa7fd4",
+      "upstreamOracleSha256": "05b32f5e18d8138a8a01125287ee615e0d112e44d2a755fc97424e5477399db3",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture class-method-overload-signatures --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "05b32f5e18d8138a8a01125287ee615e0d112e44d2a755fc97424e5477399db3",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "class-private-members-type-alias-filtering",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "e91604faf9e1037ae58faff0c66d6b14021fcd6a4fc83852075f54248e6211ed",
+      "upstreamOracleSha256": "e85d094fb693c299fc28ef5251e1c4e40744aea193420b43db9bbd36dae951ef",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture class-private-members-type-alias-filtering --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "e85d094fb693c299fc28ef5251e1c4e40744aea193420b43db9bbd36dae951ef",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "distributive-conditional-intersection-expansion",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "09fff9c41887ce5ded22479acddce9202de63adb97867747edd0bbde5c0bea54",
+      "upstreamOracleSha256": "bd47076ea67e4ff892cceb601096b19c2d74dc49adcf5eb3698d16801454712a",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture distributive-conditional-intersection-expansion --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "bd47076ea67e4ff892cceb601096b19c2d74dc49adcf5eb3698d16801454712a",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "enum-members-values-and-docs",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "55f943e54df42c0533cbfec0a593603c861c5e4ffb51dbdc41a4e087357f3f8a",
+      "upstreamOracleSha256": "4938eb513efe138514f90e2c8ee5afeba2b0a420781479bac53aa848363d43e2",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture enum-members-values-and-docs --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "4938eb513efe138514f90e2c8ee5afeba2b0a420781479bac53aa848363d43e2",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "external-conditional-type-resolution",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "31351ba738da70208d3e2c1ae25f345f8c41099bdb9bc475954ade6dfcc76411",
+      "upstreamOracleSha256": "04f1dc4a5d8ac00596249f5003affa384cc18f90dd83a8fc1bcae2e35de8a2ea",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture external-conditional-type-resolution --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "04f1dc4a5d8ac00596249f5003affa384cc18f90dd83a8fc1bcae2e35de8a2ea",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "external-mapped-type-name-preservation",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "5f5e065630ffbb71df3616e01740a5f2d1fed156829c749c02f62d94a6ad0826",
+      "upstreamOracleSha256": "dff090da46c3d149c43e5c2900f2e1a40cc8dc5e7bac61fe08000d3dc30e5f1b",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture external-mapped-type-name-preservation --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "dff090da46c3d149c43e5c2900f2e1a40cc8dc5e7bac61fe08000d3dc30e5f1b",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "external-union-type-name-preservation",
+      "input": "input.ts",
+      "disposition": "reviewed-ts7",
+      "inputSha256": "17a256121fbf9fa1e4a30f1a3d227154b133cf62910997ee898868032b7efb76",
+      "upstreamOracleSha256": "16cc5d5aa2993ed95454299bf2ac871191951641d3a1cf832ecd23fbad5e720a",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture external-union-type-name-preservation --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.tsgo.json",
+        "selectedOracleSha256": "a109da702c8eaba1b02ccd5b3590f4465d7cd9d3b87656769a7672aef3139d96",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 44,
+        "upstreamDifferenceDigest": "02115f4efd7558e0b8a538cfecb756c642653d6e8dbaaabdcf5a70c27d3caaf4",
+        "warningCount": 1,
+        "warningDetails": [
+          {
+            "message": "Could not extract type \"{ top?: number | undefined; right?: number | undefined; bottom?: number | undefined; left?: number | undefined; }\" at \"test/fixtures/external-union-type-name-preservation/input.ts:1:1\". The extractor used any. Review this API or add support for this type.",
+            "filePath": "test/fixtures/external-union-type-name-preservation/input.ts",
+            "line": 1,
+            "column": 1,
+            "parsedSymbolStack": [
+              "test/fixtures/external-union-type-name-preservation/input.ts",
+              "PositioningProps",
+              "property: collisionPadding"
+            ],
+            "code": "unsupported-type-fallback",
+            "typeFlags": [
+              "Object"
+            ],
+            "typeText": "{ top?: number | undefined; right?: number | undefined; bottom?: number | undefined; left?: number | undefined; }"
+          }
+        ],
+        "warningDigest": "8acc1f839faec8a0734ae88faefa2e1e60db4d2d3bc677701de4dfa70a045ce5",
+        "warningOracle": "external-union-type-name-preservation/warnings.tsgo.json",
+        "divergenceRecord": "external-union-type-name-preservation/ts7-oracle.json"
+      }
+    },
+    {
+      "fixture": "function-callable-intersection-extra-properties",
+      "input": "input.tsx",
+      "disposition": "unchanged",
+      "inputSha256": "d73fb2f6fd46df351428548df59d9c842a030d6ecd5ee5c37126fd98f28eb88d",
+      "upstreamOracleSha256": "bbf46ee9749a7457dfb0feca04506893dd023a15488fd68bd51813729ca165ac",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture function-callable-intersection-extra-properties --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "bbf46ee9749a7457dfb0feca04506893dd023a15488fd68bd51813729ca165ac",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "function-declaration-expression-arrow",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "b90caaeb7d04dfc35dfd11d3f9de7cab918f5bad31ed37f519881a2f873eb566",
+      "upstreamOracleSha256": "1b4b9be1a4f92091a2fec2f785d8bb10d3e4e705956bc899e03d1c63f1fa0301",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture function-declaration-expression-arrow --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "1b4b9be1a4f92091a2fec2f785d8bb10d3e4e705956bc899e03d1c63f1fa0301",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "function-parameters-optional-and-defaults",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "5a9591998cb2bf576f35250a0f2e5f9a7204aaa57e1257cd2ad647839db9ebf8",
+      "upstreamOracleSha256": "ef84cdf626ae801feee252407408a050498a3db5048f09d53ce19a9a365e2367",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture function-parameters-optional-and-defaults --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "ef84cdf626ae801feee252407408a050498a3db5048f09d53ce19a9a365e2367",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "generic-argument-alias-resolution",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "afe7cc49c8e7e5391dee5cf13ed042194ac3104dc658c78d8172f8aec5524b6a",
+      "upstreamOracleSha256": "cd3b6daf0db61a0d506c156d60ddbca9f862b8037c6ae4729127783ea6770ea4",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture generic-argument-alias-resolution --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "cd3b6daf0db61a0d506c156d60ddbca9f862b8037c6ae4729127783ea6770ea4",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "generic-callback-alias-constraint-deduplication",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "e0554943772ac77ae71d7cb016d559a0e0159324d06067b1f6651c24982b95da",
+      "upstreamOracleSha256": "50230439818d17aff1edb2d77ce1b53eeb8916a3f08c1d81dea65edad241525f",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture generic-callback-alias-constraint-deduplication --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "50230439818d17aff1edb2d77ce1b53eeb8916a3f08c1d81dea65edad241525f",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "generic-callback-alias-renamed-typeparams",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "b2b06f3789eb88c2e0be5a79cd63b6e3908e1ffae65a81d2e470fb93156c2829",
+      "upstreamOracleSha256": "4cfd9959f199994b2841d4ddcca28795993b5cf68edd9a2c4face12474fe01e4",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture generic-callback-alias-renamed-typeparams --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "4cfd9959f199994b2841d4ddcca28795993b5cf68edd9a2c4face12474fe01e4",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "generic-callback-alias-vs-inline-deduplication",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "b547eba2128222d98004a07348fd462848ebd75b37c97210105bb143b72f532b",
+      "upstreamOracleSha256": "66b52f58ef1b88389ad46cc3dba33ea82003d9680a4ac0603ef53fed4e0531e7",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture generic-callback-alias-vs-inline-deduplication --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "66b52f58ef1b88389ad46cc3dba33ea82003d9680a4ac0603ef53fed4e0531e7",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "generic-callback-constraint-property-keys",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "b012183a27ad910355cfe74dc9bc9ba9fe66df3946f78d97bda208f7c2b513ad",
+      "upstreamOracleSha256": "59158e44051c829ba7333ce277f1607a70be5d434f909b78d534b371f8b0747b",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture generic-callback-constraint-property-keys --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "59158e44051c829ba7333ce277f1607a70be5d434f909b78d534b371f8b0747b",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "generic-callback-default-deduplication",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "45542090054eb824ec84325d94c1c0d84a9c40ab4c8de22e9d0253f0fa9aa8aa",
+      "upstreamOracleSha256": "dde066359fcc655bed08a189782f4b73c27b1a8c372390b52f66784e2c03c42a",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture generic-callback-default-deduplication --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "dde066359fcc655bed08a189782f4b73c27b1a8c372390b52f66784e2c03c42a",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "generic-callback-index-signature-deduplication",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "27cfc747c15cbe9f0b6192e356905beb380f1efd45145ad42f772333558f9909",
+      "upstreamOracleSha256": "42eabd73ba0ce99e83a5065ee4d8ae8304b0c6fc3956a44716454b0de19f6c21",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture generic-callback-index-signature-deduplication --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "42eabd73ba0ce99e83a5065ee4d8ae8304b0c6fc3956a44716454b0de19f6c21",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "generic-callback-nested-shadow-deduplication",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "312f31f386f60939f4ec9400bc7f5c4ef7aa49e185c212991dbee8b31415052b",
+      "upstreamOracleSha256": "c53bc897c7bd03abf32a22336bf272eabbe91544c95989be7b909f285dd3c682",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture generic-callback-nested-shadow-deduplication --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "c53bc897c7bd03abf32a22336bf272eabbe91544c95989be7b909f285dd3c682",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "generic-callback-typeparam-vs-typename-collision",
+      "input": "input.ts",
+      "disposition": "reviewed-ts7",
+      "inputSha256": "199c9ada5591926b20ec5868d3e8d7e1c317f8dc3b1559a2da6c87e52b350705",
+      "upstreamOracleSha256": "69aa7ae1fca2a07beb0291e7da4356b7d8175f3aeca7cf632f3c1bff011b1959",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture generic-callback-typeparam-vs-typename-collision --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.tsgo.json",
+        "selectedOracleSha256": "047d65b983b1d0400c559a6116bacccbd2d086140f5394fe3bac9f765d0d268c",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 8,
+        "upstreamDifferenceDigest": "2a1f6afcbe382547bf4157002fc0dbed0555b74ce9e0b4d5d976e1838c9a27a0",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningOracle": "generic-callback-typeparam-vs-typename-collision/warnings.tsgo.json",
+        "divergenceRecord": "generic-callback-typeparam-vs-typename-collision/ts7-oracle.json"
+      }
+    },
+    {
+      "fixture": "generic-constraint-tostring-collapse",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "69d2bc0c9447dbcd7ae7b24a82a01db350f13ece2fb8e6f0d3aade94317a5bdf",
+      "upstreamOracleSha256": "7a99647083d5bf232d04362e8e1d9da62d09acc11b0d458a1366375513409637",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture generic-constraint-tostring-collapse --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "7a99647083d5bf232d04362e8e1d9da62d09acc11b0d458a1366375513409637",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "generic-default-argument-resolution",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "13cfa207ce09463f7cf90cc1872f8e712f18ec39b24de4f34ee05a3dd93de7f7",
+      "upstreamOracleSha256": "d5c80fa61bc8ee2e30767bdcd347246a8b06f5acbfa0fba51c904b20835e1874",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture generic-default-argument-resolution --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "d5c80fa61bc8ee2e30767bdcd347246a8b06f5acbfa0fba51c904b20835e1874",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "generic-function-and-interface-resolution",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "df391afb342cf573538e7dbf8a3dc4dca84458c69ebb5b88cad4b7293a80a450",
+      "upstreamOracleSha256": "aa8c99efdd699aa24d8a057ac06fd3dc8fae76d1f377d696fb764d6ed4974c85",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture generic-function-and-interface-resolution --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "aa8c99efdd699aa24d8a057ac06fd3dc8fae76d1f377d696fb764d6ed4974c85",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "generic-props-namespace-specialization",
+      "input": "input.ts",
+      "disposition": "reviewed-ts7",
+      "inputSha256": "c47519bc3502edcc69e4ee3bc78d678cd1b1a70afaa6f6d6d4d0c0619adac1e4",
+      "upstreamOracleSha256": "621739efecdc8de07bb8f4c90125e2fe9fa14f306c35a0cb19a9a330ddca7d12",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture generic-props-namespace-specialization --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.tsgo.json",
+        "selectedOracleSha256": "e61c321ca429adf72eb4207a10775b7976bbeab6acbc02ce34ea37e32eea240e",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 62,
+        "upstreamDifferenceDigest": "d47addd479ec8cc2caca4a945754795f5aa550db0f6633119341bed52b1622df",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "divergenceRecord": "generic-props-namespace-specialization/ts7-oracle.json"
+      }
+    },
+    {
+      "fixture": "interface-extends-basic-resolution",
+      "input": "input.ts",
+      "disposition": "reviewed-ts7",
+      "inputSha256": "f8319bf0e26d680f7acd65e3749bf575514e9559151743aa2be407f9c0c0b706",
+      "upstreamOracleSha256": "161eb6d46aa22021ce9f3b37a4a623b34c8c8f22de8d80a16812d3a33eca3fef",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture interface-extends-basic-resolution --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.tsgo.json",
+        "selectedOracleSha256": "98fc5c775fc5c1c39aacf883f081de46a6a0d20298c985b7bd79ba7886d0115b",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 9,
+        "upstreamDifferenceDigest": "51622464ef9317fc11c2b8f3f0e74dd4c0be3348adbfe9950abd8ba468cce775",
+        "warningCount": 1,
+        "warningDetails": [
+          {
+            "message": "Could not extract type \"any\" at \"test/fixtures/interface-extends-basic-resolution/input.ts:23:1\". The extractor used any. Review this API or add support for this type.",
+            "filePath": "test/fixtures/interface-extends-basic-resolution/input.ts",
+            "line": 23,
+            "column": 1,
+            "parsedSymbolStack": [
+              "test/fixtures/interface-extends-basic-resolution/input.ts",
+              "Dialog"
+            ],
+            "code": "unsupported-type-fallback",
+            "typeFlags": [
+              "Any"
+            ],
+            "typeText": "any"
+          }
+        ],
+        "warningDigest": "f7e76a0fde6e2b165d79d2b9bea8b8f4869b6e63f96e88924f172a3a98846451",
+        "warningOracle": "interface-extends-basic-resolution/warnings.tsgo.json",
+        "divergenceRecord": "interface-extends-basic-resolution/ts7-oracle.json"
+      }
+    },
+    {
+      "fixture": "interface-extends-namespace-and-omit-resolution",
+      "input": "input.ts",
+      "disposition": "reviewed-ts7",
+      "inputSha256": "af17b0cbc68fe05f7725a1e2ed6706b20b86ce579b307a847086dc87849e8212",
+      "upstreamOracleSha256": "c6770983ddfd63dd9ecf0aa4cacfd07da6ae1d47d456c38f0d311266e3b8622f",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture interface-extends-namespace-and-omit-resolution --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.tsgo.json",
+        "selectedOracleSha256": "18811208194076d173a25e508efe8ece789e9011d18f1e47340d627760a40126",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 388,
+        "upstreamDifferenceDigest": "bad055721c55ecaa910a58df63a1895e0024b5e329ed6ab6b8cda266ac0122c1",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "divergenceRecord": "interface-extends-namespace-and-omit-resolution/ts7-oracle.json"
+      }
+    },
+    {
+      "fixture": "interface-merged-default-and-aliased-exports",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "d997562f1b9922e1baa2f086e270b3e7dd21f8b36af27e0cab5de4b939f893d3",
+      "upstreamOracleSha256": "d491d0cd268321d6dcc299655b915d502edd7a1a8183e1636696bf8f28383b29",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture interface-merged-default-and-aliased-exports --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "d491d0cd268321d6dcc299655b915d502edd7a1a8183e1636696bf8f28383b29",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "interface-method-generic-signatures",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "5f726677a2566f73135713a5466e94abc5b5969d6c63e929c84c7a8bfac1244b",
+      "upstreamOracleSha256": "5e40d107fb8abcbedacbe625ac497c50e6eadfdb2ee016769876f9159aaaabb7",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture interface-method-generic-signatures --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "5e40d107fb8abcbedacbe625ac497c50e6eadfdb2ee016769876f9159aaaabb7",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "intersection-order-deduplication",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "cced97f1bfd0bfa3703d01050dc6d4aebdb5f1decb02a8476beb30208103977a",
+      "upstreamOracleSha256": "a1046667f70aaa76ec2337d1413d62513d07578c338b32b1a09938fb1428a8ba",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture intersection-order-deduplication --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "a1046667f70aaa76ec2337d1413d62513d07578c338b32b1a09938fb1428a8ba",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "jsdoc-comments-and-overloads",
+      "input": "input.tsx",
+      "disposition": "unchanged",
+      "inputSha256": "e4caf55d81715ed889c408493bfe53ab3cd98aba0abbba9aefc5e9aceafff9d8",
+      "upstreamOracleSha256": "adc9ce43c9284d043297a6002e3920feb37de6485ce0d912fe5dbdeaa191968e",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture jsdoc-comments-and-overloads --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "adc9ce43c9284d043297a6002e3920feb37de6485ce0d912fe5dbdeaa191968e",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "jsdoc-extra-tags-preservation",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "7d6e72c3faeb53ea4754081f5861b6fc7ad3e71b92ad8b54235c5b99bf0c8b1f",
+      "upstreamOracleSha256": "622f280a262100372388101cf038e797cda2d51df1335b0f47a4eb9d5ee2b735",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture jsdoc-extra-tags-preservation --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "622f280a262100372388101cf038e797cda2d51df1335b0f47a4eb9d5ee2b735",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "large-nested-union-any-order",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "ae5f097e370180cdca11b21b9116699058c17aa75462f6803fcb9d30fe07fc7c",
+      "upstreamOracleSha256": "81139bbc2400557e633cc73027ab0aaab0848b252f3e661bae92bcc4bc4fd79a",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture large-nested-union-any-order --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "81139bbc2400557e633cc73027ab0aaab0848b252f3e661bae92bcc4bc4fd79a",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "mapped-alias-finite-key",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "d5235cacbe47735f7eea29d4f7e8784c4bd7048fd474d1f818b0b2ad07621133",
+      "upstreamOracleSha256": "8d93be55e089463905577c8eae369cae3e83bc9b3e8d866657bfb506c2328cd8",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture mapped-alias-finite-key --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "8d93be55e089463905577c8eae369cae3e83bc9b3e8d866657bfb506c2328cd8",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "mapped-alias-nested-mapped-value",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "77ece2dd4dfe6336375112af9b51935812167d6cd371825f7d573e4618b018c4",
+      "upstreamOracleSha256": "7c1831c46a30d14c4acfe1a8ebb8f31f1b4cbb23400f96284d751043f88b1d62",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture mapped-alias-nested-mapped-value --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "7c1831c46a30d14c4acfe1a8ebb8f31f1b4cbb23400f96284d751043f88b1d62",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "mapped-alias-nested-value",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "01dc325205b2652e837396a3d785db535dc827943dffe982d40b19492484fac6",
+      "upstreamOracleSha256": "b0fb58f4b6fc2c65c88fb505513f7e4b03ed5f2c20a452e9263b4ed6ae311a7a",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture mapped-alias-nested-value --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "b0fb58f4b6fc2c65c88fb505513f7e4b03ed5f2c20a452e9263b4ed6ae311a7a",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "mapped-alias-two-hop",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "4561302f972f3f983bbd51f70a24c0a32f77400ebd51672af913283a81c018b0",
+      "upstreamOracleSha256": "88ef5d37d753f119c3fdf5f7f055eec7dd11c2a791b2fbc1356b8bf203f35a31",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture mapped-alias-two-hop --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "88ef5d37d753f119c3fdf5f7f055eec7dd11c2a791b2fbc1356b8bf203f35a31",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningOracle": "mapped-alias-two-hop/warnings.tsgo.json"
+      }
+    },
+    {
+      "fixture": "mapped-tuple-rest-synthetic-key",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "e82444211ff9c3d24c06ad1805d3823075f219db2a7aab72ab10f11a1cc21caf",
+      "upstreamOracleSha256": "ec2e063f5d8f123551e4330cb2445be565a6e5ce2c3194f2ae4b9a82f0cdf461",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture mapped-tuple-rest-synthetic-key --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "ec2e063f5d8f123551e4330cb2445be565a6e5ce2c3194f2ae4b9a82f0cdf461",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "mapped-type-builtin-utility-resolution",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "f0c0e8322c55c0a16ad84f8fdc860a459ee63fc29bacb4546f5ddc3e20c7acb7",
+      "upstreamOracleSha256": "fed539e8448e9aab1f6e44aba40a4aaa58114d16e2235ad5151e2dcfcf25c724",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture mapped-type-builtin-utility-resolution --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "fed539e8448e9aab1f6e44aba40a4aaa58114d16e2235ad5151e2dcfcf25c724",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "mapped-type-optional-aliased-unknown",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "196f3fd1950e7012f58a21ef829727c856a97f5acc77b649ee79e6829d0fcc96",
+      "upstreamOracleSha256": "aa0d328da63a8901cd2ade55bfcacac57fb9ca303a07637dec35697f7c850c47",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture mapped-type-optional-aliased-unknown --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "aa0d328da63a8901cd2ade55bfcacac57fb9ca303a07637dec35697f7c850c47",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "mapped-type-prettify-intersection-resolution",
+      "input": "input.ts",
+      "disposition": "reviewed-ts7",
+      "inputSha256": "9cf2cda795dfc0a4378b29d37d5c32cf9294d2402a56b73abdc51d3e4183c323",
+      "upstreamOracleSha256": "641a4972c707bac854b44d1dd6df3a5a24ae99be0ec5dc9505e386265ccb2440",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture mapped-type-prettify-intersection-resolution --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.tsgo.json",
+        "selectedOracleSha256": "a9347408e86864c4b5d5e1252488409eb8251774cb699a6c741054a13c389cde",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 8,
+        "upstreamDifferenceDigest": "6ca16b434ee75c33bc1e7d960671d9986ac05f80ed801959f1f189ecd580484c",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "divergenceRecord": "mapped-type-prettify-intersection-resolution/ts7-oracle.json"
+      }
+    },
+    {
+      "fixture": "merged-interface-signature-typeparams",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "7de8b298371b007daaeabf5254791402c8c74f98e0254f673ed64a2d7a9a0a9f",
+      "upstreamOracleSha256": "cc790211c24c68d4f53f7b084a6a74709bc8efa46bc9959f0ca7f8afd1f793c6",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture merged-interface-signature-typeparams --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "cc790211c24c68d4f53f7b084a6a74709bc8efa46bc9959f0ca7f8afd1f793c6",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "module-dts-declarations-and-reexports",
+      "input": "input.d.ts",
+      "disposition": "unchanged",
+      "inputSha256": "5072e9eb0e019b8eb9a4b8f0ee1332aa683c7792865d2eb21ef40ee7e2d7fe73",
+      "upstreamOracleSha256": "53f505dfebaa50e6c8273f1d42c7e91b5e7aaa00a51cb72fb94d21cc876c350b",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture module-dts-declarations-and-reexports --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "53f505dfebaa50e6c8273f1d42c7e91b5e7aaa00a51cb72fb94d21cc876c350b",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningOracle": "module-dts-declarations-and-reexports/warnings.tsgo.json"
+      }
+    },
+    {
+      "fixture": "module-export-forms",
+      "input": "input.tsx",
+      "disposition": "reviewed-ts7",
+      "inputSha256": "8318cbe9d3e222275491feb0b02cebe5e9b2c5cbfbd644c119341da36f067b20",
+      "upstreamOracleSha256": "1e2a37667f95357774d0827d528ca6aa17a54b8340289b5c8ffd6035968bcb30",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture module-export-forms --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.tsgo.json",
+        "selectedOracleSha256": "edc68584a1c2abf2437f37da6e19fcbe3e0e41f459bbf76930329f90af106ce2",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 1,
+        "upstreamDifferenceDigest": "1ce4e9a5ddc112dfc9b4976ce15144ca080db7d793ac8515d9767e1f26987cbf",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "divergenceRecord": "module-export-forms/ts7-oracle.json"
+      }
+    },
+    {
+      "fixture": "module-imports-only",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "a551059c90052aef1c3f320157f8dd863d8bd5b114d84015289ceac8f5f8966d",
+      "upstreamOracleSha256": "38fe61bf5778621545d427e7b3a73718941667dcf46baf00a5315c6e7c555efc",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "virtual-upstream-dependency",
+        "command": "node scripts/conformance/typecheck.ts --fixture module-imports-only --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "38fe61bf5778621545d427e7b3a73718941667dcf46baf00a5315c6e7c555efc",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "module-reexport-imported-class-type",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "a2981e78dcd3b857b1bbc3311719c976e8edf119cd88ca99450e0be9bd5425be",
+      "upstreamOracleSha256": "c8e00eb6a97382d08c40eaff756ae64c745986e259740df6e08e8c52d0a630ab",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture module-reexport-imported-class-type --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "c8e00eb6a97382d08c40eaff756ae64c745986e259740df6e08e8c52d0a630ab",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "module-reexports-aliased-source-tracking",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "ce8d414ffcd3654b149bdba454f77d95fa7e814d86c200be621a83f8215859f9",
+      "upstreamOracleSha256": "b63e72e7863bb60942ca0ea4bd751c08a6631bdaff11570b6df01b22c3c3c40e",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture module-reexports-aliased-source-tracking --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "b63e72e7863bb60942ca0ea4bd751c08a6631bdaff11570b6df01b22c3c3c40e",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "module-reexports-basic",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "46374bf276dff55323bf28563731b93ccda3a5c4effaf230bb0b23b56124ccf4",
+      "upstreamOracleSha256": "68198d89e9b503063e49203f530fba2bfbfc1b65d30a2dcee1dedabacd21be09",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture module-reexports-basic --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "68198d89e9b503063e49203f530fba2bfbfc1b65d30a2dcee1dedabacd21be09",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "module-reexports-parts-namespace",
+      "input": "input.ts",
+      "disposition": "reviewed-ts7",
+      "inputSha256": "bc8b5cf49f4c8199e93eed740e662e050d3a3bd080e48eda5256c18936900c1b",
+      "upstreamOracleSha256": "3c64df2e5100203cc1209dcdc0e10fb44bb7224d6ee0eb213f859a4dedc27d10",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture module-reexports-parts-namespace --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.tsgo.json",
+        "selectedOracleSha256": "26c9b435945fc8c1fa8f4f9818ae4447b3d4035ff135defdefc7467e0d692dac",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 3,
+        "upstreamDifferenceDigest": "68240f8561590f50d5be2e6125c921b78e2d62109416c935fb6d664838358ff9",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "divergenceRecord": "module-reexports-parts-namespace/ts7-oracle.json"
+      }
+    },
+    {
+      "fixture": "namespace-callback-alias-resolution",
+      "input": "input.tsx",
+      "disposition": "unchanged",
+      "inputSha256": "33007df6db69519f1aceebe2e80f932c455a1f07a5ac1a833f425cf002f14444",
+      "upstreamOracleSha256": "b5686874290477bad3705a24290626ede5f33eff1c9020b04b4d8c756da32868",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture namespace-callback-alias-resolution --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "b5686874290477bad3705a24290626ede5f33eff1c9020b04b4d8c756da32868",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "namespace-export-resolution",
+      "input": "input.tsx",
+      "disposition": "reviewed-ts7",
+      "inputSha256": "a9e45d5b6df5774577315875858dacccdfdbb0ed9d4449a01835f29c9be688e5",
+      "upstreamOracleSha256": "60666bec4c18ecaff4f90947c15fec15725878d298c409d6477de8548aef377d",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture namespace-export-resolution --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.tsgo.json",
+        "selectedOracleSha256": "b4eda5590dd434d7c2db3cf0474061af0093611f360eee6107bb0e629ce90edc",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 87,
+        "upstreamDifferenceDigest": "91df81866b5fb5391934e91cc1714ca1003ae42cf0ae6120475a0f4ef71e2575",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "divergenceRecord": "namespace-export-resolution/ts7-oracle.json"
+      }
+    },
+    {
+      "fixture": "namespace-nested-alias-resolution",
+      "input": "input.tsx",
+      "disposition": "unchanged",
+      "inputSha256": "165e11c266889f6a4e558d0c87094f9df04200632c2e29b41f9dd1d31d55d20b",
+      "upstreamOracleSha256": "b4ef5f771891bbc42a0299b6a5139a1af9d16b337633087f70c10e5a90b49e9c",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture namespace-nested-alias-resolution --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "b4ef5f771891bbc42a0299b6a5139a1af9d16b337633087f70c10e5a90b49e9c",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "nested-function-union-any-deduplication",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "5cadfb448bdb34dd7d30133c742ec3aa4e18c9da01110fbc7db66ab4f01d7fa1",
+      "upstreamOracleSha256": "eb29e7c49ddf78d5d18ea86ef6dc28b90089061adb54ba8cf58eee2fe4a7c24a",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture nested-function-union-any-deduplication --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "eb29e7c49ddf78d5d18ea86ef6dc28b90089061adb54ba8cf58eee2fe4a7c24a",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "object-property-count-limit-scope",
+      "input": "input.tsx",
+      "disposition": "unchanged",
+      "inputSha256": "ec155d461839fdfd333fd0ec6a574aadf293170ff11e2fd17ca7ac60b21ae593",
+      "upstreamOracleSha256": "3ae82993d207b3644c324dc96b2302f406a8a12a7e210f5aeedbb4c2036d20da",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture object-property-count-limit-scope --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "3ae82993d207b3644c324dc96b2302f406a8a12a7e210f5aeedbb4c2036d20da",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "react-component-function-declaration",
+      "input": "input.tsx",
+      "disposition": "unchanged",
+      "inputSha256": "cf4dce55dbd29ec0c1e1051bb234569d096d293991df8923c22fa433aae80264",
+      "upstreamOracleSha256": "f0e28ba47a20eb46b412eaa8b1598a6178dfa2a0baa606802d55ebb6eb462318",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture react-component-function-declaration --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "f0e28ba47a20eb46b412eaa8b1598a6178dfa2a0baa606802d55ebb6eb462318",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "react-component-function-overloads",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "d2b20048261b7ea19c1a11dfb9539a1ad951f2a0df4a5db6d7749faff245793e",
+      "upstreamOracleSha256": "3b83c3b86e24ee6d1be1e8b93556f3c9aa9699129efc6d44718378a996746fa7",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture react-component-function-overloads --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "3b83c3b86e24ee6d1be1e8b93556f3c9aa9699129efc6d44718378a996746fa7",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "react-component-function-variable",
+      "input": "input.tsx",
+      "disposition": "unchanged",
+      "inputSha256": "203e22a46cca65f21a52d352283849d2b3743b70f06743155745a8c218a764bf",
+      "upstreamOracleSha256": "c467bbeccc28c3e1bc3626f28c0324658694689213365a3c84c6c478e6e9ab66",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture react-component-function-variable --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "c467bbeccc28c3e1bc3626f28c0324658694689213365a3c84c6c478e6e9ab66",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "react-component-generic-function-overloads",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "78a451bf5a89948c09256bf4a44ee4a92e3a5ccddbc0dcbf5195b23f444fe81b",
+      "upstreamOracleSha256": "abdd20311305d7925c0f7011fdf224bb0cf853d389cd6631d0092035d8fd44d9",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture react-component-generic-function-overloads --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "abdd20311305d7925c0f7011fdf224bb0cf853d389cd6631d0092035d8fd44d9",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "react-component-overload-any-callback-deduplication",
+      "input": "input.tsx",
+      "disposition": "reviewed-ts7",
+      "inputSha256": "e47752019c912f5d158e31d17f429053aef149ea0f598a0c476fea4c69616f15",
+      "upstreamOracleSha256": "c64ec7f23bb80892a7e0d9c6772443814fc76159a58dd8eea593eaafbc408d3b",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture react-component-overload-any-callback-deduplication --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.tsgo.json",
+        "selectedOracleSha256": "ba023bbcecb74a2e2bf72614ba81347d7d00eb75c8995fa0d8cd8431c777fb86",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 56,
+        "upstreamDifferenceDigest": "5674e4027c39ec86e7775224cbdeecd993032a7ed313d7198719f7c0fb8da521",
+        "warningCount": 1,
+        "warningDetails": [
+          {
+            "message": "Could not extract type \"{ items: readonly any[]; }\" at \"test/fixtures/react-component-overload-any-callback-deduplication/input.tsx:1:1\". The extractor used any. Review this API or add support for this type.",
+            "filePath": "test/fixtures/react-component-overload-any-callback-deduplication/input.tsx",
+            "line": 1,
+            "column": 1,
+            "parsedSymbolStack": [
+              "test/fixtures/react-component-overload-any-callback-deduplication/input.tsx",
+              "GenericComponent"
+            ],
+            "code": "unsupported-type-fallback",
+            "typeFlags": [
+              "Object"
+            ],
+            "typeText": "{ items: readonly any[]; }"
+          }
+        ],
+        "warningDigest": "7ffedc894e138fee5c2dd2736e910e27dd29374264635ef54b41e3c17c9834a4",
+        "warningOracle": "react-component-overload-any-callback-deduplication/warnings.tsgo.json",
+        "divergenceRecord": "react-component-overload-any-callback-deduplication/ts7-oracle.json"
+      }
+    },
+    {
+      "fixture": "react-component-render-callback-props",
+      "input": "input.tsx",
+      "disposition": "reviewed-ts7",
+      "inputSha256": "96042b0edb1badfe720b2a902f51953a3f641e4fb285a9a8363cb91cbc3e5104",
+      "upstreamOracleSha256": "28e771ddc00feb5b3b277dbb77a6918332aec515699ce19d24c94337a1e77f1d",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture react-component-render-callback-props --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.tsgo.json",
+        "selectedOracleSha256": "c7a25c68566fa4b7aab2308dbe6bafd6dded3e2ee1d5809197d1319f4c47a494",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 244,
+        "upstreamDifferenceDigest": "551b0f778a86e9010be01ddee914d3e59bfb9ddbdc5e1a5b7c57af65d05e1d05",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "divergenceRecord": "react-component-render-callback-props/ts7-oracle.json"
+      }
+    },
+    {
+      "fixture": "react-component-return-types",
+      "input": "input.tsx",
+      "disposition": "unchanged",
+      "inputSha256": "426074e8413b04549c84e26405773a3b470fb440b77c1c2a1a4f00471e2b060f",
+      "upstreamOracleSha256": "8ee1eb58d1d561bd415e6b31d071b9fb144b56fb42b0e4d045061faa5441d03f",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture react-component-return-types --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "8ee1eb58d1d561bd415e6b31d071b9fb144b56fb42b0e4d045061faa5441d03f",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "react-component-union-variants",
+      "input": "input.tsx",
+      "disposition": "reviewed-ts7",
+      "inputSha256": "07b6cc69b678882f2327e50e682004a17f50c8a80bdd20a35890bb43fcd7de0b",
+      "upstreamOracleSha256": "57c9929bc3f5efbd14055f07e84b28f0fd2a70f9f80f5862225ae170122fd1c0",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture react-component-union-variants --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.tsgo.json",
+        "selectedOracleSha256": "aed9479eeb5d7b0f262e63ee61bd9357eadb936889d1abfd6278292cf345761f",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 61,
+        "upstreamDifferenceDigest": "20fda7f8473414b8ac3607de01318e9e51c691f1214fe74f1674c172e281c91c",
+        "warningCount": 1,
+        "warningDetails": [
+          {
+            "message": "Could not classify \"OptionalToolbar\" as a React component at \"test/fixtures/react-component-union-variants/input.tsx:49:14\" because part of its union returns a non-React value. The extractor kept the original union type. Review the export if it should be a component.",
+            "filePath": "test/fixtures/react-component-union-variants/input.tsx",
+            "line": 49,
+            "column": 14,
+            "parsedSymbolStack": [
+              "test/fixtures/react-component-union-variants/input.tsx",
+              "OptionalToolbar"
+            ],
+            "code": "uncertain-component-recognition",
+            "reason": "mixed-component-union",
+            "name": "OptionalToolbar"
+          }
+        ],
+        "warningDigest": "9b0a67d864f3f6470b3576a51da7d83d249cb96eb25f385f058fcd65bd90cfb4",
+        "warningOracle": "react-component-union-variants/warnings.tsgo.json",
+        "divergenceRecord": "react-component-union-variants/ts7-oracle.json"
+      }
+    },
+    {
+      "fixture": "react-event-handlers",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "b21d903110e96c534f947053a64a0d6fb6477146d249eaa9e8fa8684377d9943",
+      "upstreamOracleSha256": "a4b725d9ad923dcb3dc5db81d2e99aeca829e30a4d9ab67008c6e0e4d4d9eb7e",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture react-event-handlers --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "a4b725d9ad923dcb3dc5db81d2e99aeca829e30a4d9ab67008c6e0e4d4d9eb7e",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "react-forward-ref-component",
+      "input": "input.tsx",
+      "disposition": "unchanged",
+      "inputSha256": "205bf23acb06369926e3199a87071152b3624e6837645d7c74e44fd2ff124939",
+      "upstreamOracleSha256": "9dedec4201b50a0b55d405c2007d5f30f0ae71be612ded5233457253b497aa91",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture react-forward-ref-component --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "9dedec4201b50a0b55d405c2007d5f30f0ae71be612ded5233457253b497aa91",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningOracle": "react-forward-ref-component/warnings.tsgo.json"
+      }
+    },
+    {
+      "fixture": "react-forward-ref-union-props",
+      "input": "input.tsx",
+      "disposition": "reviewed-ts7",
+      "inputSha256": "4899548313707883f7224685b846739395a2b9a63bd099e86fe784ded3a6e17c",
+      "upstreamOracleSha256": "5ee7b32dcb00dffc4a5c8e36a6e9908fb4cd7ba4d001da0e7575a141358ee52f",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture react-forward-ref-union-props --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.tsgo.json",
+        "selectedOracleSha256": "08c08137e3d30dadcde5a67a60dc7bbf52c0241d42b983d70cf635c015113100",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 87,
+        "upstreamDifferenceDigest": "7469102a810f0b554e995ead57047d6cdb6556bcd55c0c89e92dd52b1a624ab7",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningOracle": "react-forward-ref-union-props/warnings.tsgo.json",
+        "divergenceRecord": "react-forward-ref-union-props/ts7-oracle.json"
+      }
+    },
+    {
+      "fixture": "react-hook-arrow-function",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "711822776819fba7a5a6d237290576a1293e702a4db5708bf1292a4c9859b365",
+      "upstreamOracleSha256": "827a3ae8a6541055725bc9cb17e6af73ba4afaf08be9e3f3b43a19cce9e3e259",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture react-hook-arrow-function --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "827a3ae8a6541055725bc9cb17e6af73ba4afaf08be9e3f3b43a19cce9e3e259",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "react-hook-function-declaration",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "1706901920d0136c7ecb5493786c94eb817e677b5ab211a4402d9db838c0ff6d",
+      "upstreamOracleSha256": "aba62e6cb265f6f0546570d819b169d2b976e21a4635971c251d0ad2c70ea2c0",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture react-hook-function-declaration --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "aba62e6cb265f6f0546570d819b169d2b976e21a4635971c251d0ad2c70ea2c0",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "react-hook-function-expression",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "a73868e93047a26a9bedd4127e0d4d46952e33920f00ccc5d5ffeec32af8cfb3",
+      "upstreamOracleSha256": "8d22db250bb06c8928a93ee0222c937f9b1600fbf15db84185f245fd33d6e815",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture react-hook-function-expression --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "8d22db250bb06c8928a93ee0222c937f9b1600fbf15db84185f245fd33d6e815",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "react-hook-multiple-parameters",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "9e42d9425d39d6f03a95e6b60a90c60dc547511b64372c2571920c20e2ae99d7",
+      "upstreamOracleSha256": "ba3d4799c3345f20bfe0b23da7e94228a4f20f964e705bc83c3717ec071f1cf1",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture react-hook-multiple-parameters --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "ba3d4799c3345f20bfe0b23da7e94228a4f20f964e705bc83c3717ec071f1cf1",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "react-hook-overload-signatures",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "fa9cbee86b16abdcd8c66390896163b5a5f7a51ef46c48e85215d731454231f1",
+      "upstreamOracleSha256": "d659e5683f70e72009a4fd7d71e17365c7c10ca1e40ee009dde0896d4d6a0de2",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture react-hook-overload-signatures --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "d659e5683f70e72009a4fd7d71e17365c7c10ca1e40ee009dde0896d4d6a0de2",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "react-memo-component",
+      "input": "input.tsx",
+      "disposition": "unchanged",
+      "inputSha256": "cd95f85e26dc956aec200e591150ecfedff426fa86564fe15d144e90a0bcdd76",
+      "upstreamOracleSha256": "e0c65450e8b2ce6a17023d1f82728a982252c5b5c0ec1e87748b45169a68bd54",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture react-memo-component --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "e0c65450e8b2ce6a17023d1f82728a982252c5b5c0ec1e87748b45169a68bd54",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningOracle": "react-memo-component/warnings.tsgo.json"
+      }
+    },
+    {
+      "fixture": "react-mui-overridable-component",
+      "input": "input.d.ts",
+      "disposition": "reviewed-ts7",
+      "inputSha256": "587e1932146e5ab26f702fb79726635c0cef9303adac7303c9e17ff49bda8207",
+      "upstreamOracleSha256": "a3da026fd912f9d210751d4db0b6b6bf914c1ae751adb12b5e7b378568dbbfb2",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture react-mui-overridable-component --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.tsgo.json",
+        "selectedOracleSha256": "85b6ae240d038ec673d22d510c2c1070b777ea6b6d3fffc7e19ca04925e9ba43",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 164,
+        "upstreamDifferenceDigest": "759f082589ceaf87a38d75f1afbe74c7a1748117d2dc8c23e43cd6dc7af44a4c",
+        "warningCount": 8,
+        "warningDetails": [
+          {
+            "message": "The type at \"test/fixtures/react-mui-overridable-component/input.d.ts:1:1\" has more than one index signature, but the output model supports one. The extractor omitted the signature with key type \"number\". Review the generated API if both signatures matter.",
+            "filePath": "test/fixtures/react-mui-overridable-component/input.d.ts",
+            "line": 1,
+            "column": 1,
+            "parsedSymbolStack": [
+              "test/fixtures/react-mui-overridable-component/input.d.ts",
+              "default",
+              "parameter: props"
+            ],
+            "code": "omitted-index-signature",
+            "reason": "additional-signature",
+            "keyTypes": [
+              "number"
+            ]
+          },
+          {
+            "message": "The index signature at \"test/fixtures/react-mui-overridable-component/input.d.ts:1:1\" uses unsupported key type \"symbol\". The extractor omitted it. Change the key type or review the generated API.",
+            "filePath": "test/fixtures/react-mui-overridable-component/input.d.ts",
+            "line": 1,
+            "column": 1,
+            "parsedSymbolStack": [
+              "test/fixtures/react-mui-overridable-component/input.d.ts",
+              "default",
+              "parameter: props"
+            ],
+            "code": "omitted-index-signature",
+            "reason": "unrepresentable-key",
+            "keyTypes": [
+              "symbol"
+            ]
+          },
+          {
+            "message": "The type at \"test/fixtures/react-mui-overridable-component/input.d.ts:1:1\" has more than one index signature, but the output model supports one. The extractor omitted the signature with key type \"number\". Review the generated API if both signatures matter.",
+            "filePath": "test/fixtures/react-mui-overridable-component/input.d.ts",
+            "line": 1,
+            "column": 1,
+            "parsedSymbolStack": [
+              "test/fixtures/react-mui-overridable-component/input.d.ts",
+              "default",
+              "parameter: props"
+            ],
+            "code": "omitted-index-signature",
+            "reason": "additional-signature",
+            "keyTypes": [
+              "number"
+            ]
+          },
+          {
+            "message": "The index signature at \"test/fixtures/react-mui-overridable-component/input.d.ts:1:1\" uses unsupported key type \"symbol\". The extractor omitted it. Change the key type or review the generated API.",
+            "filePath": "test/fixtures/react-mui-overridable-component/input.d.ts",
+            "line": 1,
+            "column": 1,
+            "parsedSymbolStack": [
+              "test/fixtures/react-mui-overridable-component/input.d.ts",
+              "default",
+              "parameter: props"
+            ],
+            "code": "omitted-index-signature",
+            "reason": "unrepresentable-key",
+            "keyTypes": [
+              "symbol"
+            ]
+          },
+          {
+            "message": "The type at \"test/fixtures/react-mui-overridable-component/input.d.ts:1:1\" has more than one index signature, but the output model supports one. The extractor omitted the signature with key type \"number\". Review the generated API if both signatures matter.",
+            "filePath": "test/fixtures/react-mui-overridable-component/input.d.ts",
+            "line": 1,
+            "column": 1,
+            "parsedSymbolStack": [
+              "test/fixtures/react-mui-overridable-component/input.d.ts",
+              "default",
+              "parameter: props"
+            ],
+            "code": "omitted-index-signature",
+            "reason": "additional-signature",
+            "keyTypes": [
+              "number"
+            ]
+          },
+          {
+            "message": "The index signature at \"test/fixtures/react-mui-overridable-component/input.d.ts:1:1\" uses unsupported key type \"symbol\". The extractor omitted it. Change the key type or review the generated API.",
+            "filePath": "test/fixtures/react-mui-overridable-component/input.d.ts",
+            "line": 1,
+            "column": 1,
+            "parsedSymbolStack": [
+              "test/fixtures/react-mui-overridable-component/input.d.ts",
+              "default",
+              "parameter: props"
+            ],
+            "code": "omitted-index-signature",
+            "reason": "unrepresentable-key",
+            "keyTypes": [
+              "symbol"
+            ]
+          },
+          {
+            "message": "The type at \"test/fixtures/react-mui-overridable-component/input.d.ts:1:1\" has more than one index signature, but the output model supports one. The extractor omitted the signature with key type \"number\". Review the generated API if both signatures matter.",
+            "filePath": "test/fixtures/react-mui-overridable-component/input.d.ts",
+            "line": 1,
+            "column": 1,
+            "parsedSymbolStack": [
+              "test/fixtures/react-mui-overridable-component/input.d.ts",
+              "default",
+              "parameter: props"
+            ],
+            "code": "omitted-index-signature",
+            "reason": "additional-signature",
+            "keyTypes": [
+              "number"
+            ]
+          },
+          {
+            "message": "The index signature at \"test/fixtures/react-mui-overridable-component/input.d.ts:1:1\" uses unsupported key type \"symbol\". The extractor omitted it. Change the key type or review the generated API.",
+            "filePath": "test/fixtures/react-mui-overridable-component/input.d.ts",
+            "line": 1,
+            "column": 1,
+            "parsedSymbolStack": [
+              "test/fixtures/react-mui-overridable-component/input.d.ts",
+              "default",
+              "parameter: props"
+            ],
+            "code": "omitted-index-signature",
+            "reason": "unrepresentable-key",
+            "keyTypes": [
+              "symbol"
+            ]
+          }
+        ],
+        "warningDigest": "bd466e8155f43fbf2028e22b2d714476945dc7f7eaa6458fc8cdafd28559590a",
+        "warningOracle": "react-mui-overridable-component/warnings.tsgo.json",
+        "divergenceRecord": "react-mui-overridable-component/ts7-oracle.json"
+      }
+    },
+    {
+      "fixture": "react-props-callback-types",
+      "input": "input.tsx",
+      "disposition": "unchanged",
+      "inputSha256": "b798d0e06aadecebf82b32c815de3cd2a10a51b0dc3af4deba650ae45a988320",
+      "upstreamOracleSha256": "03baf35273b643b033a0f3f65676429ff8890bdf451ba8841a184a869c94d4eb",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture react-props-callback-types --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "03baf35273b643b033a0f3f65676429ff8890bdf451ba8841a184a869c94d4eb",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "react-props-literal-types",
+      "input": "input.tsx",
+      "disposition": "unchanged",
+      "inputSha256": "043561c033fbca1657c937fdf91c49e4f1fe1e5dff646932bef6b2da117655bc",
+      "upstreamOracleSha256": "e8b202ac6c3e2f35eac4bac9126efb4d9000c3e672d3c365c5e1887e85e10bb7",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture react-props-literal-types --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "e8b202ac6c3e2f35eac4bac9126efb4d9000c3e672d3c365c5e1887e85e10bb7",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "react-props-optional-types",
+      "input": "input.tsx",
+      "disposition": "unchanged",
+      "inputSha256": "dd89e1faac66a4f914b28c2536dd9d1196dafb02271ee26b2f0d67958f96c304",
+      "upstreamOracleSha256": "d4fd635b3121753d3a3f5714e20cb8bd80bf6171d4a41a277f4c71f7338ada78",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture react-props-optional-types --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "d4fd635b3121753d3a3f5714e20cb8bd80bf6171d4a41a277f4c71f7338ada78",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "react-refs",
+      "input": "input.tsx",
+      "disposition": "reviewed-ts7",
+      "inputSha256": "564f7f5d173c80ae7e45c11307e4f0a6b4883c897a892660c4e0f54a6552eba6",
+      "upstreamOracleSha256": "d62b16df31ca2e963b33af5d8c2df931e01ecacdc16d1d08d9827910f6f2d927",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture react-refs --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.tsgo.json",
+        "selectedOracleSha256": "ea1ab1b1f9369b26511456d295bf1a8df8f65e878fc3618b9e8b7a30e027ba1d",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 17,
+        "upstreamDifferenceDigest": "9d8c5dc33099dc09fe6d2d6cef02baa1ed5b9366a210a081a11a209eb58cc658",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "divergenceRecord": "react-refs/ts7-oracle.json"
+      }
+    },
+    {
+      "fixture": "readonly-array-mapped-alias-wrapped",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "6beb52fa7718f39187c3c94878f2c8b72c285f8ef732223a1b2c652159e9dcbc",
+      "upstreamOracleSha256": "a9815aa8bdc260296d369f03cba898de5ebc9aa3a9f909551cd15c2fa0bdf6d4",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture readonly-array-mapped-alias-wrapped --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "a9815aa8bdc260296d369f03cba898de5ebc9aa3a9f909551cd15c2fa0bdf6d4",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "readonly-array-mapped-type",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "3b0dd199ccf59be38b6c0a73319f0f80ee00000e07060a47fcc122ed0c6b46ef",
+      "upstreamOracleSha256": "54a558c6290325c9ff36471dc60964e68914d037223727b5df6547733effab69",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture readonly-array-mapped-type --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "54a558c6290325c9ff36471dc60964e68914d037223727b5df6547733effab69",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "readonly-array-mapped-type-any-value",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "0fb0cbb069c050b2ee432b3cb79df07a4af0defeaef76c0f59bc0be62dfa18d8",
+      "upstreamOracleSha256": "475a394b262a2faa34e528994fa02cf0ae9534d29f81875d2de24e8ad6f82fd1",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture readonly-array-mapped-type-any-value --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "475a394b262a2faa34e528994fa02cf0ae9534d29f81875d2de24e8ad6f82fd1",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "readonly-array-mapped-type-as-clause",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "49de8195ee37a588fbc9d1c4137d318fd56a3eea5fe5bef3e995592313a23963",
+      "upstreamOracleSha256": "a993a3a56cd47d85500a14adf977b55de8d656c282eefdb3b56871a4f7d974e2",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture readonly-array-mapped-type-as-clause --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "a993a3a56cd47d85500a14adf977b55de8d656c282eefdb3b56871a4f7d974e2",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "readonly-array-mapped-type-key-no-default",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "2c58c5e2f374ba72210e683d8fc98588cd38df33f75fe271739ea1c738d85942",
+      "upstreamOracleSha256": "a635b5e79d2aaa73e93c595ef0748a1bce58fe6ff37d9b46c39333830b2cc0fd",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture readonly-array-mapped-type-key-no-default --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "a635b5e79d2aaa73e93c595ef0748a1bce58fe6ff37d9b46c39333830b2cc0fd",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "readonly-array-mapped-type-literal-key",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "fedd01c966f17d883145dc92471f41fda01e63ebc43178709e36611f4112e9bf",
+      "upstreamOracleSha256": "66d2cfe2c6026cadc31012a33034e724ca81bae6c7873a7f313fa00f7d7cfd6f",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture readonly-array-mapped-type-literal-key --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "66d2cfe2c6026cadc31012a33034e724ca81bae6c7873a7f313fa00f7d7cfd6f",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "readonly-array-mapped-type-non-optional",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "63f21cd4057a06f44a99e434ed67869796bc3528a36dc5789823276174cd5534",
+      "upstreamOracleSha256": "c1bf513083ccc534f88d0a1ff52a0bf6da7f346687dfa85061d3e6649d46516a",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture readonly-array-mapped-type-non-optional --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "c1bf513083ccc534f88d0a1ff52a0bf6da7f346687dfa85061d3e6649d46516a",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "readonly-array-mapped-type-number-key",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "5b9320abdcf8f7b2f9343555a42e2e9eda55a958bf182445f3eaf8f62486634c",
+      "upstreamOracleSha256": "59d52d0b3bb39dddab216b25a5bf9aea385a515e09e2a1faed5a2bfe5a95517b",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture readonly-array-mapped-type-number-key --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "59d52d0b3bb39dddab216b25a5bf9aea385a515e09e2a1faed5a2bfe5a95517b",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "readonly-array-mapped-type-plus-optional",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "b0fea1481219947633f8fc6d233752553508631f1d17a770c43db6bcc50978ec",
+      "upstreamOracleSha256": "35c7350cdbed1981a0556934b25b1763c0cde1be49bce578eb7f663e29293c3a",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture readonly-array-mapped-type-plus-optional --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "35c7350cdbed1981a0556934b25b1763c0cde1be49bce578eb7f663e29293c3a",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "readonly-array-mapped-type-strip-optional",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "13cf3dfd5c6de814465003f70534e262baa32e41778e20100e6df04e35b07a5e",
+      "upstreamOracleSha256": "9a45d300d8e3dedd6d2b25255044e5ceb5615ea91ad4a62ca2b7e09eb458df2c",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture readonly-array-mapped-type-strip-optional --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "9a45d300d8e3dedd6d2b25255044e5ceb5615ea91ad4a62ca2b7e09eb458df2c",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "readonly-array-mapped-type-template-literal-constraint",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "8ba30ab2597a8f56dc58f953f049572cd4bb972cc641331517a3806a772e926a",
+      "upstreamOracleSha256": "5d5bc4a2c31a2711e8fe099fdea071e2990d2b97af151dafc41b91473303dace",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture readonly-array-mapped-type-template-literal-constraint --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "5d5bc4a2c31a2711e8fe099fdea071e2990d2b97af151dafc41b91473303dace",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "readonly-array-mapped-type-union-default",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "2f516406f17ec60e05c3e4d6fb60fbdff01ba68c3d14dabd6ed8c20e74e87418",
+      "upstreamOracleSha256": "4424e531713e74a810a2b02efa245ca08721e9b9b32e78624b4aa6ad84d91b47",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture readonly-array-mapped-type-union-default --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "4424e531713e74a810a2b02efa245ca08721e9b9b32e78624b4aa6ad84d91b47",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "readonly-array-mapped-type-value-no-default",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "d0597db67c1660d1f690ddbe8fb93ede197a7fce031ce60ae2044ff4bec61a82",
+      "upstreamOracleSha256": "bfa94b0d7718fa011cf39d72c08f9b5a8673065b1db63d7cda78a61e70169384",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture readonly-array-mapped-type-value-no-default --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "bfa94b0d7718fa011cf39d72c08f9b5a8673065b1db63d7cda78a61e70169384",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "readonly-array-mapped-type-with-concrete-props",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "634d3e65e9637deb11ac3fa968032dafef22efffa2cdf43b06273caf726023e7",
+      "upstreamOracleSha256": "d1c3d87f3339329fe7d7d9e5aa6dab3a0651c85a2be3f7bb55c269d87c5551ad",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture readonly-array-mapped-type-with-concrete-props --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "d1c3d87f3339329fe7d7d9e5aa6dab3a0651c85a2be3f7bb55c269d87c5551ad",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "symbol-double-underscore-name-preservation",
+      "input": "input.ts",
+      "disposition": "reviewed-ts7",
+      "inputSha256": "c8c731dd8ab944c055e2c0ff793339bea8e7e9dd46b97f30d0b624070eff723e",
+      "upstreamOracleSha256": "adaa72b3b4b8eb6b0da2358a954cd1c00d5d63f146835967a5956e601f5fe88d",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture symbol-double-underscore-name-preservation --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.tsgo.json",
+        "selectedOracleSha256": "aed8c805c1ca097dd72e7db9e4d4a3b21372cf8e12607da7d1c6760c67645552",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 9,
+        "upstreamDifferenceDigest": "3a23a9015a8c1f270c80389b949813b3873474a0a645016f91004ab98e1b4303",
+        "warningCount": 1,
+        "warningDetails": [
+          {
+            "message": "Could not extract type \"__Named\" at \"test/fixtures/symbol-double-underscore-name-preservation/input.ts:1:1\". The extractor used any. Review this API or add support for this type.",
+            "filePath": "test/fixtures/symbol-double-underscore-name-preservation/input.ts",
+            "line": 1,
+            "column": 1,
+            "parsedSymbolStack": [
+              "test/fixtures/symbol-double-underscore-name-preservation/input.ts",
+              "__Named"
+            ],
+            "code": "unsupported-type-fallback",
+            "typeFlags": [
+              "Object"
+            ],
+            "typeText": "__Named"
+          }
+        ],
+        "warningDigest": "a2d6079e4ef3cef00cafcd55a3dc18090fdcc2b6fa27f23cec646b5fd75429c6",
+        "warningOracle": "symbol-double-underscore-name-preservation/warnings.tsgo.json",
+        "divergenceRecord": "symbol-double-underscore-name-preservation/ts7-oracle.json"
+      }
+    },
+    {
+      "fixture": "type-alias-basic-resolution",
+      "input": "input.ts",
+      "disposition": "reviewed-ts7",
+      "inputSha256": "f9d0f49ea207ce1d7d3125288a7b0a5cc0fce55ddb892d558df9d86a20fb7eff",
+      "upstreamOracleSha256": "15ca21025d52a5a688dceece0fc46926b44a773a2607795b23c665917d31dce1",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture type-alias-basic-resolution --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.tsgo.json",
+        "selectedOracleSha256": "0f2803b07ae676b29dbfaa4bee2b8adc84792317de2c2597e0de790b437e566a",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 28,
+        "upstreamDifferenceDigest": "4b3aa308a23d0c77608086bbc3eb2d9a1a6c6783997d02f0abcfd38492e62cf1",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "divergenceRecord": "type-alias-basic-resolution/ts7-oracle.json"
+      }
+    },
+    {
+      "fixture": "type-alias-export-preservation",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "2ce196148264f771f7c821087355a70094e3b736e1b94250865d828c86e8ab15",
+      "upstreamOracleSha256": "1f0b2970ba92e46018c28b4aeab187dd4722ffa1de8e721c7b35af8f96c8a307",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture type-alias-export-preservation --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "1f0b2970ba92e46018c28b4aeab187dd4722ffa1de8e721c7b35af8f96c8a307",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "type-alias-generic-argument-resolution",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "98afa23eb88530e70fca4474b80a217c5e39f7f61115f8d33af233a68be8d9e5",
+      "upstreamOracleSha256": "7f9f22e7c06fade3bd71e57bf611a21e8e282c4e6bb3a98c7150009fe02249bd",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture type-alias-generic-argument-resolution --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "7f9f22e7c06fade3bd71e57bf611a21e8e282c4e6bb3a98c7150009fe02249bd",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "type-alias-union-member-resolution",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "33bf0f6d2529fdfb06eadb981f162be59f86549d459e2ce48e040fdab9273219",
+      "upstreamOracleSha256": "0b16329d4b8f708afe030848ecf6e141212232250c66831b6b711d0c3e12907a",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture type-alias-union-member-resolution --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "0b16329d4b8f708afe030848ecf6e141212232250c66831b6b711d0c3e12907a",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "type-array-syntax-resolution",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "1a009f20b2fe7c4d60b5ced3f74d909935945e893b4624d998acf678828bf1e7",
+      "upstreamOracleSha256": "7f13138ac0c9dcb23eebf1a98f344fd437e869000128c84482395e4b0f9b15b8",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture type-array-syntax-resolution --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "7f13138ac0c9dcb23eebf1a98f344fd437e869000128c84482395e4b0f9b15b8",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "type-conditional-return-and-props",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "aa8772359fa0dc3df07f13a1c75d62d6807f574031e735bf6e7fb58cf12b2720",
+      "upstreamOracleSha256": "1c04e4491f6f7968bd3fcb19f06187eb0bff6af8e62a8d9626384d57fcbd5b2f",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture type-conditional-return-and-props --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "1c04e4491f6f7968bd3fcb19f06187eb0bff6af8e62a8d9626384d57fcbd5b2f",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "type-cycle-recursive-resolution",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "8d1df44008760d234547d8b1d0d37e3d1ed66327ecc06953f30b900626ec89fb",
+      "upstreamOracleSha256": "7b923d64eddd033eb28fc9509b4b9231be7f57008d8b5926c1b2c548d8f606a7",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture type-cycle-recursive-resolution --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "7b923d64eddd033eb28fc9509b4b9231be7f57008d8b5926c1b2c548d8f606a7",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "type-extract-utility-resolution",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "533c302d398fc6d2e6c6c9ad1e543b14d87299c3e78995b605b2d614d059f147",
+      "upstreamOracleSha256": "270d5acc5df1267e5bbee2bfb1384f619b967b0c638b5379d46f835f2635c974",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture type-extract-utility-resolution --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "270d5acc5df1267e5bbee2bfb1384f619b967b0c638b5379d46f835f2635c974",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "type-index-signature-resolution",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "143935d58c2d757fd2f69aaddcccdcc5626f65918f4639d1ab96e61e5e37a99a",
+      "upstreamOracleSha256": "c316d637eabd72820d9928ae577e9ba9afcc8882ce3410ee61964f175c353dae",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture type-index-signature-resolution --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "c316d637eabd72820d9928ae577e9ba9afcc8882ce3410ee61964f175c353dae",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "type-indexed-access-union-resolution",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "ca13b03bee74edbf331dde2c40c03cdf4507ec0216a72f54eafb50ba9c62bdc5",
+      "upstreamOracleSha256": "2dd06453e9b748380ebc09ddf8fc4da21b306f780b22fd82429bd7625b567a0b",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture type-indexed-access-union-resolution --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "2dd06453e9b748380ebc09ddf8fc4da21b306f780b22fd82429bd7625b567a0b",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "type-intersection-resolution",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "3da95ee85faf76517eff3b113d5316ca3420c5700cf1eea9fbaac9b884f7b1df",
+      "upstreamOracleSha256": "7ddf6eca667d3a666fb49436a5059d7e44493c0de5e4de903e42afe488505c00",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture type-intersection-resolution --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "7ddf6eca667d3a666fb49436a5059d7e44493c0de5e4de903e42afe488505c00",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "type-intrinsic-props-resolution",
+      "input": "input.tsx",
+      "disposition": "unchanged",
+      "inputSha256": "1a1bf8c1a31b73f35c68d158e34cc6feb9fbe1b34126407f19952f8c3e82f6b1",
+      "upstreamOracleSha256": "51157a802b748325cb1fd13fb4c0e85204ccb5f0a762449b6d65b614b05e788d",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture type-intrinsic-props-resolution --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "51157a802b748325cb1fd13fb4c0e85204ccb5f0a762449b6d65b614b05e788d",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "type-literal-union-resolution",
+      "input": "input.ts",
+      "disposition": "reviewed-ts7",
+      "inputSha256": "d963371f0b9b57547516d2037b7430814413e745a8af81f8a477a1b12d60b36c",
+      "upstreamOracleSha256": "c31b5075dbd161fd7e8c3becadfbe831aa0dcffe72a513e7509096643d55c088",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture type-literal-union-resolution --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.tsgo.json",
+        "selectedOracleSha256": "5df96f7715e1a99706570f4d62c071167fd65b3a15b044be5670c6d1f2e98520",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 7,
+        "upstreamDifferenceDigest": "a3a5a23617c4eb51368c7f2c543861728c9ff90c320d87965f0ea16672a9aa85",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "divergenceRecord": "type-literal-union-resolution/ts7-oracle.json"
+      }
+    },
+    {
+      "fixture": "type-never-resolution",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "f5741805dd43b8435c925fcbd3b36594be295a6ce77be0f31a5b3f62bf5c9426",
+      "upstreamOracleSha256": "36d691f6acb7f6156e0a2daec3f02825ad7c041f50ee9dab55d5e22705988b28",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture type-never-resolution --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "36d691f6acb7f6156e0a2daec3f02825ad7c041f50ee9dab55d5e22705988b28",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "type-object-shape-resolution",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "e9b90144567f908a10f76ffb86d34c332dc6747c4950edced9b9e007b5806776",
+      "upstreamOracleSha256": "ff9d72c17a46f8fb36ca3728c25b7df9a88a31f1bf9b20affd0547de717955b7",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture type-object-shape-resolution --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "ff9d72c17a46f8fb36ca3728c25b7df9a88a31f1bf9b20affd0547de717955b7",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "type-record-resolution",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "c8e0f78a9f76ecee119c3af5f22ea03917da1b4ed52f4e272c6690c3c1044dec",
+      "upstreamOracleSha256": "93f68c9389ba546c1eb1d665bd3d5091f92ebac55ed3fdd2c893769a97a2b4b6",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture type-record-resolution --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "93f68c9389ba546c1eb1d665bd3d5091f92ebac55ed3fdd2c893769a97a2b4b6",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "type-reference-vs-inline-resolution",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "22ce9b84a3191e765b67095a6606b5a713aa7340f24e598210f0dace5d464924",
+      "upstreamOracleSha256": "9fd91e6cab6b3733be530165a8b3c5df88913dc9aa5ad648eaa8c246c37fb005",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture type-reference-vs-inline-resolution --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "9fd91e6cab6b3733be530165a8b3c5df88913dc9aa5ad648eaa8c246c37fb005",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "type-tuple-resolution",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "d2a3036bd36b75863e53738d470a921cd5a06eb32c70b1dda199807151ac2415",
+      "upstreamOracleSha256": "dbcf2c760611d7f6482bcdb9fc424cb2cb3873428bc79647a80b54c6d4fbf705",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture type-tuple-resolution --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "dbcf2c760611d7f6482bcdb9fc424cb2cb3873428bc79647a80b54c6d4fbf705",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "type-union-object-props-resolution",
+      "input": "input.tsx",
+      "disposition": "unchanged",
+      "inputSha256": "1d116da28a2722abc4cf70ac26559b9251dd9100ac036b996087bf2d3ddc9967",
+      "upstreamOracleSha256": "d3000dfeae139f56e4e977081b21d9e50889d7f7cffc8178c5ef596377663b0f",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture type-union-object-props-resolution --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "d3000dfeae139f56e4e977081b21d9e50889d7f7cffc8178c5ef596377663b0f",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "type-utility-types-resolution",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "8a5b1cd4a15215425162955e7f0a6af78b3fc4b6f2052b1403c701f44f9a7ab5",
+      "upstreamOracleSha256": "bfe85f584983f3a5eb947a09993e0819972a5d5b784211bddb71ef967c7fe984",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture type-utility-types-resolution --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "bfe85f584983f3a5eb947a09993e0819972a5d5b784211bddb71ef967c7fe984",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "union-any-wildcard-order",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "84d8ea30bffec72b1fe8a0b78d0c704f2272dcde5f7d38763f9e7d3431886c02",
+      "upstreamOracleSha256": "a94699d8c30b09e9e4bfb886ac6c135672ae9be9d2ab9424e369af537c6f5c83",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture union-any-wildcard-order --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "a94699d8c30b09e9e4bfb886ac6c135672ae9be9d2ab9424e369af537c6f5c83",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "union-never-reduction",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "a8cb3133c8b0fe927ee0404ff42c8e1771b35e657b54fa18d0690d64c61e5ad6",
+      "upstreamOracleSha256": "de34796cee14c613f5ab89ef35052ac9b81580fdccc86d2dcf47de6860e627f0",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture union-never-reduction --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "de34796cee14c613f5ab89ef35052ac9b81580fdccc86d2dcf47de6860e627f0",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "fixture": "unresolved-indexed-access-fallback",
+      "input": "input.ts",
+      "disposition": "unchanged",
+      "inputSha256": "b42c9cc370e2c0669d4ae83926fe0b614a9ef1d8f33be061035cb313112c728e",
+      "upstreamOracleSha256": "d9f28cc69a60ecc785f519f5ce1ec8b41d405a11f7a1d22c3701ef73f274f3bb",
+      "typecheck": {
+        "status": "pass",
+        "strategy": "direct-input",
+        "command": "node scripts/conformance/typecheck.ts --fixture unresolved-indexed-access-fallback --pretty false",
+        "diagnosticCount": 0,
+        "diagnostics": []
+      },
+      "extraction": {
+        "status": "match",
+        "oracleFile": "output.json",
+        "selectedOracleSha256": "d9f28cc69a60ecc785f519f5ce1ec8b41d405a11f7a1d22c3701ef73f274f3bb",
+        "differenceCount": 0,
+        "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "upstreamDifferenceCount": 0,
+        "upstreamDifferenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    }
+  ],
+  "referenceCheck": {
+    "mode": "optional",
+    "status": "verified",
+    "repository": "michaldudak/typescript-api-extractor",
+    "commit": "e14535030957e29ce6e5d870e4ab71740175a0d4",
+    "fixtureCount": 116,
+    "comparedFiles": 251,
+    "pathUniverse": {
+      "count": 251,
+      "sha256": "4b05cb220b44c622021a692b64e283d5f7f2efe47305ba636bb53958a37abe79",
+      "command": "git ls-tree -r --name-only e14535030957e29ce6e5d870e4ab71740175a0d4 -- test/fixtures"
+    },
+    "command": "reference audit optional michaldudak/typescript-api-extractor@e14535030957e29ce6e5d870e4ab71740175a0d4"
+  },
+  "status": "pass"
+}

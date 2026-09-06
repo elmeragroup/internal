@@ -1,0 +1,8 @@
+{
+  "extends": "@elmeragroup/typescript-config/internal-package.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "lib": ["ES2022", "DOM"]
+  },
+  "include": ["src", "test", "vitest.config.ts"]
+}

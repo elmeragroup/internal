@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "rootDir": "../..",
+    "strict": true,
+    "target": "ES2022",
+    "noEmit": true,
+    "skipLibCheck": false
+  },
+  "include": [
+    "keyof-arguments.ts",
+    "generic-class.ts",
+    "substitution-scope.ts",
+    "spread-pairing.ts",
+    "unresolvable-cycle.ts"
+  ]
+}

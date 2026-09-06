@@ -1,0 +1,14 @@
+{
+	"fixture": "react-component-union-variants",
+	"compiler": "typescript@7.0.2",
+	"sourceOracle": "output.json",
+	"comparison": "exact",
+	"divergence": {
+		"code": "TS7_REACT_EXTERNAL_GRAPH",
+		"genus": "external-react-graph",
+		"reason": "Component recognition, the union merge across polymorphic variants, the mixed-union warning path, and the squashed prop tables reproduce the upstream oracle exactly; the residual differences are confined to the render-prop RETURN payloads, where the preserved oracle summarizes the external `React.ReactElement` reference while TypeScript 7 resolves its type-argument graph (expanding the element's children/props union view) inside the same external React graph this record excludes from equality. The same genus was recorded for base-ui-component since Issue 02.",
+		"upstreamPreserved": true,
+		"differenceCount": 61,
+		"differenceDigest": "20fda7f8473414b8ac3607de01318e9e51c691f1214fe74f1674c172e281c91c"
+	}
+}

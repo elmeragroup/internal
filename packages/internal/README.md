@@ -1,0 +1,30 @@
+# @elmeragroup/internal
+
+Shared engineering helpers for the Elmera Group.
+
+```sh
+pnpm add -D @elmeragroup/internal@canary
+```
+
+```ts
+import { generateApiArtifacts } from "@elmeragroup/internal";
+
+const { components } = await generateApiArtifacts({
+  projectRoot: process.cwd(),
+  tsconfigPath: "tsconfig.json",
+  components: [
+    {
+      slug: "button",
+      entryFile: "src/button.ts",
+      exportNames: ["Button"],
+      outputFile: "docs/button/api.json",
+    },
+  ],
+});
+```
+
+Requires Node >=24.13.0 <25. Generate during the build, then import the JSON from rendering code.
+
+The generator defaults to `includeExternalTypes: ["@base-ui/react"]` and `allowedWarningCodes: ["unsupported-type-fallback"]`. Override either option as needed. Accepted warnings are returned in `diagnostics`.
+
+Use `mode: "check"` to detect stale artifacts without writing. See [api-artifacts](https://github.com/elmeragroup/internal/tree/main/packages/api-artifacts) for options and output details.

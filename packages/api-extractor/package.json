@@ -1,0 +1,65 @@
+{
+  "name": "@elmeragroup/api-extractor",
+  "version": "0.1.0-canary.0",
+  "type": "module",
+  "license": "MIT",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "node scripts/build.ts",
+    "ci:checks": "pnpm run check:catalog && pnpm run check:boundary && pnpm run test:fixtures && pnpm run test:conformance && pnpm run test:timing && pnpm run test:timing:issue14 && pnpm run test:timing:external-selection",
+    "format:check": "oxfmt --check .",
+    "lint": "oxlint . --deny-warnings",
+    "test": "vitest run",
+    "test:timing": "node scripts/timing.ts --plan issue02 --check",
+    "test:timing:issue14": "node scripts/timing.ts --plan issue14 --check",
+    "test:timing:external-selection": "node scripts/timing.ts --plan externalSelection --check",
+    "report:timing": "node scripts/timing.ts --plan issue02 --write",
+    "report:timing:issue14": "node scripts/timing.ts --plan issue14 --write",
+    "report:warnings": "node scripts/conformance/report.ts --write-warnings",
+    "check:catalog": "node scripts/check-fixture-catalog.ts",
+    "check:boundary": "node scripts/check-boundary.ts",
+    "test:fixtures": "node scripts/typecheck-fixtures.ts",
+    "check:all": "pnpm run format:check && pnpm run lint && pnpm run build && pnpm run type-check && pnpm run test && pnpm run ci:checks",
+    "test:conformance": "node scripts/conformance/report.ts --check",
+    "report:conformance": "node scripts/conformance/report.ts --write",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "effect": "catalog:",
+    "typescript": "catalog:"
+  },
+  "devDependencies": {
+    "@elmeragroup/typescript-config": "workspace:*",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "oxlint": "catalog:",
+    "react": "catalog:",
+    "vitest": "catalog:"
+  },
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist/**",
+    "README.md",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "engines": {
+    "node": ">=24.13.0 <25"
+  },
+  "publishConfig": {
+    "access": "public",
+    "tag": "canary"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/elmeragroup/internal.git",
+    "directory": "packages/api-extractor"
+  }
+}

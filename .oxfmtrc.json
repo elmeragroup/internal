@@ -1,0 +1,64 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "bracketSpacing": true,
+  "bracketSameLine": true,
+  "singleQuote": false,
+  "jsxSingleQuote": false,
+  "trailingComma": "es5",
+  "semi": true,
+  "printWidth": 110,
+  "arrowParens": "always",
+  "endOfLine": "lf",
+  "sortImports": {
+    "newlinesBetween": true,
+    "sortSideEffects": true,
+    "customGroups": [
+      {
+        "groupName": "react",
+        "elementNamePattern": ["react", "react/**"]
+      },
+      {
+        "groupName": "elmera",
+        "elementNamePattern": ["@elmeragroup", "@elmeragroup/**"]
+      }
+    ],
+    "groups": [
+      "react",
+      ["builtin", "external", "internal", "subpath"],
+      "elmera",
+      ["parent", "sibling", "index"],
+      "unknown"
+    ]
+  },
+  "sortPackageJson": false,
+  "ignorePatterns": [
+    "node_modules",
+    "**/node_modules/**",
+    "dist",
+    "**/dist/**",
+    ".turbo",
+    "**/.next/**",
+    "**/next-env.d.ts",
+    ".artifacts",
+    ".cache",
+    ".ref",
+    "packages/oxlint-anti-slop/**",
+    "**/__snapshots__/**",
+    "packages/api-extractor/test/fixtures/**",
+    "pnpm-lock.yaml",
+    "*.lock",
+    "*.log",
+    ".DS_Store",
+    ".agent/**",
+    ".agents/**",
+    ".claude/**",
+    ".codex/**",
+    ".continue/**",
+    ".cursor/**",
+    ".gemini/**",
+    ".opencode/**",
+    ".pi/**",
+    ".roo/**",
+    ".windsurf/**"
+  ]
+}

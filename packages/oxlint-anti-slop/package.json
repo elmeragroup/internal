@@ -1,0 +1,19 @@
+{
+  "name": "@elmeragroup/oxlint-plugin-anti-slop",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "license": "MIT",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "scripts": {
+    "test": "node --experimental-strip-types --test rules/*.test.ts"
+  },
+  "dependencies": {
+    "@oxlint/plugins": "catalog:"
+  },
+  "devDependencies": {
+    "oxlint": "catalog:"
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "$comment": "Per-fixture facts the fixture tree cannot state. Everything else in the catalog is derived from disk: a directory with an input file is a fixture, output.json makes it a conformance fixture, output.tsgo.json makes that a reviewed TypeScript 7 divergence, ts7-oracle.json is the divergence record, and warnings.tsgo.json supplies the warning oracle and its code order.",
+  "timing": {
+    "$comment": "IPC ceilings for the boundary plan, in plan order. The conformance plan measures the same four fixtures in the same order.",
+    "boundary": [
+      {
+        "fixture": "alias-with-explicit-type-args",
+        "maxFetchedToMaterializedRatio": 1.2,
+        "maxRequestCount": 148,
+        "maxBytesReceived": 33303,
+        "bytesReceivedPathLengthHeadroom": 32768
+      },
+      {
+        "fixture": "mapped-alias-two-hop",
+        "maxFetchedToMaterializedRatio": 1.2,
+        "maxRequestCount": 83,
+        "maxBytesReceived": 22577,
+        "bytesReceivedPathLengthHeadroom": 32768
+      },
+      {
+        "fixture": "module-dts-declarations-and-reexports",
+        "maxFetchedToMaterializedRatio": 120,
+        "maxRequestCount": 187,
+        "maxBytesReceived": 980000
+      },
+      {
+        "fixture": "base-ui-component",
+        "maxFetchedToMaterializedRatio": 140,
+        "maxRequestCount": 433,
+        "maxBytesReceived": 3200000
+      }
+    ],
+    "externalSelection": [
+      {
+        "fixture": "package-selective-external-types",
+        "maxRequestCount": 310,
+        "maxBytesReceived": 2000000
+      }
+    ]
+  },
+  "virtualUpstreamDependency": ["module-imports-only"],
+  "locallyGeneratedOracles": ["render-prop-union", "template-literal-union-prop"],
+  "excludedTypecheckProjects": ["basic/invalid-tsconfig.json", "conformance-tsconfig.json"]
+}

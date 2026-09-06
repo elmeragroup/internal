@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "paths": {
+      "@fixture/source.js": ["./module-resolution-alias/source.d.ts"],
+      "@fixture/*": ["./module-resolution-alias/*"]
+    },
+    "jsx": "react-jsx",
+    "rootDir": "../..",
+    "strict": true,
+    "target": "ES2022",
+    "noEmit": true,
+    "skipLibCheck": false
+  },
+  "include": [
+    "alias-with-explicit-type-args/input.ts",
+    "mapped-alias-two-hop/input.ts",
+    "module-dts-declarations-and-reexports/input.d.ts",
+    "module-dts-declarations-and-reexports/source.d.ts",
+    "module-dts-type-star/input.d.ts",
+    "module-dts-type-star/source.d.ts",
+    "module-resolution-alias/input.d.ts",
+    "module-resolution-alias/source.d.ts",
+    "module-resolution-package/input.d.ts",
+    "base-ui-component/input.tsx"
+  ]
+}

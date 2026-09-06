@@ -1,0 +1,14 @@
+{
+  "fixture": "mapped-type-prettify-intersection-resolution",
+  "compiler": "typescript@7.0.2",
+  "sourceOracle": "output.json",
+  "comparison": "exact",
+  "divergence": {
+    "code": "TS7_MAPPED_INTERSECTION_PROPERTY_ORDER",
+    "genus": "mapped-intersection-property-order",
+    "reason": "TypeScript 7 returns the properties of a mapped type over an intersection of mapped types in sorted order, while the pinned TypeScript 6 upstream oracle observes them in declaration order (x, y, width, height). Only the property order differs; every property name, type, optionality, and the merged intersection shape match the upstream oracle.",
+    "upstreamPreserved": true,
+    "differenceCount": 8,
+    "differenceDigest": "6ca16b434ee75c33bc1e7d960671d9986ac05f80ed801959f1f189ecd580484c"
+  }
+}

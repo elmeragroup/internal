@@ -1,0 +1,14 @@
+{
+	"fixture": "interface-extends-namespace-and-omit-resolution",
+	"compiler": "typescript@7.0.2",
+	"sourceOracle": "output.json",
+	"comparison": "exact",
+	"divergence": {
+		"code": "TS7_UNION_MEMBER_FLATTENING",
+		"genus": "external-union-and-member-order",
+		"reason": "Heritage extraction unwraps utility types and records resolvedName exactly as upstream, every namespace member matches, and all sixteen export names and their order reproduce the preserved oracle byte-for-byte. The residual differences are two compiler-view genera: TypeScript 6 summarizes dependency-owned `React.ReactNode` unions as opaque references while TypeScript 7 hands the resolver expanded element/state unions beneath them - the external React graph genus recorded since Issue 02 - and TypeScript 7 reports interface members in declaration order where TypeScript 6 reported the checker's instantiation order in AlertDialogRootProps and AlertDialogRoot.Props (ours [open, defaultOpen, children, onOpenChange], upstream [onOpenChange, children, open, defaultOpen]), the same member-order divergence recorded for the reduced Omit intersection in react-component-overload-any-callback-deduplication. Neither is extraction policy: the resolver reports what the checker hands it in both compilers.",
+		"upstreamPreserved": true,
+		"differenceCount": 388,
+		"differenceDigest": "bad055721c55ecaa910a58df63a1895e0024b5e329ed6ab6b8cda266ac0122c1"
+	}
+}

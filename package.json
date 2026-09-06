@@ -1,0 +1,45 @@
+{
+  "name": "elmera-group-internal",
+  "private": true,
+  "scripts": {
+    "build": "turbo run build",
+    "changeset": "changeset",
+    "ci:checks": "oxfmt --check && turbo run ci:checks",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check",
+    "lint": "oxlint . --deny-warnings",
+    "lint:fix": "oxlint --fix .",
+    "test": "turbo run test",
+    "test:repo-policy": "vitest run --config test/vitest.config.mjs",
+    "type-check": "turbo run type-check",
+    "canary:version": "node scripts/canary-version.ts",
+    "canary:pack": "pnpm build && node scripts/canary-pack.ts",
+    "test:packed-consumer": "node scripts/packed-consumer.ts",
+    "canary:publish": "node scripts/canary-publish.ts",
+    "type-check:scripts": "tsc --noEmit -p scripts/tsconfig.json"
+  },
+  "devDependencies": {
+    "@changesets/cli": "catalog:",
+    "@elmeragroup/oxlint-plugin": "workspace:*",
+    "@elmeragroup/oxlint-plugin-anti-slop": "workspace:*",
+    "@elmeragroup/typescript-config": "workspace:*",
+    "@oxlint/plugins": "catalog:",
+    "@types/node": "catalog:",
+    "eslint-plugin-turbo": "catalog:",
+    "oxfmt": "catalog:",
+    "oxlint": "catalog:",
+    "oxlint-tsgolint": "catalog:",
+    "turbo": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "yaml": "catalog:",
+    "@elmeragroup/internal": "workspace:*",
+    "@elmeragroup/api-extractor": "workspace:*",
+    "effect": "catalog:"
+  },
+  "engines": {
+    "node": ">=24.13.0 <25"
+  },
+  "packageManager": "pnpm@11.20.0",
+  "type": "module"
+}

@@ -1,0 +1,14 @@
+{
+	"fixture": "react-forward-ref-union-props",
+	"compiler": "typescript@7.0.2",
+	"sourceOracle": "output.json",
+	"comparison": "exact",
+	"divergence": {
+		"code": "TS7_REACT_COMPONENT_UNION_ORDER",
+		"genus": "react-union-member-order",
+		"reason": "TypeScript 7 exposes the union members in a different checker declaration order than the pinned TypeScript 6 upstream oracle; the authored component and ref structures are unchanged.",
+		"upstreamPreserved": true,
+		"differenceCount": 87,
+		"differenceDigest": "7469102a810f0b554e995ead57047d6cdb6556bcd55c0c89e92dd52b1a624ab7"
+	}
+}

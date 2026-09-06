@@ -1,0 +1,25 @@
+{
+	"compilerOptions": {
+		"module": "ESNext",
+		"moduleResolution": "Bundler",
+		"jsx": "react-jsx",
+		"rootDir": "../..",
+		"strict": true,
+		"target": "ES2022",
+		"noEmit": true,
+		"skipLibCheck": false
+	},
+	"include": [
+		"input.tsx",
+		"fake-react.d.ts",
+		"local-react.d.ts",
+		"bridge-one.ts",
+		"bridge-two.ts",
+		"bridge-star-one.ts",
+		"bridge-star-two.ts",
+		"bridge-namespace-one.ts",
+		"bridge-namespace-two.ts",
+		"bridge-nested.ts",
+		"alias-namespace.ts"
+	]
+}

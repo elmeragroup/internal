@@ -1,0 +1,21 @@
+{
+	"compilerOptions": {
+		"module": "ESNext",
+		"moduleResolution": "Bundler",
+		"jsx": "react-jsx",
+		"rootDir": "../..",
+		"strict": true,
+		"target": "ES2022",
+		"noEmit": true,
+		"skipLibCheck": false
+	},
+	"include": [
+		"input.tsx",
+		"barrel.ts",
+		"react-branch.ts",
+		"local-branch.d.ts",
+		"react-hop.ts",
+		"local-hop.ts",
+		"transitive-barrel.ts"
+	]
+}

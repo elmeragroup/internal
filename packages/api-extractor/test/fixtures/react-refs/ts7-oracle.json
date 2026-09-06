@@ -1,0 +1,14 @@
+{
+	"fixture": "react-refs",
+	"compiler": "typescript@7.0.2",
+	"sourceOracle": "output.json",
+	"comparison": "exact",
+	"divergence": {
+		"code": "TS7_REF_ALIAS_UNION_EXPANSION",
+		"genus": "union-alias-expansion",
+		"reason": "TypeScript 6 keeps the alias identity of `React.Ref<T>` on its resolved union, so the pinned oracle reports one opaque external reference `React.Ref<HTMLInputElement>` beside `undefined`; TypeScript 7 hands the resolver the expanded union instead, so the members report individually (`React.RefObject<T | null>` with its substituted argument, `React.RefCallback`, and folded `null`) and the optional property widens to four members. Inside the expanded members the TypeScript 7 substitution view also names the DOM element through React's augmented namespace chain (`HTMLInputElement` with namespaces ['React']) where TypeScript 6 reported the bare global name. The ownership policy itself behaves identically in both compilers - every dependency-owned arm summarizes as a named external reference rather than expanding signatures - so all remaining differences sit in the compiler's union identity view, and every non-alias prop of this fixture reproduces the upstream oracle byte-for-byte.",
+		"upstreamPreserved": true,
+		"differenceCount": 17,
+		"differenceDigest": "9d8c5dc33099dc09fe6d2d6cef02baa1ed5b9366a210a081a11a209eb58cc658"
+	}
+}

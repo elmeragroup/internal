@@ -1,0 +1,33 @@
+packages:
+  - packages/*
+  - tooling/*
+
+catalog:
+  "@changesets/cli": 2.29.7
+  "@oxlint/plugins": 1.78.0
+  "@types/node": 25.9.5
+  "@types/react": 19.2.17
+  "@types/react-dom": 19.2.3
+  eslint-plugin-turbo: 2.10.2
+  effect: 4.0.0-rc.111
+  oxfmt: 0.60.0
+  oxlint: 1.78.0
+  oxlint-tsgolint: 7.0.2001
+  react: 19.2.8
+  turbo: 2.10.2
+  typescript: 7.0.2
+  vitest: 4.1.10
+  yaml: 2.9.0
+
+autoInstallPeers: true
+
+allowBuilds:
+  esbuild: true
+  "@swc/core": true
+  "@parcel/watcher": true
+  msgpackr-extract: false
+
+minimumReleaseAge: 4320
+
+minimumReleaseAgeExclude:
+  - effect@4.0.0-rc.111

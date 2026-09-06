@@ -1,0 +1,19 @@
+{
+	"compilerOptions": {
+		"module": "ESNext",
+		"moduleResolution": "Bundler",
+		"jsx": "react-jsx",
+		"rootDir": "../..",
+		"strict": true,
+		"target": "ES2022",
+		"noEmit": true,
+		"skipLibCheck": false
+	},
+	"include": [
+		"type-extract-utility-resolution/input.ts",
+		"type-alias-export-preservation/input.ts",
+		"unresolved-indexed-access-fallback/input.ts",
+		"type-literal-union-resolution/input.ts",
+		"type-conditional-return-and-props/input.ts"
+	]
+}

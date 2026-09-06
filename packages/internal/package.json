@@ -1,0 +1,46 @@
+{
+  "name": "@elmeragroup/internal",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "build": "node ../../scripts/build-package.ts",
+    "type-check": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@elmeragroup/api-artifacts": "workspace:*"
+  },
+  "devDependencies": {
+    "@elmeragroup/typescript-config": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "version": "0.1.0-canary.0",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist/**",
+    "README.md",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "engines": {
+    "node": ">=24.13.0 <25"
+  },
+  "publishConfig": {
+    "access": "public",
+    "tag": "canary"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/elmeragroup/internal.git",
+    "directory": "packages/internal"
+  }
+}

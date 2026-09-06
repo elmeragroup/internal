@@ -1,0 +1,14 @@
+{
+	"fixture": "namespace-export-resolution",
+	"compiler": "typescript@7.0.2",
+	"sourceOracle": "output.json",
+	"comparison": "exact",
+	"divergence": {
+		"code": "TS7_UNION_MEMBER_FLATTENING",
+		"genus": "union-member-flattening",
+		"reason": "TypeScript 7 hands the resolver a flattened union view where TypeScript 6 preserved the pre-flattening composition, and the difference is observable only through the namespace member exports this fixture flattens. Two leaf families are affected. First, an optional enum property ('os?: Grade') reaches the resolver as a three-member union of its EXPANDED enum literals plus 'undefined' (verified against the raw checker: members 'undefined', 'Grade.good', 'Grade.bad'), while TypeScript 6 kept the whole enum as one member beside 'undefined'; resolving each literal member re-derives its owning enum node, so the reported union carries the enum shape twice where upstream reports it once. Second, a two-hop alias chain collapses: 'oa?: NamespacedType' (NamespacedType = OutsideType = 'one' | 'two') reports its alias symbol as 'OutsideType' under TypeScript 7 where TypeScript 6 named the intermediate 'NamespacedType', and the same collapse affects the parameter of acceptsNamespacedType. The module-surface machinery itself - namespace flattening, nested namespaces, member ordering, public-name repair for 'Root.NamespacedType' - reproduces the upstream oracle exactly; every remaining shifted leaf is confined to these two union-composition families and none touches export structure.",
+		"upstreamPreserved": true,
+		"differenceCount": 87,
+		"differenceDigest": "91df81866b5fb5391934e91cc1714ca1003ae42cf0ae6120475a0f4ef71e2575"
+	}
+}

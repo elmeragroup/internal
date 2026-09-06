@@ -1,0 +1,17 @@
+{
+	"compilerOptions": {
+		"module": "ESNext",
+		"moduleResolution": "Bundler",
+		"jsx": "react-jsx",
+		"rootDir": "../..",
+		"strict": true,
+		"target": "ES2022",
+		"noEmit": true,
+		"skipLibCheck": false
+	},
+	"include": [
+		"external-mapped-type-name-preservation/input.ts",
+		"mapped-type-builtin-utility-resolution/input.ts",
+		"mapped-type-optional-aliased-unknown/input.ts"
+	]
+}

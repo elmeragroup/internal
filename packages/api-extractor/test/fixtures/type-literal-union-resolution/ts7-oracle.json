@@ -1,0 +1,14 @@
+{
+  "fixture": "type-literal-union-resolution",
+  "compiler": "typescript@7.0.2",
+  "sourceOracle": "output.json",
+  "comparison": "exact",
+  "divergence": {
+    "code": "TS7_KEYOF_UNION_MEMBER_ORDER",
+    "genus": "keyof-union-member-order",
+    "reason": "TypeScript 7's checker returns the reduced `keyof Params` union with its literal members in sorted-key order (callback, indirectUnion, inlineNumberUnion, …), while the pinned TypeScript 6 oracle preserves the operand's property declaration order (inlineStringUnion, inlineNumberUnion, referencedStringUnion, …). The resolver's canonicalizer is order-preserving for both compilers — a minimal probe (`keyof { zebra; mango; alpha }`) reproduces the sorted order from the checker alone — so the reordering happens inside TypeScript 7's union construction, not in extraction policy. All 7 leaf differences are confined to the `resolvedType` member values of the one preserved operator; every other shape matches the upstream oracle, including the compacted named-object operand and the `resolutionKind`.",
+    "upstreamPreserved": true,
+    "differenceCount": 7,
+    "differenceDigest": "a3a5a23617c4eb51368c7f2c543861728c9ff90c320d87965f0ea16672a9aa85"
+  }
+}

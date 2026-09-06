@@ -1,0 +1,25 @@
+{
+  "fixture": "interface-extends-basic-resolution",
+  "compiler": "typescript@7.0.2",
+  "sourceOracle": "output.json",
+  "comparison": "exact",
+  "divergence": {
+    "code": "TS7_INTERFACE_MEMBER_ENUMERATION_AND_FALLBACK",
+    "genus": "checker-member-order-and-unsupported-any-fallback",
+    "reason": "TypeScript 7 enumerates inherited interface members in declaration order where the pinned TypeScript 6 checker reports the instantiated order, and its native symbol graph exposes the exported namespace value `Dialog` as an unresolved `any`. The nine changed leaves are limited to the three inherited property orders, the `Dialog` fallback, and the corresponding `Dialog.Props` surface. Heritage names and resolved names remain intact, so this is compiler-view evidence rather than a resolver policy change.",
+    "upstreamPreserved": true,
+    "differenceCount": 9,
+    "differenceDigest": "51622464ef9317fc11c2b8f3f0e74dd4c0be3348adbfe9950abd8ba468cce775",
+    "differencePaths": [
+      "/exports/0/type/properties/0/name",
+      "/exports/0/type/properties/1/name",
+      "/exports/1/type/properties/0/name",
+      "/exports/1/type/properties/1/name",
+      "/exports/1/type/properties/1/type/intrinsic",
+      "/exports/1/type/properties/2/name",
+      "/exports/1/type/properties/2/type/intrinsic",
+      "/exports/2/type/properties/0/name",
+      "/exports/2/type/properties/1/name"
+    ]
+  }
+}

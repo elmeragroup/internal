@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "rootDir": "../..",
+    "strict": true,
+    "target": "ES2022",
+    "noEmit": true,
+    "skipLibCheck": false
+  },
+  "include": ["input.ts", "shadowed.ts", "shadowed-array.ts"]
+}

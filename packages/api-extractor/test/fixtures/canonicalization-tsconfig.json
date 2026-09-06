@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "rootDir": "../..",
+    "strict": true,
+    "target": "ES2022",
+    "noEmit": true,
+    "skipLibCheck": false
+  },
+  "include": [
+    "distributive-conditional-intersection-expansion/input.ts",
+    "intersection-order-deduplication/input.ts",
+    "large-nested-union-any-order/input.ts",
+    "mapped-type-prettify-intersection-resolution/input.ts",
+    "nested-function-union-any-deduplication/input.ts",
+    "type-alias-union-member-resolution/input.ts",
+    "type-indexed-access-union-resolution/input.ts",
+    "type-intersection-resolution/input.ts",
+    "type-never-resolution/input.ts",
+    "type-union-object-props-resolution/input.tsx",
+    "union-any-wildcard-order/input.ts",
+    "union-never-reduction/input.ts"
+  ]
+}

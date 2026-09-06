@@ -1,0 +1,14 @@
+{
+	"fixture": "generic-props-namespace-specialization",
+	"compiler": "typescript@7.0.2",
+	"sourceOracle": "output.json",
+	"comparison": "exact",
+	"divergence": {
+		"code": "TS7_REACT_EXTERNAL_GRAPH",
+		"genus": "external-react-graph",
+		"reason": "The namespace recovery this fixture was deferred for works: namespacedProps resolves MyComponent.Props through its specialization, every namespace member name and ordering matches the upstream oracle, and GenericHTMLProps reports its intersection shape exactly. Every remaining leaf difference sits inside the render-callback return type, where TypeScript 6 summarizes the external `React.ReactElement` reference and TypeScript 7 resolves its type-argument union graph - the external React graph genus recorded since Issue 02, none of it in the namespace machinery.",
+		"upstreamPreserved": true,
+		"differenceCount": 62,
+		"differenceDigest": "d47addd479ec8cc2caca4a945754795f5aa550db0f6633119341bed52b1622df"
+	}
+}

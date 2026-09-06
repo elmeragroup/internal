@@ -1,0 +1,25 @@
+{
+  "fixture": "symbol-double-underscore-name-preservation",
+  "compiler": "typescript@7.0.2",
+  "sourceOracle": "output.json",
+  "comparison": "exact",
+  "divergence": {
+    "code": "TS7_DOUBLE_UNDERSCORE_SYMBOL_RESOLUTION",
+    "genus": "reserved-symbol-name-resolution",
+    "reason": "TypeScript 7's native checker does not materialize the exported object symbol whose name begins with `__` in the same way as the pinned TypeScript 6 checker. Function parameter and return types therefore retain an anonymous object shape, while the direct `__Named` export falls through the structured unsupported-type warning to `any`. The nine changed leaves and one warning are confined to that compiler symbol-resolution behavior; the authored input and upstream oracle remain unchanged.",
+    "upstreamPreserved": true,
+    "differenceCount": 9,
+    "differenceDigest": "3a23a9015a8c1f270c80389b949813b3873474a0a645016f91004ab98e1b4303",
+    "differencePaths": [
+      "/exports/0/type/callSignatures/0/parameters/0/type/typeName/name",
+      "/exports/0/type/callSignatures/0/returnValueType/typeName/name",
+      "/exports/1/type/intrinsic",
+      "/exports/1/type/kind",
+      "/exports/1/type/properties/0/name",
+      "/exports/1/type/properties/0/optional",
+      "/exports/1/type/properties/0/type/intrinsic",
+      "/exports/1/type/properties/0/type/kind",
+      "/exports/1/type/typeName/name"
+    ]
+  }
+}

@@ -1,0 +1,14 @@
+{
+	"fixture": "module-reexports-parts-namespace",
+	"compiler": "typescript@7.0.2",
+	"sourceOracle": "output.json",
+	"comparison": "exact",
+	"divergence": {
+		"code": "TS7_UNION_MEMBER_FLATTENING",
+		"genus": "union-identity-pinning",
+		"reason": "The re-export surface this fixture pins - export names, ordering, reexportedFrom, documentation ownership, type-only star filtering, and the flattened namespace members - reproduces the upstream oracle exactly, and every React leaf the deferral recorded is gone now that dependency-owned types summarize before structural expansion. Three leaves remain, all the same TypeScript 7 union identity pinning recorded across the TS7_UNION_MEMBER_FLATTENING cases: the optional `partState` property reports its instantiated alias name (`ComponentPartState`) in Component.Root, Component.Root.Props, and ComponentRootProps where TypeScript 6 reported an anonymous union, because TypeScript 7 pins the alias identity onto the checker's union view and the resolver faithfully names what the checker hands it.",
+		"upstreamPreserved": true,
+		"differenceCount": 3,
+		"differenceDigest": "68240f8561590f50d5be2e6125c921b78e2d62109416c935fb6d664838358ff9"
+	}
+}

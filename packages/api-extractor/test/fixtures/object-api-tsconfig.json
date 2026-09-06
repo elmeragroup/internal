@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "rootDir": "../..",
+    "strict": true,
+    "target": "ES2022",
+    "noEmit": true,
+    "skipLibCheck": false
+  },
+  "include": [
+    "type-object-shape-resolution/input.ts",
+    "enum-members-values-and-docs/input.ts",
+    "jsdoc-extra-tags-preservation/input.ts",
+    "object-property-count-limit-scope/input.tsx",
+    "function-parameters-optional-and-defaults/input.ts"
+  ]
+}

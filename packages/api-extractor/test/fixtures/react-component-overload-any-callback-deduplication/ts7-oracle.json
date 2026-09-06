@@ -1,0 +1,14 @@
+{
+	"fixture": "react-component-overload-any-callback-deduplication",
+	"compiler": "typescript@7.0.2",
+	"sourceOracle": "output.json",
+	"comparison": "exact",
+	"divergence": {
+		"code": "TS7_REACT_EXTERNAL_GRAPH",
+		"genus": "external-react-graph-and-member-order",
+		"reason": "Overload squashing deduplicates the `any`-callback forms exactly as upstream, and the surviving prop set matches; the residual differences re-derive the three TypeScript 7 divergences recorded at deferral: the reduced `Omit<...>` intersection reports its members in TypeScript 7's declaration order where the pinned oracle reports `filter` first from the mapped-type view, the indexed-access constraint read `{items: readonly any[]}` degrades through the structured fallback contract (one recorded `unsupported-type-fallback` warning, mirrored in this fixture's warning expectations) where TypeScript 6 silently narrowed the same shape, and one union arm reports `any` versus the oracle's array form. All are compiler-view differences inside the external React/Omit graph, not extraction policy.",
+		"upstreamPreserved": true,
+		"differenceCount": 56,
+		"differenceDigest": "5674e4027c39ec86e7775224cbdeecd993032a7ed313d7198719f7c0fb8da521"
+	}
+}

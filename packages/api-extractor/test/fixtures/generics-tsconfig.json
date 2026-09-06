@@ -1,0 +1,32 @@
+{
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "rootDir": "../..",
+    "strict": true,
+    "target": "ES2022",
+    "noEmit": true,
+    "skipLibCheck": false
+  },
+  "include": [
+    "generic-argument-alias-resolution/input.ts",
+    "generic-callback-alias-constraint-deduplication/input.ts",
+    "generic-callback-alias-renamed-typeparams/input.ts",
+    "generic-callback-alias-vs-inline-deduplication/input.ts",
+    "generic-callback-constraint-property-keys/input.ts",
+    "generic-callback-default-deduplication/input.ts",
+    "generic-callback-nested-shadow-deduplication/input.ts",
+    "generic-constraint-tostring-collapse/input.ts",
+    "generic-default-argument-resolution/input.ts",
+    "generic-function-and-interface-resolution/input.ts",
+    "interface-method-generic-signatures/input.ts",
+    "type-alias-generic-argument-resolution/input.ts",
+    "type-alias-basic-resolution/input.ts",
+    "type-reference-vs-inline-resolution/input.ts",
+    "generic-substitution-scope/keyof-arguments.ts",
+    "generic-substitution-scope/generic-class.ts",
+    "generic-substitution-scope/substitution-scope.ts",
+    "generic-substitution-scope/spread-pairing.ts"
+  ]
+}

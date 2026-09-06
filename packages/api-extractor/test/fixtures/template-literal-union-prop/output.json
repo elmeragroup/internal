@@ -1,0 +1,44 @@
+{
+	"name": "fixtures/template-literal-union-prop/input",
+	"exports": [
+		{
+			"name": "PhoneField",
+			"type": {
+				"kind": "component",
+				"typeName": {
+					"name": "PhoneField"
+				},
+				"props": [
+					{
+						"name": "autocomplete",
+						"type": {
+							"kind": "union",
+							"types": [
+								{
+									"kind": "literal",
+									"value": "\"on\""
+								},
+								{
+									"kind": "literal",
+									"value": "\"off\""
+								},
+								{
+									"kind": "literal",
+									"value": "`section-${string}`"
+								},
+								{
+									"kind": "literal",
+									"value": "`shipping ${string}`"
+								}
+							]
+						},
+						"optional": false
+					}
+				]
+			}
+		}
+	],
+	"imports": [
+		"react"
+	]
+}

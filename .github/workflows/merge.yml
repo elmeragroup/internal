@@ -1,0 +1,45 @@
+name: Merge
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: oxfmt
+        run: pnpm exec oxfmt --check
+
+      - name: Check workspace
+        run: pnpm exec turbo run ci:checks
+
+      - name: Verify packed consumer
+        run: pnpm canary:pack && pnpm test:packed-consumer
+
+      - name: Changeset presence
+        if: ${{ github.event_name == 'pull_request' && !startsWith(github.head_ref, 'changeset-release/') && !contains(github.event.pull_request.labels.*.name, 'no-changeset') }}
+        run: pnpm exec changeset status --since=origin/${{ github.base_ref }}

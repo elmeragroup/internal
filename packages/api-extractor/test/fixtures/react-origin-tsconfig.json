@@ -1,0 +1,38 @@
+{
+	"compilerOptions": {
+		"module": "ESNext",
+		"moduleResolution": "Bundler",
+		"jsx": "react-jsx",
+		"rootDir": "../..",
+		"strict": true,
+		"target": "ES2022",
+		"noEmit": true,
+		"skipLibCheck": false
+	},
+	"include": [
+		"react-wrapper-provenance/input.tsx",
+		"base-ui-component/input.tsx",
+		"react-forward-ref-component/input.tsx",
+		"react-forward-ref-union-props/input.tsx",
+		"react-memo-component/input.tsx",
+		"react-mui-overridable-component/input.d.ts",
+		"react-component-function-declaration/input.tsx",
+		"react-component-function-overloads/input.ts",
+		"react-component-function-variable/input.tsx",
+		"react-component-generic-function-overloads/input.ts",
+		"react-component-overload-any-callback-deduplication/input.tsx",
+		"react-component-render-callback-props/input.tsx",
+		"react-component-return-types/input.tsx",
+		"react-component-union-variants/input.tsx",
+		"react-event-handlers/input.ts",
+		"react-hook-arrow-function/input.ts",
+		"react-hook-function-declaration/input.ts",
+		"react-hook-function-expression/input.ts",
+		"react-hook-multiple-parameters/input.ts",
+		"react-hook-overload-signatures/input.ts",
+		"react-props-callback-types/input.tsx",
+		"react-props-literal-types/input.tsx",
+		"react-props-optional-types/input.tsx",
+		"react-refs/input.tsx"
+	]
+}

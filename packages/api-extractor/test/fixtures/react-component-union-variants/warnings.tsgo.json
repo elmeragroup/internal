@@ -1,0 +1,15 @@
+[
+  {
+    "message": "Could not classify \"OptionalToolbar\" as a React component at \"test/fixtures/react-component-union-variants/input.tsx:49:14\" because part of its union returns a non-React value. The extractor kept the original union type. Review the export if it should be a component.",
+    "filePath": "test/fixtures/react-component-union-variants/input.tsx",
+    "line": 49,
+    "column": 14,
+    "parsedSymbolStack": [
+      "test/fixtures/react-component-union-variants/input.tsx",
+      "OptionalToolbar"
+    ],
+    "code": "uncertain-component-recognition",
+    "reason": "mixed-component-union",
+    "name": "OptionalToolbar"
+  }
+]

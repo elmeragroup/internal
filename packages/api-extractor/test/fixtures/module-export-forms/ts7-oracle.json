@@ -1,0 +1,14 @@
+{
+	"fixture": "module-export-forms",
+	"compiler": "typescript@7.0.2",
+	"sourceOracle": "output.json",
+	"comparison": "exact",
+	"divergence": {
+		"code": "TS7_DEFAULT_EXPORT_SYMBOL_NAMING",
+		"genus": "default-export-symbol-naming",
+		"reason": "Every export form matches the preserved oracle after the external-before-callable ordering landed: the merged namespace member, the aliased overload re-exports, the forward-ref callable surface with its summarized `React.ForwardedRef<Element>` reference, and export ordering. One leaf remains: TypeScript 7 materializes the declaration-shaped `export default` with the synthetic `default` symbol name where TypeScript 6 kept the authored function name - the same compiler-model difference recorded when missing-default-export-symbol was implemented, which no resolver policy can recover because no authored name survives on the symbol.",
+		"upstreamPreserved": true,
+		"differenceCount": 1,
+		"differenceDigest": "1ce4e9a5ddc112dfc9b4976ce15144ca080db7d793ac8515d9767e1f26987cbf"
+	}
+}

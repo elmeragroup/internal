@@ -1,0 +1,14 @@
+{
+	"fixture": "react-component-render-callback-props",
+	"compiler": "typescript@7.0.2",
+	"sourceOracle": "output.json",
+	"comparison": "exact",
+	"divergence": {
+		"code": "TS7_REACT_EXTERNAL_GRAPH",
+		"genus": "external-react-graph",
+		"reason": "The component transform recognizes AccordionHeader and produces the same one-prop table as upstream; the residual differences sit inside the `render` prop's payload, where TypeScript 6 summarizes the `ReactElement<unknown>` return of the render callback and TypeScript 7 exposes the expanded external element/props union graph beneath it. The exported props alias resolves to the same empty-object descriptor on both sides. Same external-graph genus recorded for base-ui-component since Issue 02.",
+		"upstreamPreserved": true,
+		"differenceCount": 244,
+		"differenceDigest": "551b0f778a86e9010be01ddee914d3e59bfb9ddbdc5e1a5b7c57af65d05e1d05"
+	}
+}

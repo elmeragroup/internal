@@ -1,0 +1,12 @@
+.ref/
+.DS_Store
+node_modules/
+!packages/api-extractor/test/fixtures/**/node_modules/
+.pnpm-store/
+.turbo/
+dist/
+.artifacts/
+coverage/
+.cache/
+*.tsbuildinfo
+.idea/

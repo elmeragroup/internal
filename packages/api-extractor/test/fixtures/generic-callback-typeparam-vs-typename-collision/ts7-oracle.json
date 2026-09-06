@@ -1,0 +1,24 @@
+{
+  "fixture": "generic-callback-typeparam-vs-typename-collision",
+  "compiler": "typescript@7.0.2",
+  "sourceOracle": "output.json",
+  "comparison": "exact",
+  "divergence": {
+    "code": "TS7_CONSTRAINT_TYPEPARAM_RENDERING",
+    "genus": "constraint-rendering",
+    "reason": "TypeScript 7 renders the self-referential `{ self: T }` constraint through the type-parameter node, while the pinned TypeScript 6 oracle observes the intermediate concrete interface object named `T`. The eight changed leaves are limited to the Colliding callback's parameter and return constraints; the AlphaEquiv callback and the rest of the generic structure are unchanged. This is a checker rendering difference under substitution, not a canonicalization or ownership policy decision.",
+    "upstreamPreserved": true,
+    "differenceCount": 8,
+    "differenceDigest": "2a1f6afcbe382547bf4157002fc0dbed0555b74ce9e0b4d5d976e1838c9a27a0",
+    "differencePaths": [
+      "/exports/0/type/types/0/callSignatures/0/parameters/0/type/constraint/properties/0/type/kind",
+      "/exports/0/type/types/0/callSignatures/0/parameters/0/type/constraint/properties/0/type/name",
+      "/exports/0/type/types/0/callSignatures/0/parameters/0/type/constraint/properties/0/type/properties/@length",
+      "/exports/0/type/types/0/callSignatures/0/parameters/0/type/constraint/properties/0/type/typeName/name",
+      "/exports/0/type/types/0/callSignatures/0/returnValueType/constraint/properties/0/type/kind",
+      "/exports/0/type/types/0/callSignatures/0/returnValueType/constraint/properties/0/type/name",
+      "/exports/0/type/types/0/callSignatures/0/returnValueType/constraint/properties/0/type/properties/@length",
+      "/exports/0/type/types/0/callSignatures/0/returnValueType/constraint/properties/0/type/typeName/name"
+    ]
+  }
+}

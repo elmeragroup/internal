@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "rootDir": ".",
+    "strict": true,
+    "target": "ES2022"
+  },
+  "include": ["input.ts", "unsupported.ts", "unsupported-template.ts", "unsupported-signatures.ts"]
+}

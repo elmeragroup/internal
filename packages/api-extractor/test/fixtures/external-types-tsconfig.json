@@ -1,0 +1,31 @@
+{
+	"compilerOptions": {
+		"module": "ESNext",
+		"moduleResolution": "Bundler",
+		"jsx": "react-jsx",
+		"rootDir": "../..",
+		"strict": true,
+		"target": "ES2022",
+		"noEmit": true,
+		"skipLibCheck": false
+	},
+	"include": [
+		"external-conditional-type-resolution/input.ts",
+		"external-union-type-name-preservation/input.ts",
+		"generic-callback-typeparam-vs-typename-collision/input.ts",
+		"generic-props-namespace-specialization/input.ts",
+		"interface-extends-namespace-and-omit-resolution/input.ts",
+		"module-export-forms/input.tsx",
+		"module-reexports-aliased-source-tracking/input.ts",
+		"react-component-overload-any-callback-deduplication/input.tsx",
+		"react-component-render-callback-props/input.tsx",
+		"react-component-union-variants/input.tsx",
+		"react-event-handlers/input.ts",
+		"react-hook-arrow-function/input.ts",
+		"react-hook-function-declaration/input.ts",
+		"react-hook-function-expression/input.ts",
+		"react-refs/input.tsx",
+		"module-reexports-parts-namespace/input.ts",
+		"external-root-boundary/input.ts"
+	]
+}

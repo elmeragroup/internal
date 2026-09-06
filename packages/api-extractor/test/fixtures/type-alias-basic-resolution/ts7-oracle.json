@@ -1,0 +1,14 @@
+{
+  "fixture": "type-alias-basic-resolution",
+  "compiler": "typescript@7.0.2",
+  "sourceOracle": "output.json",
+  "comparison": "exact",
+  "divergence": {
+    "code": "TS7_ALIAS_OPTIONAL_UNION_PINNING",
+    "genus": "alias-optional-union-pinning",
+    "reason": "TypeScript 7's union identity pinning erases the intermediate named alias union at optionality positions: for `oa?: Alias` (Alias = SomeType = 1 | 2) the checker reports no alias symbol on the undefined arm and flattens the members to [1, 2, undefined], while the pinned TypeScript 6 oracle preserves the nested named Alias union beside undefined; the same pinning surfaces `MyRecord<string, string>` as the optional union's public name where TypeScript 6 leaves that union anonymous. All 28 leaf differences are confined to those two optionality-induced aliased unions (oa and or). Every other shape matches the upstream oracle, including the non-optional `a: Alias` and the aliased intrinsics AliasedAny/AliasedUnknown, which this fixture pins by keeping their alias names over any/unknown.",
+    "upstreamPreserved": true,
+    "differenceCount": 28,
+    "differenceDigest": "4b3aa308a23d0c77608086bbc3eb2d9a1a6c6783997d02f0abcfd38492e62cf1"
+  }
+}

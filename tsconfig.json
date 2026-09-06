@@ -1,0 +1,3 @@
+{
+  "extends": "@elmeragroup/typescript-config/base.json"
+}

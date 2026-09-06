@@ -1,0 +1,19 @@
+{
+  "name": "@elmeragroup/oxlint-plugin",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./index.js"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@oxlint/plugins": "catalog:"
+  },
+  "devDependencies": {
+    "oxlint": "catalog:",
+    "vitest": "catalog:"
+  }
+}

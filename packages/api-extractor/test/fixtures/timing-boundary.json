@@ -1,0 +1,111 @@
+{
+  "issue": "02-prove-compiler-boundary",
+  "command": "fnm exec --using 24.13.0 -- node scripts/timing.ts --plan issue02 --check",
+  "runtime": {
+    "node": "24.13.0",
+    "compiler": "typescript@7.0.2"
+  },
+  "samples": [
+    {
+      "fixture": "alias-with-explicit-type-args",
+      "enabled": true,
+      "totals": {
+        "requestCount": 175,
+        "roundTripMs": 38.05917300000027,
+        "bytesSent": 32401,
+        "bytesReceived": 33303,
+        "serverTimeMs": 24.381336999999977,
+        "transportOverheadMs": 13.677836000000294,
+        "nodesMaterialized": 86,
+        "sourceFilesFetched": 1,
+        "nodesFetched": 97
+      },
+      "fetchedToMaterializedRatio": 1.127906976744186,
+      "budget": {
+        "maxFetchedToMaterializedRatio": 1.2,
+        "maxRequestCount": 148,
+        "maxBytesReceived": 33303,
+        "bytesReceivedPathLengthHeadroom": 32768
+      }
+    },
+    {
+      "fixture": "mapped-alias-two-hop",
+      "enabled": true,
+      "totals": {
+        "requestCount": 114,
+        "roundTripMs": 28.336739000000705,
+        "bytesSent": 22932,
+        "bytesReceived": 22577,
+        "serverTimeMs": 20.714332999999975,
+        "transportOverheadMs": 7.62240600000073,
+        "nodesMaterialized": 64,
+        "sourceFilesFetched": 1,
+        "nodesFetched": 71
+      },
+      "fetchedToMaterializedRatio": 1.109375,
+      "budget": {
+        "maxFetchedToMaterializedRatio": 1.2,
+        "maxRequestCount": 83,
+        "maxBytesReceived": 22577,
+        "bytesReceivedPathLengthHeadroom": 32768
+      }
+    },
+    {
+      "fixture": "module-dts-declarations-and-reexports",
+      "enabled": true,
+      "totals": {
+        "requestCount": 240,
+        "roundTripMs": 34.19736400000005,
+        "bytesSent": 43963,
+        "bytesReceived": 944311,
+        "serverTimeMs": 24.645674999999997,
+        "transportOverheadMs": 9.551689000000053,
+        "nodesMaterialized": 154,
+        "sourceFilesFetched": 9,
+        "nodesFetched": 24073
+      },
+      "fetchedToMaterializedRatio": 156.3181818181818,
+      "budget": {
+        "maxFetchedToMaterializedRatio": 120,
+        "maxRequestCount": 187,
+        "maxBytesReceived": 980000
+      }
+    },
+    {
+      "fixture": "base-ui-component",
+      "enabled": true,
+      "totals": {
+        "requestCount": 568,
+        "roundTripMs": 79.079338,
+        "bytesSent": 106706,
+        "bytesReceived": 11252841,
+        "serverTimeMs": 57.34203899999998,
+        "transportOverheadMs": 21.73729900000003,
+        "nodesMaterialized": 1162,
+        "sourceFilesFetched": 5,
+        "nodesFetched": 189027
+      },
+      "fetchedToMaterializedRatio": 162.6738382099828,
+      "budget": {
+        "maxFetchedToMaterializedRatio": 140,
+        "maxRequestCount": 433,
+        "maxBytesReceived": 3200000
+      }
+    }
+  ],
+  "stopConditions": {
+    "backendLeakage": {
+      "status": "clear",
+      "evidence": "check-boundary.ts scans package source and declarations; unstable TypeScript imports are limited to src/backend/ts7/**"
+    },
+    "durableContractLeakage": {
+      "status": "clear",
+      "evidence": "package-owned backend contracts, parser, model, warnings, errors, provenance, and ProjectExtractor expose no compiler objects"
+    },
+    "unacceptableIpcGrowth": {
+      "status": "not-triggered",
+      "evidence": "all four sequential boundary fixtures must keep requestCount and bytesReceived within their catalog ceilings; roundTripMs is recorded as an observation only"
+    }
+  },
+  "decision": "go"
+}

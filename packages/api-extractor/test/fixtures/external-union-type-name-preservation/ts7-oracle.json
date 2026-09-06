@@ -1,0 +1,14 @@
+{
+	"fixture": "external-union-type-name-preservation",
+	"compiler": "typescript@7.0.2",
+	"sourceOracle": "output.json",
+	"comparison": "exact",
+	"divergence": {
+		"code": "TS7_UNION_MEMBER_FLATTENING",
+		"genus": "union-identity-flattening",
+		"reason": "This fixture pins that dependency-owned names survive inside project unions, and that purpose holds after the external-before-callable ordering landed: Boundary, Anchor, and the re-exported Padding summarize their external members (`Element`, `Rect`, `Point`, `Padding`) exactly as the preserved oracle shows. The residual differences are TypeScript 7's union identity flattening, the same genus recorded for module-reexports-parts-namespace: the checker pins the alias onto the flattened member list instead of nesting the aliased union (collisionBoundary reports Boundary's members inline where the oracle nests `{typeName: Boundary}`), `Padding | undefined` flattens to its members so the `Prettify<Partial<SideObject>>` half loses its alias and degrades through the structured fallback contract (one recorded `unsupported-type-fallback` warning), and the two-hop re-export NestedRect reports the final hop `Prettify` where the oracle preserves the authored name - the final-hop naming behavior already recorded for namespace-export-resolution.",
+		"upstreamPreserved": true,
+		"differenceCount": 44,
+		"differenceDigest": "02115f4efd7558e0b8a538cfecb756c642653d6e8dbaaabdcf5a70c27d3caaf4"
+	}
+}

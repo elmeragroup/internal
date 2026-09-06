@@ -1,0 +1,18 @@
+[
+  {
+    "message": "Could not extract type \"{ top?: number | undefined; right?: number | undefined; bottom?: number | undefined; left?: number | undefined; }\" at \"test/fixtures/external-union-type-name-preservation/input.ts:1:1\". The extractor used any. Review this API or add support for this type.",
+    "filePath": "test/fixtures/external-union-type-name-preservation/input.ts",
+    "line": 1,
+    "column": 1,
+    "parsedSymbolStack": [
+      "test/fixtures/external-union-type-name-preservation/input.ts",
+      "PositioningProps",
+      "property: collisionPadding"
+    ],
+    "code": "unsupported-type-fallback",
+    "typeFlags": [
+      "Object"
+    ],
+    "typeText": "{ top?: number | undefined; right?: number | undefined; bottom?: number | undefined; left?: number | undefined; }"
+  }
+]

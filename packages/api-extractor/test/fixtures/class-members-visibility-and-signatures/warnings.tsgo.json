@@ -1,0 +1,34 @@
+[
+  {
+    "message": "The non-class shape at \"test/fixtures/class-members-visibility-and-signatures/input.ts:285:2\" has 1 construct signature at Constructable/constructSignatures, which the output model cannot represent. The extractor omitted it. Use a class declaration or review the generated API.",
+    "filePath": "test/fixtures/class-members-visibility-and-signatures/input.ts",
+    "line": 285,
+    "column": 2,
+    "parsedSymbolStack": [
+      "test/fixtures/class-members-visibility-and-signatures/input.ts",
+      "Constructable"
+    ],
+    "code": "unrepresented-construct-signatures",
+    "structuralPath": [
+      "Constructable",
+      "constructSignatures"
+    ],
+    "signatureCount": 1
+  },
+  {
+    "message": "The non-class shape at \"test/fixtures/class-members-visibility-and-signatures/input.ts:292:2\" has 1 construct signature at ConstructableType/constructSignatures, which the output model cannot represent. The extractor omitted it. Use a class declaration or review the generated API.",
+    "filePath": "test/fixtures/class-members-visibility-and-signatures/input.ts",
+    "line": 292,
+    "column": 2,
+    "parsedSymbolStack": [
+      "test/fixtures/class-members-visibility-and-signatures/input.ts",
+      "ConstructableType"
+    ],
+    "code": "unrepresented-construct-signatures",
+    "structuralPath": [
+      "ConstructableType",
+      "constructSignatures"
+    ],
+    "signatureCount": 1
+  }
+]

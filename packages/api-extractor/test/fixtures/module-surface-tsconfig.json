@@ -1,0 +1,19 @@
+{
+	"compilerOptions": {
+		"module": "ESNext",
+		"moduleResolution": "Bundler",
+		"jsx": "react-jsx",
+		"rootDir": "../..",
+		"strict": true,
+		"target": "ES2022",
+		"noEmit": true,
+		"skipLibCheck": false
+	},
+	"include": [
+		"interface-merged-default-and-aliased-exports/input.ts",
+		"module-reexports-basic/input.ts",
+		"namespace-callback-alias-resolution/input.tsx",
+		"namespace-export-resolution/input.tsx",
+		"namespace-nested-alias-resolution/input.tsx"
+	]
+}

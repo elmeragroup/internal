@@ -1,0 +1,17 @@
+[
+  {
+    "message": "Could not extract type \"{ items: readonly any[]; }\" at \"test/fixtures/react-component-overload-any-callback-deduplication/input.tsx:1:1\". The extractor used any. Review this API or add support for this type.",
+    "filePath": "test/fixtures/react-component-overload-any-callback-deduplication/input.tsx",
+    "line": 1,
+    "column": 1,
+    "parsedSymbolStack": [
+      "test/fixtures/react-component-overload-any-callback-deduplication/input.tsx",
+      "GenericComponent"
+    ],
+    "code": "unsupported-type-fallback",
+    "typeFlags": [
+      "Object"
+    ],
+    "typeText": "{ items: readonly any[]; }"
+  }
+]

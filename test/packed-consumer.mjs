@@ -1,0 +1,112 @@
+import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { createRequire } from "node:module";
+import path from "node:path";
+import { pathToFileURL } from "node:url";
+
+import { ApiArtifactsDriftError, generateApiArtifacts } from "@elmeragroup/internal";
+
+const root = process.cwd();
+const require = createRequire(import.meta.url);
+const internalRequire = createRequire(require.resolve("@elmeragroup/internal"));
+const artifactsRequire = createRequire(internalRequire.resolve("@elmeragroup/api-artifacts"));
+const extractorEntry = artifactsRequire.resolve("@elmeragroup/api-extractor");
+const extractorRequire = createRequire(extractorEntry);
+// SAFETY: the archive entry is the extractor package; dynamic resolution tests the installed dependency graph.
+const { ProjectExtractor } = /** @type {typeof import("@elmeragroup/api-extractor")} */ (
+  await import(pathToFileURL(extractorEntry).href)
+);
+// SAFETY: resolve Effect from the installed extractor to share its service runtime.
+const { Effect } = /** @type {typeof import("effect")} */ (
+  await import(pathToFileURL(extractorRequire.resolve("effect")).href)
+);
+await mkdir("node_modules/@base-ui/react", { recursive: true });
+await writeFile(
+  "node_modules/@base-ui/react/package.json",
+  JSON.stringify({ name: "@base-ui/react", version: "0.0.0", types: "index.d.ts" })
+);
+await writeFile(
+  "node_modules/@base-ui/react/index.d.ts",
+  `export type Props = {
+/** Whether the trigger is disabled. */
+disabled?: boolean;
+};`
+);
+await writeFile(
+  "tsconfig.json",
+  JSON.stringify({
+    compilerOptions: {
+      strict: true,
+      module: "NodeNext",
+      moduleResolution: "NodeNext",
+      target: "ES2022",
+      lib: ["ES2022", "DOM"],
+      types: [],
+      skipLibCheck: false,
+      noEmit: true,
+    },
+    include: ["button.ts", "consumer.ts"],
+  })
+);
+await writeFile(
+  "button.ts",
+  `"use client";
+import type { Props as BaseProps } from "@base-ui/react";
+export type Props = BaseProps & {
+/** Visible label. */
+label: string;
+};
+export function Button({ label, disabled = false }: Props) { return label; }
+`
+);
+const options = {
+  projectRoot: root,
+  tsconfigPath: "tsconfig.json",
+  components: [
+    { slug: "button", entryFile: "button.ts", exportNames: ["Button"], outputFile: "docs/button/api.json" },
+  ],
+};
+const first = await generateApiArtifacts(options);
+assert.equal(first.components.length, 1);
+assert.equal(first.components[0].parts[0].rsc, "client");
+assert.deepEqual(
+  first.components[0].parts[0].props.map((prop) => prop.name),
+  ["label", "disabled"]
+);
+assert.equal(first.components[0].parts[0].props[1].defaultValue, "false");
+assert.deepEqual(first.components[0].parts[0].props[1].origin, { packageName: "@base-ui/react" });
+assert.match(first.components[0].$generated, /@elmeragroup\/internal/);
+const before = await stat("docs/button/api.json");
+await generateApiArtifacts(options);
+assert.equal((await stat("docs/button/api.json")).mtimeMs, before.mtimeMs);
+await generateApiArtifacts({ ...options, mode: "check" });
+await writeFile("docs/button/api.json", "stale\n");
+await assert.rejects(generateApiArtifacts({ ...options, mode: "check" }), ApiArtifactsDriftError);
+assert.equal(await readFile("docs/button/api.json", "utf8"), "stale\n");
+const extracted = await Effect.runPromise(
+  Effect.gen(function* () {
+    const extractor = yield* ProjectExtractor;
+    return yield* extractor.extractModule(path.join(root, "button.ts"));
+  }).pipe(
+    Effect.provide(ProjectExtractor.live({ tsconfigPath: path.join(root, "tsconfig.json"), cwd: root }))
+  )
+);
+assert.ok(extracted.module.exports.some((entry) => entry.name === "Button"));
+await writeFile(
+  "consumer.ts",
+  `import { generateApiArtifacts } from "@elmeragroup/internal";
+import type { GenerateApiArtifactsOptions, ApiPart } from "@elmeragroup/internal";
+const options: GenerateApiArtifactsOptions = { projectRoot: ".", tsconfigPath: "tsconfig.json", components: [] };
+const result = await generateApiArtifacts(options);
+const parts: readonly ApiPart[] = result.components.flatMap(component => component.parts);
+void parts;
+`
+);
+const compilerRoot = path.dirname(artifactsRequire.resolve("typescript/package.json"));
+execFileSync(process.execPath, [path.join(compilerRoot, "bin/tsc"), "-p", "tsconfig.json"], {
+  stdio: "inherit",
+});
+console.log(
+  "Packed umbrella, extraction, dependency defaults, drift checks, and consumer declarations passed."
+);

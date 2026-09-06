@@ -1,0 +1,17 @@
+[
+  {
+    "message": "Could not extract type \"any\" at \"test/fixtures/interface-extends-basic-resolution/input.ts:23:1\". The extractor used any. Review this API or add support for this type.",
+    "filePath": "test/fixtures/interface-extends-basic-resolution/input.ts",
+    "line": 23,
+    "column": 1,
+    "parsedSymbolStack": [
+      "test/fixtures/interface-extends-basic-resolution/input.ts",
+      "Dialog"
+    ],
+    "code": "unsupported-type-fallback",
+    "typeFlags": [
+      "Any"
+    ],
+    "typeText": "any"
+  }
+]

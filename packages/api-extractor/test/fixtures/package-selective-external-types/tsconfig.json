@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "noEmit": true,
+    "rootDir": ".",
+    "skipLibCheck": false,
+    "strict": true,
+    "target": "ES2022"
+  },
+  "include": ["input.ts"]
+}

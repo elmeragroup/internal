@@ -1,0 +1,17 @@
+[
+  {
+    "message": "Could not extract type \"__Named\" at \"test/fixtures/symbol-double-underscore-name-preservation/input.ts:1:1\". The extractor used any. Review this API or add support for this type.",
+    "filePath": "test/fixtures/symbol-double-underscore-name-preservation/input.ts",
+    "line": 1,
+    "column": 1,
+    "parsedSymbolStack": [
+      "test/fixtures/symbol-double-underscore-name-preservation/input.ts",
+      "__Named"
+    ],
+    "code": "unsupported-type-fallback",
+    "typeFlags": [
+      "Object"
+    ],
+    "typeText": "__Named"
+  }
+]

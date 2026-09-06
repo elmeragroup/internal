@@ -1,0 +1,14 @@
+{
+	"fixture": "react-mui-overridable-component",
+	"compiler": "typescript@7.0.2",
+	"sourceOracle": "output.json",
+	"comparison": "exact",
+	"divergence": {
+		"code": "TS7_REACT_OVERRIDABLE_INTRINSIC_ORDER",
+		"genus": "jsx-intrinsic-order-and-fallback",
+		"reason": "TypeScript 7 enumerates the intrinsic JSX element-name constraint in a different checker order than the pinned TypeScript 6 upstream oracle and surfaces its unsupported index signatures through the structured warning contract; the overridable component props and generic RootComponent constraint are otherwise unchanged.",
+		"upstreamPreserved": true,
+		"differenceCount": 164,
+		"differenceDigest": "759f082589ceaf87a38d75f1afbe74c7a1748117d2dc8c23e43cd6dc7af44a4c"
+	}
+}

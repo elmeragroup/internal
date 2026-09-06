@@ -1,0 +1,1029 @@
+{
+	"name": "test/fixtures/react-component-render-callback-props/input",
+	"exports": [
+		{
+			"name": "AccordionHeader",
+			"type": {
+				"kind": "component",
+				"typeName": {
+					"name": "AccordionHeader"
+				},
+				"props": [
+					{
+						"name": "render",
+						"type": {
+							"kind": "union",
+							"types": [
+								{
+									"kind": "external",
+									"typeName": {
+										"name": "ReactElement",
+										"namespaces": [
+											"React"
+										],
+										"typeArguments": [
+											{
+												"type": {
+													"kind": "intrinsic",
+													"intrinsic": "unknown"
+												},
+												"equalToDefault": true
+											},
+											{
+												"type": {
+													"kind": "union",
+													"types": [
+														{
+															"kind": "intrinsic",
+															"intrinsic": "string"
+														},
+														{
+															"kind": "function",
+															"callSignatures": [
+																{
+																	"parameters": [
+																		{
+																			"type": {
+																				"kind": "intrinsic",
+																				"intrinsic": "any"
+																			},
+																			"name": "props",
+																			"optional": false
+																		}
+																	],
+																	"returnValueType": {
+																		"kind": "union",
+																		"types": [
+																			{
+																				"kind": "intrinsic",
+																				"intrinsic": "string"
+																			},
+																			{
+																				"kind": "intrinsic",
+																				"intrinsic": "number"
+																			},
+																			{
+																				"kind": "intrinsic",
+																				"intrinsic": "bigint"
+																			},
+																			{
+																				"kind": "intrinsic",
+																				"intrinsic": "boolean"
+																			},
+																			{
+																				"kind": "external",
+																				"typeName": {
+																					"name": "Iterable",
+																					"typeArguments": [
+																						{
+																							"type": {
+																								"kind": "external",
+																								"typeName": {
+																									"name": "ReactNode",
+																									"namespaces": [
+																										"React"
+																									]
+																								}
+																							},
+																							"equalToDefault": false
+																						},
+																						{
+																							"type": {
+																								"kind": "intrinsic",
+																								"intrinsic": "any"
+																							},
+																							"equalToDefault": true
+																						},
+																						{
+																							"type": {
+																								"kind": "intrinsic",
+																								"intrinsic": "any"
+																							},
+																							"equalToDefault": true
+																						}
+																					]
+																				}
+																			},
+																			{
+																				"kind": "external",
+																				"typeName": {
+																					"name": "Promise",
+																					"typeArguments": [
+																						{
+																							"type": {
+																								"kind": "external",
+																								"typeName": {
+																									"name": "AwaitedReactNode"
+																								}
+																							},
+																							"equalToDefault": false
+																						}
+																					]
+																				}
+																			},
+																			{
+																				"kind": "external",
+																				"typeName": {
+																					"name": "Promise",
+																					"typeArguments": [
+																						{
+																							"type": {
+																								"kind": "external",
+																								"typeName": {
+																									"name": "ReactNode",
+																									"namespaces": [
+																										"React"
+																									]
+																								}
+																							},
+																							"equalToDefault": false
+																						}
+																					]
+																				}
+																			},
+																			{
+																				"kind": "external",
+																				"typeName": {
+																					"name": "ReactElement",
+																					"namespaces": [
+																						"React"
+																					],
+																					"typeArguments": [
+																						{
+																							"type": {
+																								"kind": "intrinsic",
+																								"intrinsic": "unknown"
+																							},
+																							"equalToDefault": true
+																						},
+																						{
+																							"type": {
+																								"kind": "union",
+																								"types": []
+																							},
+																							"equalToDefault": true
+																						}
+																					]
+																				}
+																			},
+																			{
+																				"kind": "external",
+																				"typeName": {
+																					"name": "ReactPortal",
+																					"namespaces": [
+																						"React"
+																					]
+																				}
+																			},
+																			{
+																				"kind": "intrinsic",
+																				"intrinsic": "null"
+																			},
+																			{
+																				"kind": "intrinsic",
+																				"intrinsic": "undefined"
+																			}
+																		]
+																	}
+																}
+															]
+														},
+														{
+															"kind": "object",
+															"properties": []
+														}
+													]
+												},
+												"equalToDefault": true
+											}
+										]
+									}
+								},
+								{
+									"kind": "function",
+									"typeName": {
+										"name": "ComponentRenderFn",
+										"typeArguments": [
+											{
+												"type": {
+													"kind": "external",
+													"typeName": {
+														"name": "HTMLProps",
+														"namespaces": [
+															"React"
+														],
+														"typeArguments": [
+															{
+																"type": {
+																	"kind": "external",
+																	"typeName": {
+																		"name": "HTMLElement"
+																	}
+																},
+																"equalToDefault": false
+															}
+														]
+													}
+												},
+												"equalToDefault": false
+											},
+											{
+												"type": {
+													"kind": "object",
+													"typeName": {
+														"name": "AccordionItemState"
+													},
+													"properties": [
+														{
+															"name": "expanded",
+															"type": {
+																"kind": "intrinsic",
+																"intrinsic": "boolean"
+															},
+															"optional": false
+														}
+													]
+												},
+												"equalToDefault": false
+											}
+										]
+									},
+									"callSignatures": [
+										{
+											"parameters": [
+												{
+													"type": {
+														"kind": "external",
+														"typeName": {
+															"name": "HTMLProps",
+															"namespaces": [
+																"React"
+															],
+															"typeArguments": [
+																{
+																	"type": {
+																		"kind": "external",
+																		"typeName": {
+																			"name": "HTMLElement"
+																		}
+																	},
+																	"equalToDefault": false
+																}
+															]
+														}
+													},
+													"name": "props",
+													"optional": false
+												},
+												{
+													"type": {
+														"kind": "object",
+														"typeName": {
+															"name": "AccordionItemState"
+														},
+														"properties": [
+															{
+																"name": "expanded",
+																"type": {
+																	"kind": "intrinsic",
+																	"intrinsic": "boolean"
+																},
+																"optional": false
+															}
+														]
+													},
+													"name": "state",
+													"optional": false
+												}
+											],
+											"returnValueType": {
+												"kind": "external",
+												"typeName": {
+													"name": "ReactElement",
+													"namespaces": [
+														"React"
+													],
+													"typeArguments": [
+														{
+															"type": {
+																"kind": "intrinsic",
+																"intrinsic": "unknown"
+															},
+															"equalToDefault": true
+														},
+														{
+															"type": {
+																"kind": "union",
+																"types": [
+																	{
+																		"kind": "intrinsic",
+																		"intrinsic": "string"
+																	},
+																	{
+																		"kind": "function",
+																		"callSignatures": [
+																			{
+																				"parameters": [
+																					{
+																						"type": {
+																							"kind": "intrinsic",
+																							"intrinsic": "any"
+																						},
+																						"name": "props",
+																						"optional": false
+																					}
+																				],
+																				"returnValueType": {
+																					"kind": "union",
+																					"types": [
+																						{
+																							"kind": "intrinsic",
+																							"intrinsic": "string"
+																						},
+																						{
+																							"kind": "intrinsic",
+																							"intrinsic": "number"
+																						},
+																						{
+																							"kind": "intrinsic",
+																							"intrinsic": "bigint"
+																						},
+																						{
+																							"kind": "intrinsic",
+																							"intrinsic": "boolean"
+																						},
+																						{
+																							"kind": "external",
+																							"typeName": {
+																								"name": "Iterable",
+																								"typeArguments": [
+																									{
+																										"type": {
+																											"kind": "external",
+																											"typeName": {
+																												"name": "ReactNode",
+																												"namespaces": [
+																													"React"
+																												]
+																											}
+																										},
+																										"equalToDefault": false
+																									},
+																									{
+																										"type": {
+																											"kind": "intrinsic",
+																											"intrinsic": "any"
+																										},
+																										"equalToDefault": true
+																									},
+																									{
+																										"type": {
+																											"kind": "intrinsic",
+																											"intrinsic": "any"
+																										},
+																										"equalToDefault": true
+																									}
+																								]
+																							}
+																						},
+																						{
+																							"kind": "external",
+																							"typeName": {
+																								"name": "Promise",
+																								"typeArguments": [
+																									{
+																										"type": {
+																											"kind": "external",
+																											"typeName": {
+																												"name": "AwaitedReactNode"
+																											}
+																										},
+																										"equalToDefault": false
+																									}
+																								]
+																							}
+																						},
+																						{
+																							"kind": "external",
+																							"typeName": {
+																								"name": "Promise",
+																								"typeArguments": [
+																									{
+																										"type": {
+																											"kind": "external",
+																											"typeName": {
+																												"name": "ReactNode",
+																												"namespaces": [
+																													"React"
+																												]
+																											}
+																										},
+																										"equalToDefault": false
+																									}
+																								]
+																							}
+																						},
+																						{
+																							"kind": "external",
+																							"typeName": {
+																								"name": "ReactElement",
+																								"namespaces": [
+																									"React"
+																								],
+																								"typeArguments": [
+																									{
+																										"type": {
+																											"kind": "intrinsic",
+																											"intrinsic": "unknown"
+																										},
+																										"equalToDefault": true
+																									},
+																									{
+																										"type": {
+																											"kind": "union",
+																											"types": []
+																										},
+																										"equalToDefault": true
+																									}
+																								]
+																							}
+																						},
+																						{
+																							"kind": "external",
+																							"typeName": {
+																								"name": "ReactPortal",
+																								"namespaces": [
+																									"React"
+																								]
+																							}
+																						},
+																						{
+																							"kind": "intrinsic",
+																							"intrinsic": "null"
+																						},
+																						{
+																							"kind": "intrinsic",
+																							"intrinsic": "undefined"
+																						}
+																					]
+																				}
+																			}
+																		]
+																	},
+																	{
+																		"kind": "object",
+																		"properties": []
+																	}
+																]
+															},
+															"equalToDefault": true
+														}
+													]
+												}
+											}
+										}
+									]
+								},
+								{
+									"kind": "intrinsic",
+									"intrinsic": "undefined"
+								}
+							]
+						},
+						"documentation": {
+							"description": "Render function or element",
+							"tags": []
+						},
+						"optional": true
+					}
+				]
+			}
+		},
+		{
+			"name": "AccordionHeaderProps",
+			"type": {
+				"kind": "object",
+				"typeName": {
+					"name": "BaseUIComponentProps",
+					"typeArguments": [
+						{
+							"type": {
+								"kind": "object",
+								"typeName": {
+									"name": "State",
+									"namespaces": [
+										"Accordion",
+										"Item"
+									]
+								},
+								"properties": [
+									{
+										"name": "expanded",
+										"type": {
+											"kind": "intrinsic",
+											"intrinsic": "boolean"
+										},
+										"optional": false
+									}
+								]
+							},
+							"equalToDefault": false
+						}
+					]
+				},
+				"properties": [
+					{
+						"name": "render",
+						"type": {
+							"kind": "union",
+							"types": [
+								{
+									"kind": "external",
+									"typeName": {
+										"name": "ReactElement",
+										"namespaces": [
+											"React"
+										],
+										"typeArguments": [
+											{
+												"type": {
+													"kind": "intrinsic",
+													"intrinsic": "unknown"
+												},
+												"equalToDefault": true
+											},
+											{
+												"type": {
+													"kind": "union",
+													"types": [
+														{
+															"kind": "intrinsic",
+															"intrinsic": "string"
+														},
+														{
+															"kind": "function",
+															"callSignatures": [
+																{
+																	"parameters": [
+																		{
+																			"type": {
+																				"kind": "intrinsic",
+																				"intrinsic": "any"
+																			},
+																			"name": "props",
+																			"optional": false
+																		}
+																	],
+																	"returnValueType": {
+																		"kind": "union",
+																		"types": [
+																			{
+																				"kind": "intrinsic",
+																				"intrinsic": "string"
+																			},
+																			{
+																				"kind": "intrinsic",
+																				"intrinsic": "number"
+																			},
+																			{
+																				"kind": "intrinsic",
+																				"intrinsic": "bigint"
+																			},
+																			{
+																				"kind": "intrinsic",
+																				"intrinsic": "boolean"
+																			},
+																			{
+																				"kind": "external",
+																				"typeName": {
+																					"name": "Iterable",
+																					"typeArguments": [
+																						{
+																							"type": {
+																								"kind": "external",
+																								"typeName": {
+																									"name": "ReactNode",
+																									"namespaces": [
+																										"React"
+																									]
+																								}
+																							},
+																							"equalToDefault": false
+																						},
+																						{
+																							"type": {
+																								"kind": "intrinsic",
+																								"intrinsic": "any"
+																							},
+																							"equalToDefault": true
+																						},
+																						{
+																							"type": {
+																								"kind": "intrinsic",
+																								"intrinsic": "any"
+																							},
+																							"equalToDefault": true
+																						}
+																					]
+																				}
+																			},
+																			{
+																				"kind": "external",
+																				"typeName": {
+																					"name": "Promise",
+																					"typeArguments": [
+																						{
+																							"type": {
+																								"kind": "external",
+																								"typeName": {
+																									"name": "AwaitedReactNode"
+																								}
+																							},
+																							"equalToDefault": false
+																						}
+																					]
+																				}
+																			},
+																			{
+																				"kind": "external",
+																				"typeName": {
+																					"name": "Promise",
+																					"typeArguments": [
+																						{
+																							"type": {
+																								"kind": "external",
+																								"typeName": {
+																									"name": "ReactNode",
+																									"namespaces": [
+																										"React"
+																									]
+																								}
+																							},
+																							"equalToDefault": false
+																						}
+																					]
+																				}
+																			},
+																			{
+																				"kind": "external",
+																				"typeName": {
+																					"name": "ReactElement",
+																					"namespaces": [
+																						"React"
+																					],
+																					"typeArguments": [
+																						{
+																							"type": {
+																								"kind": "intrinsic",
+																								"intrinsic": "unknown"
+																							},
+																							"equalToDefault": true
+																						},
+																						{
+																							"type": {
+																								"kind": "union",
+																								"types": []
+																							},
+																							"equalToDefault": true
+																						}
+																					]
+																				}
+																			},
+																			{
+																				"kind": "external",
+																				"typeName": {
+																					"name": "ReactPortal",
+																					"namespaces": [
+																						"React"
+																					]
+																				}
+																			},
+																			{
+																				"kind": "intrinsic",
+																				"intrinsic": "null"
+																			},
+																			{
+																				"kind": "intrinsic",
+																				"intrinsic": "undefined"
+																			}
+																		]
+																	}
+																}
+															]
+														},
+														{
+															"kind": "object",
+															"properties": []
+														}
+													]
+												},
+												"equalToDefault": true
+											}
+										]
+									}
+								},
+								{
+									"kind": "function",
+									"typeName": {
+										"name": "ComponentRenderFn",
+										"typeArguments": [
+											{
+												"type": {
+													"kind": "external",
+													"typeName": {
+														"name": "HTMLProps",
+														"namespaces": [
+															"React"
+														],
+														"typeArguments": [
+															{
+																"type": {
+																	"kind": "external",
+																	"typeName": {
+																		"name": "HTMLElement"
+																	}
+																},
+																"equalToDefault": false
+															}
+														]
+													}
+												},
+												"equalToDefault": false
+											},
+											{
+												"type": {
+													"kind": "object",
+													"typeName": {
+														"name": "AccordionItemState"
+													},
+													"properties": [
+														{
+															"name": "expanded",
+															"type": {
+																"kind": "intrinsic",
+																"intrinsic": "boolean"
+															},
+															"optional": false
+														}
+													]
+												},
+												"equalToDefault": false
+											}
+										]
+									},
+									"callSignatures": [
+										{
+											"parameters": [
+												{
+													"type": {
+														"kind": "external",
+														"typeName": {
+															"name": "HTMLProps",
+															"namespaces": [
+																"React"
+															],
+															"typeArguments": [
+																{
+																	"type": {
+																		"kind": "external",
+																		"typeName": {
+																			"name": "HTMLElement"
+																		}
+																	},
+																	"equalToDefault": false
+																}
+															]
+														}
+													},
+													"name": "props",
+													"optional": false
+												},
+												{
+													"type": {
+														"kind": "object",
+														"typeName": {
+															"name": "AccordionItemState"
+														},
+														"properties": [
+															{
+																"name": "expanded",
+																"type": {
+																	"kind": "intrinsic",
+																	"intrinsic": "boolean"
+																},
+																"optional": false
+															}
+														]
+													},
+													"name": "state",
+													"optional": false
+												}
+											],
+											"returnValueType": {
+												"kind": "external",
+												"typeName": {
+													"name": "ReactElement",
+													"namespaces": [
+														"React"
+													],
+													"typeArguments": [
+														{
+															"type": {
+																"kind": "intrinsic",
+																"intrinsic": "unknown"
+															},
+															"equalToDefault": true
+														},
+														{
+															"type": {
+																"kind": "union",
+																"types": [
+																	{
+																		"kind": "intrinsic",
+																		"intrinsic": "string"
+																	},
+																	{
+																		"kind": "function",
+																		"callSignatures": [
+																			{
+																				"parameters": [
+																					{
+																						"type": {
+																							"kind": "intrinsic",
+																							"intrinsic": "any"
+																						},
+																						"name": "props",
+																						"optional": false
+																					}
+																				],
+																				"returnValueType": {
+																					"kind": "union",
+																					"types": [
+																						{
+																							"kind": "intrinsic",
+																							"intrinsic": "string"
+																						},
+																						{
+																							"kind": "intrinsic",
+																							"intrinsic": "number"
+																						},
+																						{
+																							"kind": "intrinsic",
+																							"intrinsic": "bigint"
+																						},
+																						{
+																							"kind": "intrinsic",
+																							"intrinsic": "boolean"
+																						},
+																						{
+																							"kind": "external",
+																							"typeName": {
+																								"name": "Iterable",
+																								"typeArguments": [
+																									{
+																										"type": {
+																											"kind": "external",
+																											"typeName": {
+																												"name": "ReactNode",
+																												"namespaces": [
+																													"React"
+																												]
+																											}
+																										},
+																										"equalToDefault": false
+																									},
+																									{
+																										"type": {
+																											"kind": "intrinsic",
+																											"intrinsic": "any"
+																										},
+																										"equalToDefault": true
+																									},
+																									{
+																										"type": {
+																											"kind": "intrinsic",
+																											"intrinsic": "any"
+																										},
+																										"equalToDefault": true
+																									}
+																								]
+																							}
+																						},
+																						{
+																							"kind": "external",
+																							"typeName": {
+																								"name": "Promise",
+																								"typeArguments": [
+																									{
+																										"type": {
+																											"kind": "external",
+																											"typeName": {
+																												"name": "AwaitedReactNode"
+																											}
+																										},
+																										"equalToDefault": false
+																									}
+																								]
+																							}
+																						},
+																						{
+																							"kind": "external",
+																							"typeName": {
+																								"name": "Promise",
+																								"typeArguments": [
+																									{
+																										"type": {
+																											"kind": "external",
+																											"typeName": {
+																												"name": "ReactNode",
+																												"namespaces": [
+																													"React"
+																												]
+																											}
+																										},
+																										"equalToDefault": false
+																									}
+																								]
+																							}
+																						},
+																						{
+																							"kind": "external",
+																							"typeName": {
+																								"name": "ReactElement",
+																								"namespaces": [
+																									"React"
+																								],
+																								"typeArguments": [
+																									{
+																										"type": {
+																											"kind": "intrinsic",
+																											"intrinsic": "unknown"
+																										},
+																										"equalToDefault": true
+																									},
+																									{
+																										"type": {
+																											"kind": "union",
+																											"types": []
+																										},
+																										"equalToDefault": true
+																									}
+																								]
+																							}
+																						},
+																						{
+																							"kind": "external",
+																							"typeName": {
+																								"name": "ReactPortal",
+																								"namespaces": [
+																									"React"
+																								]
+																							}
+																						},
+																						{
+																							"kind": "intrinsic",
+																							"intrinsic": "null"
+																						},
+																						{
+																							"kind": "intrinsic",
+																							"intrinsic": "undefined"
+																						}
+																					]
+																				}
+																			}
+																		]
+																	},
+																	{
+																		"kind": "object",
+																		"properties": []
+																	}
+																]
+															},
+															"equalToDefault": true
+														}
+													]
+												}
+											}
+										}
+									]
+								},
+								{
+									"kind": "intrinsic",
+									"intrinsic": "undefined"
+								}
+							]
+						},
+						"documentation": {
+							"description": "Render function or element",
+							"tags": []
+						},
+						"optional": true
+					}
+				]
+			}
+		}
+	],
+	"imports": [
+		"react"
+	]
+}

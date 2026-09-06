@@ -1,0 +1,54 @@
+{
+  "name": "@elmeragroup/api-artifacts",
+  "version": "0.1.0-canary.0",
+  "type": "module",
+  "license": "MIT",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./model": {
+      "types": "./dist/model.d.ts",
+      "import": "./dist/model.js",
+      "default": "./dist/model.js"
+    }
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-package.ts",
+    "type-check": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@elmeragroup/api-extractor": "workspace:*",
+    "effect": "catalog:",
+    "typescript": "catalog:"
+  },
+  "devDependencies": {
+    "@elmeragroup/typescript-config": "workspace:*",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "react": "catalog:",
+    "vitest": "catalog:"
+  },
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist/**",
+    "README.md",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "engines": {
+    "node": ">=24.13.0 <25"
+  },
+  "publishConfig": {
+    "access": "public",
+    "tag": "canary"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/elmeragroup/internal.git",
+    "directory": "packages/api-artifacts"
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "rootDir": "../..",
+    "strict": true,
+    "target": "ES2022",
+    "noEmit": true,
+    "skipLibCheck": false
+  },
+  "include": [
+    "generic-callback-index-signature-deduplication/input.ts",
+    "mapped-alias-finite-key/input.ts",
+    "mapped-alias-nested-mapped-value/input.ts",
+    "mapped-alias-nested-value/input.ts",
+    "mapped-tuple-rest-synthetic-key/input.ts",
+    "readonly-array-mapped-alias-wrapped/input.ts",
+    "readonly-array-mapped-type/input.ts",
+    "readonly-array-mapped-type-any-value/input.ts",
+    "readonly-array-mapped-type-as-clause/input.ts",
+    "readonly-array-mapped-type-key-no-default/input.ts",
+    "readonly-array-mapped-type-literal-key/input.ts",
+    "readonly-array-mapped-type-non-optional/input.ts",
+    "readonly-array-mapped-type-number-key/input.ts",
+    "readonly-array-mapped-type-plus-optional/input.ts",
+    "readonly-array-mapped-type-strip-optional/input.ts",
+    "readonly-array-mapped-type-template-literal-constraint/input.ts",
+    "readonly-array-mapped-type-union-default/input.ts",
+    "readonly-array-mapped-type-value-no-default/input.ts",
+    "readonly-array-mapped-type-with-concrete-props/input.ts",
+    "type-array-syntax-resolution/input.ts",
+    "type-cycle-recursive-resolution/input.ts",
+    "type-index-signature-resolution/helper.ts",
+    "type-index-signature-resolution/input.ts",
+    "type-record-resolution/input.ts",
+    "type-tuple-resolution/input.ts",
+    "type-utility-types-resolution/input.ts"
+  ]
+}

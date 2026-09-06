@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "rootDir": "../..",
+    "strict": true,
+    "target": "ES2022",
+    "noEmit": true,
+    "skipLibCheck": false
+  },
+  "include": [
+    "class-members-visibility-and-signatures/input.ts",
+    "class-method-generic-signatures/input.ts",
+    "class-method-overload-signatures/input.ts",
+    "class-private-members-type-alias-filtering/input.ts",
+    "function-callable-intersection-extra-properties/input.tsx",
+    "function-declaration-expression-arrow/input.ts",
+    "jsdoc-comments-and-overloads/input.tsx",
+    "merged-interface-signature-typeparams/input.ts",
+    "module-reexport-imported-class-type/input.ts",
+    "module-reexport-imported-class-type/source.ts"
+  ]
+}
