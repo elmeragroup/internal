@@ -25,4 +25,6 @@ Use `mode: "check"` before any generation in CI. It throws `ApiArtifactsDriftErr
 
 Declared public props require JSDoc. Recipe axes use the `*-variants` naming convention. Dependency props are included only when their provenance names a selected package, they have documentation, and the consuming component actually accepts them. Unaccepted extraction warning codes fail generation. Accepted warnings remain in `diagnostics`.
 
+Each part's `rsc` value is classified from the selected source module's directive prologue in the parsed syntax. Only an exact authored `"use client"` or `'use client'` expression statement in that prologue is `client`. `server` means that module has no client directive; it is not a transitive React server/client module-graph analysis.
+
 Import artifact types through `@elmeragroup/api-artifacts/model`. Generate the JSON during the build, then import it from MDX or other rendering code.

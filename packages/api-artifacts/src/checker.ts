@@ -1,9 +1,12 @@
 import path from "node:path";
+import type { SourceFile } from "typescript/unstable/ast";
 import {
   isBindingElement,
+  isExpressionStatement,
   isFunctionLikeDeclaration,
   isIdentifier,
   isObjectBindingPattern,
+  isStringLiteral,
 } from "typescript/unstable/ast/is";
 import { API, NodeBuilderFlags, SignatureKind, SymbolFlags } from "typescript/unstable/sync";
 import type {
@@ -50,20 +53,15 @@ export function openLibraryProject(tsconfigPath: string, projectRoot: string): L
  * A `"use client"` directive only counts as one when it leads the module, so a stray
  * string expression further down never flips the classification.
  */
-export function readRscStatus(sourceText: string): RscStatus {
-  const withoutComments = sourceText.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
-  for (const line of withoutComments.split("\n")) {
-    const trimmed = line.trim();
-    if (trimmed === "") {
-      continue;
+export function readRscStatus(sourceFile: SourceFile): RscStatus {
+  for (const statement of sourceFile.statements) {
+    if (!isExpressionStatement(statement) || !isStringLiteral(statement.expression)) {
+      return "server";
     }
-    if (/^["'']use client["''];?$/.test(trimmed)) {
+    const authored = statement.expression.getText(sourceFile);
+    if (authored === '"use client"' || authored === "'use client'") {
       return "client";
     }
-    if (/^["''][^"']*["''];?$/.test(trimmed)) {
-      continue;
-    }
-    return "server";
   }
   return "server";
 }
@@ -161,7 +159,7 @@ export function readPartSource(context: LibraryProject, signature: Signature): P
   }
   return {
     sourcePath: path.relative(context.projectRoot, sourceFile.fileName).replaceAll("\\", "/"),
-    rsc: readRscStatus(sourceFile.text),
+    rsc: readRscStatus(sourceFile),
     defaults,
   };
 }
