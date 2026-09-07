@@ -22,7 +22,7 @@
     "@elmeragroup/oxlint-plugin-anti-slop": "workspace:*",
     "tsdown": "catalog:"
   },
-  "version": "0.1.0-canary.1",
+  "version": "0.1.0",
   "exports": {
     ".": {
       "types": "./dist/index.d.mts",
