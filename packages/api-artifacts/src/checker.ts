@@ -126,6 +126,8 @@ export function propOrigin(declarationPaths: readonly string[], synthesized: boo
 /**
  * Turns one source-inspection result into artifact source metadata. Unresolved
  * implementations become an actionable problem instead of React declaration paths.
+ * A forwarded dependency value reads its metadata from the authored module that
+ * forwards it: that module's directive decides `rsc`, and it has no defaults.
  */
 function partSourceFromInspection(
   context: LibraryProject,
@@ -145,7 +147,9 @@ function partSourceFromInspection(
   return {
     sourcePath: path.relative(context.projectRoot, sourceFile.fileName).replaceAll("\\", "/"),
     rsc: readRscStatus(sourceFile),
-    defaults: new Map(result.defaults.map((entry) => [entry.name, entry.initializerText])),
+    defaults: new Map(
+      result.status === "resolved" ? result.defaults.map((entry) => [entry.name, entry.initializerText]) : []
+    ),
   };
 }
 
@@ -227,6 +231,13 @@ export type PartForwarded = {
 };
 
 const emptyForwarded: PartForwarded = { count: 0, from: [] };
+
+/** A forwarded value's own declaring package joins the packages its forwarded props come from. */
+function withForwardedValue(forwarded: PartForwarded, result: ComponentSourceResult): PartForwarded {
+  if (result.status !== "forwarded" || forwarded.from.includes(result.packageName)) return forwarded;
+  const from = [...forwarded.from, result.packageName].sort((left, right) => left.localeCompare(right));
+  return { count: forwarded.count, from };
+}
 
 /**
  * Counts props the part accepts that are neither library-declared nor recipe
@@ -397,7 +408,7 @@ function describePart(
       rsc: source.rsc,
       sourcePath: source.sourcePath,
       props: [],
-      forwardedFrom: [],
+      forwardedFrom: forwarded.from,
       forwardedCount: 0,
     };
   }
@@ -471,7 +482,10 @@ export function extractPart(
       props.set(property.name, property);
     }
   }
-  const forwarded = props.size === 0 ? emptyForwarded : forwardedOfProps(context, props.values());
+  const forwarded = withForwardedValue(
+    props.size === 0 ? emptyForwarded : forwardedOfProps(context, props.values()),
+    sourceResult
+  );
   return {
     name: request.name,
     declarationPaths,

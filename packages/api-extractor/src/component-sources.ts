@@ -32,6 +32,18 @@ export const ComponentSourceResolvedSchema = Schema.Struct({
 });
 export type ComponentSourceResolved = typeof ComponentSourceResolvedSchema.Type;
 
+/**
+ * The requested value is a dependency declaration that authored code forwards
+ * without implementing: `filePath` is the authored module whose re-export or
+ * alias forwards it, and `packageName` the dependency that owns the declaration.
+ */
+export const ComponentSourceForwardedSchema = Schema.Struct({
+  status: Schema.Literal("forwarded"),
+  filePath: Schema.String,
+  packageName: Schema.String,
+});
+export type ComponentSourceForwarded = typeof ComponentSourceForwardedSchema.Type;
+
 export const ComponentSourceUnresolvedSchema = Schema.Struct({
   status: Schema.Literal("unresolved"),
   reason: ComponentSourceUnresolvedReasonSchema,
@@ -40,6 +52,7 @@ export type ComponentSourceUnresolved = typeof ComponentSourceUnresolvedSchema.T
 
 export const ComponentSourceResultSchema = Schema.Union([
   ComponentSourceResolvedSchema,
+  ComponentSourceForwardedSchema,
   ComponentSourceUnresolvedSchema,
 ]);
 export type ComponentSourceResult = typeof ComponentSourceResultSchema.Type;

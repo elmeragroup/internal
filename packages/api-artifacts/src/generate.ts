@@ -28,6 +28,11 @@ export type GenerateApiArtifactsOptions = {
   readonly includeExternalTypes?: readonly string[];
   /** Accepted warnings remain visible in the returned diagnostics. */
   readonly allowedWarningCodes?: readonly ExtractWarning["code"][];
+  /**
+   * `check` validates the complete inventory and throws `ApiArtifactsDriftError` listing the
+   * missing or stale output files without writing anything; the generated texts are not returned
+   * on that path. `write` (the default) replaces changed files.
+   */
   readonly mode?: "write" | "check";
   /** Optional consumer-specific regeneration instructions. */
   readonly generatedBy?: string;

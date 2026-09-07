@@ -37,9 +37,14 @@ destructuring defaults without running semantic extraction or admitting warnings
 values, namespace and object property references, and an implementation in another project file.
 Overloaded functions use the declaration with an actual syntax body, excluding return-type annotations.
 Each request produces one result at the same
-index. Unsupported wrappers, cycles, missing exports or members, declaration-only sources, and
-unsupported default expressions return `{ status: "unresolved", reason }` instead of guessing.
-Compiler objects never cross this boundary.
+index. A value that authored code only forwards from a dependency, through named or `export *`
+re-export chains, an exported import binding, an `export default` of one, or an `export const X =
+DepX` alias, and that the dependency declares without a body returns
+`{ status: "forwarded", filePath, packageName }`. `filePath` is the innermost project module the
+forwarding route reaches, and a member request inherits its container's route. Unsupported wrappers,
+cycles, missing exports or members, project declaration-only sources, and unsupported default
+expressions return `{ status: "unresolved", reason }` instead of
+guessing. Compiler objects never cross this boundary.
 
 `extractModule` returns:
 

@@ -1,4 +1,3 @@
-import { Effect } from "effect";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
@@ -6,8 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import type {
   BackendCompilerOperations,
-  BackendExtractionSession,
-  BackendModuleDraft,
+  BackendDeclarationOwnership,
   BackendNodeFacts,
   BackendNodeHandle,
   BackendNodeReference,
@@ -16,17 +14,19 @@ import type {
   BackendSymbolHandle,
   BackendTypeHandle,
 } from "../src/backend/contracts.ts";
-import { openTsgoProject } from "../src/backend/ts7/project.ts";
-import type { ComponentSourceRequest, ComponentSourceResult } from "../src/component-sources.ts";
-import { ProjectExtractor } from "../src/index.ts";
 import { inspectRequestedComponentSources } from "../src/parse/component-source.ts";
+import {
+  componentSourceFixture,
+  exportSymbol,
+  inspectNative,
+  primaryNode,
+  withSession,
+} from "./support/component-source.ts";
 
-const fixtureDirectory = resolve(import.meta.dirname, "fixtures/component-source");
-const tsconfigPath = resolve(fixtureDirectory, "tsconfig.json");
-const inputPath = resolve(fixtureDirectory, "input.tsx");
-const renderPath = resolve(fixtureDirectory, "render.tsx");
-const declaredPath = resolve(fixtureDirectory, "declared.d.ts");
-const defaultExpressionPath = resolve(fixtureDirectory, "default-expression.ts");
+const inputPath = componentSourceFixture("input.tsx");
+const renderPath = componentSourceFixture("render.tsx");
+const declaredPath = componentSourceFixture("declared.d.ts");
+const defaultExpressionPath = componentSourceFixture("default-expression.ts");
 
 const reactMemoFacts = {
   identity: { name: "memo", namespaces: ["React"] },
@@ -37,51 +37,6 @@ const reactForwardRefFacts = {
   identity: { name: "forwardRef", namespaces: ["React"] },
   moduleOrigin: { moduleSpecifier: "react", packageName: "react", external: true },
 } as const;
-
-function inspectNative(
-  filePath: string,
-  requests: readonly ComponentSourceRequest[],
-  projectConfig = tsconfigPath
-): Promise<readonly ComponentSourceResult[]> {
-  return Effect.runPromise(
-    Effect.scoped(
-      Effect.gen(function* () {
-        const extractor = yield* ProjectExtractor;
-        return yield* extractor.inspectComponentSources(filePath, requests);
-      }).pipe(Effect.provide(ProjectExtractor.live({ tsconfigPath: projectConfig })))
-    )
-  );
-}
-
-function withSession(
-  filePath: string,
-  run: (session: BackendExtractionSession, draft: BackendModuleDraft) => void
-): void {
-  const project = openTsgoProject({ tsconfigPath });
-  try {
-    const session = project.openExtraction({ componentSources: true });
-    try {
-      run(session, session.readModule(filePath));
-    } finally {
-      session.close();
-    }
-  } finally {
-    project.close();
-  }
-}
-
-function exportSymbol(draft: BackendModuleDraft, name: string): BackendSymbolHandle {
-  const symbol = draft.exports.find((entry) => entry.name === name)?.symbol;
-  if (symbol === undefined) throw new Error(`Missing export ${name}`);
-  return symbol;
-}
-
-function primaryNode(session: BackendExtractionSession, symbol: BackendSymbolHandle): BackendNodeHandle {
-  const facts = session.compiler.symbolFacts(symbol);
-  const declaration = facts.valueDeclaration ?? facts.declarations[0];
-  if (declaration === undefined) throw new Error("Missing declaration");
-  return declaration;
-}
 
 const sessionKey = Symbol("component-source-double");
 
@@ -119,8 +74,14 @@ function operations(config: {
   readonly nodes?: Map<BackendNodeReference, BackendNodeFacts>;
   readonly types?: Map<BackendSymbolHandle, BackendTypeHandle>;
   readonly properties?: Map<BackendTypeHandle, readonly BackendSymbolHandle[]>;
-}): Pick<BackendCompilerOperations, "nodeFacts" | "symbolFacts" | "typeOfSymbol" | "propertiesOfType"> {
+  /** File ownership per node; unlisted nodes are project-owned. */
+  readonly ownership?: Map<BackendNodeReference, BackendDeclarationOwnership>;
+}): Pick<
+  BackendCompilerOperations,
+  "declarationOwnership" | "nodeFacts" | "symbolFacts" | "typeOfSymbol" | "propertiesOfType"
+> {
   return {
+    declarationOwnership: (node) => config.ownership?.get(node) ?? { kind: "project" },
     nodeFacts: (node) => {
       const facts = config.nodes?.get(node);
       if (facts === undefined) throw new Error("missing node facts");
@@ -507,6 +468,64 @@ describe("component source resolver doubles", () => {
       "cycle",
       "ambiguous-implementation",
       "resolved",
+    ]);
+  });
+
+  it("publishes dependency declarations from the innermost project module that forwards them", () => {
+    const declared = nodeHandle(40);
+    const declaredSymbol = symbolHandle(40);
+    const alias = nodeHandle(41);
+    const aliasSymbol = symbolHandle(41);
+    const aliasIdentifier = nodeHandle(42);
+    const projectDeclared = nodeHandle(43);
+    const projectSymbol = symbolHandle(43);
+    const ops = operations({
+      symbols: new Map([
+        [declaredSymbol, symbolFacts("Forwarded", [declared], { valueDeclaration: declared })],
+        [aliasSymbol, symbolFacts("Aliased", [alias], { valueDeclaration: alias })],
+        [projectSymbol, symbolFacts("Declared", [projectDeclared], { valueDeclaration: projectDeclared })],
+      ]),
+      nodes: new Map([
+        [
+          declared,
+          baseFacts("function", {
+            hasImplementationBody: false,
+            filePath: "/virtual/node_modules/dep-aria/index.d.ts",
+          }),
+        ],
+        [alias, baseFacts("variable", { initializer: aliasIdentifier, filePath: "/virtual/facade.ts" })],
+        [
+          aliasIdentifier,
+          baseFacts("unknown", { referencedValueSymbol: declaredSymbol, filePath: "/virtual/facade.ts" }),
+        ],
+        [projectDeclared, baseFacts("function", { hasImplementationBody: false })],
+      ]),
+      ownership: new Map([[declared, { kind: "dependency", packageName: "dep-aria" }]]),
+    });
+    expect(
+      inspectRequestedComponentSources(
+        {
+          name: "input",
+          exports: [
+            { name: "Forwarded", symbol: declaredSymbol, forwardingModulePath: "/virtual/facade.ts" },
+            { name: "Aliased", symbol: aliasSymbol, forwardingModulePath: "/virtual/input.tsx" },
+            { name: "Unforwarded", symbol: declaredSymbol },
+            { name: "Declared", symbol: projectSymbol, forwardingModulePath: "/virtual/input.tsx" },
+          ],
+        },
+        ops,
+        [
+          { exportName: "Forwarded" },
+          { exportName: "Aliased" },
+          { exportName: "Unforwarded" },
+          { exportName: "Declared" },
+        ]
+      )
+    ).toEqual([
+      { status: "forwarded", filePath: "/virtual/facade.ts", packageName: "dep-aria" },
+      { status: "forwarded", filePath: "/virtual/facade.ts", packageName: "dep-aria" },
+      { status: "unresolved", reason: "no-implementation" },
+      { status: "unresolved", reason: "no-implementation" },
     ]);
   });
 
