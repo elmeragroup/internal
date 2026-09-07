@@ -32,7 +32,7 @@ Use `mode: "check"` to detect stale artifacts without writing. See [api-artifact
 ## Entry points
 
 `@elmeragroup/internal/api-artifacts` exports the same function, defaults, errors, and types as the root.
-Use `@elmeragroup/internal/api-artifacts/model` for artifact types. Its runtime module is empty.
+Use `@elmeragroup/internal/api-artifacts/model` for artifact types. Its runtime module is empty. Diagnostic declarations reference the extractor’s Effect-based warning types.
 The low-level Effect interface is available from `@elmeragroup/internal/api-extractor`.
 
 Configure the plugins explicitly in Oxlint:

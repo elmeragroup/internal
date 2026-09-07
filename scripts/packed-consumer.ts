@@ -34,11 +34,12 @@ try {
     )
   );
   writeFileSync(resolve(consumer, "pnpm-workspace.yaml"), "autoInstallPeers: false\n");
-  cpSync(resolve(repoRoot, "test/packed-consumer.mjs"), resolve(consumer, "check.mjs"));
   cpSync(resolve(repoRoot, "test/packed-consumer"), resolve(consumer, "checks"), { recursive: true });
   run("pnpm", ["install", "--ignore-scripts"], consumer);
   // Node's type stripping is disabled to prove only compiled JavaScript is loaded.
-  run(process.execPath, ["--no-experimental-strip-types", "check.mjs"], consumer);
+  for (const check of ["api", "types", "lint", "tree-shaking"]) {
+    run(process.execPath, ["--no-experimental-strip-types", `checks/${check}.mjs`], consumer);
+  }
   writeFileSync(
     resolve(archiveDirectory, "verified.json"),
     `${JSON.stringify(

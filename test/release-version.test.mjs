@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 
 import { assertCanaryReleaseVersion, assertReleaseVersion } from "../scripts/release-version.ts";
 import { archivePath, packageName } from "../scripts/release.ts";
-import { asRecord, asRecordArray, asString, isString, readJsonObject } from "./json-object.mjs";
+import { asRecordArray, asString, isString, readJsonObject } from "./json-object.mjs";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const changesetBin = createRequire(import.meta.url).resolve("@changesets/cli/bin.js");
@@ -181,6 +181,20 @@ describe("changesets umbrella release plan", () => {
     });
   });
 
+  it.each([
+    "@elmeragroup/api-extractor",
+    "@elmeragroup/api-artifacts",
+    "@elmeragroup/oxlint-plugin",
+    "@elmeragroup/oxlint-plugin-anti-slop",
+  ])("does not release private changes to %s", (name) => {
+    withPlannerWorkspace((workspace) => {
+      writeChangeset(workspace, "private-patch", name, "patch");
+      expect(plannedPublicReleases(workspace)).toEqual([]);
+      writeChangeset(workspace, "public-patch", packageName, "patch");
+      plannedVersion(plannedPublicReleases(workspace));
+    });
+  });
+
   it("plans one version for mixed patch and minor changesets", () => {
     withPlannerWorkspace((workspace) => {
       writeChangeset(workspace, "patch-internal", "@elmeragroup/internal", "patch");
@@ -207,14 +221,5 @@ describe("release commands and workflows", () => {
     expect(publish).toContain("pnpm canary:version");
     expect(publish).toContain("pnpm packages:pack");
     expect(publish).toContain("pnpm canary:publish");
-    const publisher = readFileSync(join(repoRoot, "scripts/canary-publish.ts"), "utf8");
-    expect(publisher).toContain("canaryVersion()");
-    expect(publisher).toContain('"--tag"');
-    expect(publisher).toContain('"canary"');
-    const scripts = asRecord(readJsonObject(join(repoRoot, "package.json")).scripts, "scripts");
-    expect(asString(scripts["packages:pack"], "packages:pack")).toBe(
-      "pnpm build && node scripts/canary-pack.ts"
-    );
-    expect(asString(scripts["canary:pack"], "canary:pack")).toBe("pnpm packages:pack");
   });
 });

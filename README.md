@@ -77,7 +77,7 @@ checks extraction, defaults, drift detection, all public declarations, both lint
 
 Set the repository Actions secret `NPM_TOKEN` to an npm publishing token with write access to the `@elmeragroup` scope. Run the **Publish Canary** workflow on `main` with a fresh `x.y.z-canary.N` version.
 
-The workflow runs the checks above, uploads the verified archives, and publishes them with public access under the `canary` tag. It does not update `latest`. There is no stable publication path.
+The workflow runs the checks above, uploads the verified archive, and publishes it with public access under the `canary` tag. It does not update `latest`. There is no stable publication path.
 
 To prepare a version locally:
 
@@ -89,4 +89,4 @@ pnpm packages:pack
 pnpm test:packed-consumer
 ```
 
-Run `pnpm canary:publish` with npm authentication to publish the verified archives. Each release needs a new version.
+Run `pnpm canary:publish` with npm authentication to publish the verified archive. Each release needs a new version.
