@@ -1,6 +1,6 @@
 import type {
   BackendCompilerOperations,
-  BackendExportDraft,
+  BackendDeclarationOwnership,
   BackendModuleDraft,
   BackendNodeFacts,
   BackendNodeHandle,
@@ -16,22 +16,21 @@ import { isReactWrapperCall } from "./react-policy.ts";
 
 type SourceOperations = Pick<
   BackendCompilerOperations,
-  "nodeFacts" | "propertiesOfType" | "symbolFacts" | "typeOfSymbol"
+  "declarationOwnership" | "nodeFacts" | "propertiesOfType" | "symbolFacts" | "typeOfSymbol"
 >;
 
 /**
  * Mutable bookkeeping for one request's walk.
  *
- * `authoredFilePath` is the last project-owned file the walk passed through.
- * When the walk ends on a dependency declaration, that file (or, for a pure
- * re-export chain the walk never steps through, the export's own forwarding
- * statement) is the authored module the value is published from.
+ * `publishingFilePath` is the innermost project-owned module seen so far: the
+ * export's forwarding module to begin with, then each project node the walk
+ * passes through. A walk that ends on a dependency declaration publishes the
+ * forwarded value from it.
  */
 type Walk = {
   readonly visitedSymbols: Set<BackendSymbolHandle>;
   readonly visitedNodes: Set<BackendNodeHandle>;
-  readonly forwardingFilePath: string | undefined;
-  authoredFilePath: string | undefined;
+  publishingFilePath: string | undefined;
 };
 
 /** Resolves requested component implementation files without semantic extraction. */
@@ -52,21 +51,20 @@ function inspectRequestedComponentSource(
   if (blocked !== undefined) return blocked;
   const exported = draft.exports.find((entry) => entry.name === request.exportName);
   if (exported === undefined) return unresolved("export-not-found");
-  const root =
-    request.memberName === undefined
-      ? exported.symbol
-      : findMember(operations, exported.symbol, request.memberName);
-  if (root === undefined) return unresolved("member-not-found");
-  return followSymbol(operations, root, startWalk(exported));
+  const walk = startWalk(exported.forwardingModulePath);
+  if (request.memberName === undefined) return followSymbol(operations, exported.symbol, walk);
+  // A member is published from its container's authored route: `export const
+  // Group = DepGroup` forwards every member from the aliasing module. The
+  // container walk only contributes that route; its own outcome is not the
+  // member's.
+  followSymbol(operations, exported.symbol, walk);
+  const member = findMember(operations, exported.symbol, request.memberName);
+  if (member === undefined) return unresolved("member-not-found");
+  return followSymbol(operations, member, startWalk(walk.publishingFilePath));
 }
 
-function startWalk(exported: BackendExportDraft): Walk {
-  return {
-    visitedSymbols: new Set(),
-    visitedNodes: new Set(),
-    forwardingFilePath: exported.forwardingFilePath,
-    authoredFilePath: undefined,
-  };
+function startWalk(publishingFilePath: string | undefined): Walk {
+  return { visitedSymbols: new Set(), visitedNodes: new Set(), publishingFilePath };
 }
 
 function blockingWarning(draft: BackendModuleDraft, exportName: string): ComponentSourceResult | undefined {
@@ -123,12 +121,13 @@ function followNode(
   if (walk.visitedNodes.has(node)) return unresolved("cycle");
   walk.visitedNodes.add(node);
   const facts = operations.nodeFacts(node);
-  if (facts.ownership?.kind === "project") walk.authoredFilePath = facts.filePath;
+  const ownership = operations.declarationOwnership(node);
+  if (ownership.kind === "project") walk.publishingFilePath = facts.filePath;
   if (facts.innerExpression !== undefined) {
     return followNode(operations, facts.innerExpression, walk);
   }
   if (isFunctionKind(facts)) {
-    if (facts.hasImplementationBody !== true) return declarationOnly(facts, walk);
+    if (facts.hasImplementationBody !== true) return declarationOnly(ownership, walk);
     const parameter = facts.parameters?.[0];
     return {
       status: "resolved",
@@ -149,7 +148,7 @@ function followNode(
     if (facts.referencedValueSymbol !== undefined) {
       return followSymbol(operations, facts.referencedValueSymbol, walk);
     }
-    return declarationOnly(facts, walk);
+    return declarationOnly(ownership, walk);
   }
   if (facts.referencedValueSymbol !== undefined) {
     return followSymbol(operations, facts.referencedValueSymbol, walk);
@@ -158,17 +157,15 @@ function followNode(
 }
 
 /**
- * A declaration without a body is a forwarded dependency value when it is
- * owned by a dependency and an authored module forwards it. A project
- * declaration file, or a dependency reached without any authored hop, still
- * has no recoverable implementation.
+ * A declaration without a body is a forwarded dependency value when a
+ * dependency owns it and a project module forwards it. A project declaration
+ * file still has no recoverable implementation.
  */
-function declarationOnly(facts: BackendNodeFacts, walk: Walk): ComponentSourceResult {
-  const filePath = walk.authoredFilePath ?? walk.forwardingFilePath;
-  if (facts.ownership?.kind !== "dependency" || filePath === undefined) {
+function declarationOnly(ownership: BackendDeclarationOwnership, walk: Walk): ComponentSourceResult {
+  if (ownership.kind !== "dependency" || walk.publishingFilePath === undefined) {
     return unresolved("no-implementation");
   }
-  return { status: "forwarded", filePath, packageName: facts.ownership.packageName };
+  return { status: "forwarded", filePath: walk.publishingFilePath, packageName: ownership.packageName };
 }
 
 function functionImplementations(

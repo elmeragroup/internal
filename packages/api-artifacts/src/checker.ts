@@ -105,11 +105,6 @@ export type PartSource = {
   rsc: RscStatus;
   /** Destructuring defaults, keyed by prop name. */
   defaults: ReadonlyMap<string, string>;
-  /**
-   * The dependency that declares a value the authored module only forwards, so
-   * the part is published from the facade with the package in `forwardedFrom`.
-   */
-  forwardedPackage: string | null;
 };
 
 function isRecipeAxisDeclaration(declarationPath: string): boolean {
@@ -131,7 +126,7 @@ export function propOrigin(declarationPaths: readonly string[], synthesized: boo
 /**
  * Turns one source-inspection result into artifact source metadata. Unresolved
  * implementations become an actionable problem instead of React declaration paths.
- * A forwarded dependency value reads its metadata from the authored facade that
+ * A forwarded dependency value reads its metadata from the authored module that
  * forwards it: that module's directive decides `rsc`, and it has no defaults.
  */
 function partSourceFromInspection(
@@ -152,20 +147,10 @@ function partSourceFromInspection(
   return {
     sourcePath: path.relative(context.projectRoot, sourceFile.fileName).replaceAll("\\", "/"),
     rsc: readRscStatus(sourceFile),
-    defaults:
-      result.status === "forwarded"
-        ? new Map()
-        : new Map(result.defaults.map((entry) => [entry.name, entry.initializerText])),
-    forwardedPackage: result.status === "forwarded" ? result.packageName : null,
+    defaults: new Map(
+      result.status === "resolved" ? result.defaults.map((entry) => [entry.name, entry.initializerText]) : []
+    ),
   };
-}
-
-/** The declaring packages a part forwards from, including a forwarded value's own package. */
-function forwardedFrom(source: PartSource, forwarded: PartForwarded): readonly string[] {
-  if (source.forwardedPackage === null || forwarded.from.includes(source.forwardedPackage)) {
-    return forwarded.from;
-  }
-  return [...forwarded.from, source.forwardedPackage].sort((left, right) => left.localeCompare(right));
 }
 
 /**
@@ -246,6 +231,13 @@ export type PartForwarded = {
 };
 
 const emptyForwarded: PartForwarded = { count: 0, from: [] };
+
+/** A forwarded value's own declaring package joins the packages its forwarded props come from. */
+function withForwardedValue(forwarded: PartForwarded, result: ComponentSourceResult): PartForwarded {
+  if (result.status !== "forwarded" || forwarded.from.includes(result.packageName)) return forwarded;
+  const from = [...forwarded.from, result.packageName].sort((left, right) => left.localeCompare(right));
+  return { count: forwarded.count, from };
+}
 
 /**
  * Counts props the part accepts that are neither library-declared nor recipe
@@ -416,7 +408,7 @@ function describePart(
       rsc: source.rsc,
       sourcePath: source.sourcePath,
       props: [],
-      forwardedFrom: forwardedFrom(source, emptyForwarded),
+      forwardedFrom: forwarded.from,
       forwardedCount: 0,
     };
   }
@@ -465,7 +457,7 @@ function describePart(
     rsc: source.rsc,
     sourcePath: source.sourcePath,
     props: rows,
-    forwardedFrom: forwardedFrom(source, forwarded),
+    forwardedFrom: forwarded.from,
     forwardedCount: forwarded.count,
   };
 }
@@ -490,7 +482,10 @@ export function extractPart(
       props.set(property.name, property);
     }
   }
-  const forwarded = props.size === 0 ? emptyForwarded : forwardedOfProps(context, props.values());
+  const forwarded = withForwardedValue(
+    props.size === 0 ? emptyForwarded : forwardedOfProps(context, props.values()),
+    sourceResult
+  );
   return {
     name: request.name,
     declarationPaths,

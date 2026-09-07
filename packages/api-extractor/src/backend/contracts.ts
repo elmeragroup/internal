@@ -283,11 +283,6 @@ export type BackendNodeFacts = {
   readonly innerExpression?: BackendNodeHandle;
   /** Whether a function-like declaration has an implementation body. */
   readonly hasImplementationBody?: boolean;
-  /**
-   * Who owns the node's source file. Read for source inspection only, where the
-   * walk must tell a forwarded dependency declaration from a project `.d.ts`.
-   */
-  readonly ownership?: BackendDeclarationOwnership;
 };
 
 type BackendBindingDefaultFact = {
@@ -332,11 +327,13 @@ export type BackendExportDraft = {
    */
   readonly reexportChain?: readonly string[];
   /**
-   * Compiler file path of the innermost re-export declaration on that chain,
-   * the authored module whose statement forwards the original declaration.
-   * Present exactly when `reexportChain` is.
+   * Compiler path of the innermost project-owned module whose statement
+   * introduces this export: the described module itself for local
+   * declarations, aliases, and `export *`, or the last project module a
+   * module re-export chain reaches. Source inspection publishes a forwarded
+   * dependency value from it. The backend sets it on every export.
    */
-  readonly forwardingFilePath?: string;
+  readonly forwardingModulePath?: string;
   readonly extendsTypes?: readonly { readonly name: string; readonly resolvedName?: string }[];
 };
 

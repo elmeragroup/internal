@@ -1,5 +1,6 @@
 import type { Node, SourceFile } from "typescript/unstable/ast";
 import { isExportSpecifier, isStringLiteral } from "typescript/unstable/ast/is";
+import { SymbolFlags } from "typescript/unstable/sync";
 import type { Symbol as TsSymbol } from "typescript/unstable/sync";
 
 import { resolveOwnedDeclaration } from "./declarations.ts";
@@ -7,7 +8,8 @@ import { exportsOf } from "./module-ordering.ts";
 import { memoizeWalkFact } from "./module-walk-memo.ts";
 import type { DescriptorScope, TsgoModuleSession } from "./module.ts";
 import { repositoryRelativePath } from "./path-identity.ts";
-import { enclosingExportDeclaration } from "./syntax.ts";
+import { enclosingExportDeclaration, isStarExport } from "./syntax.ts";
+import { sameUltimateSymbol, ultimateSymbol } from "./ultimate-symbol.ts";
 
 /**
  * Re-export chain walking for the module surface.
@@ -23,14 +25,12 @@ import { enclosingExportDeclaration } from "./syntax.ts";
 /**
  * One forwarding link recovered from a re-export statement.
  *
- * `file` is the module whose statement forwards the symbol, `exportedName`
- * is the name the target module exports it under, and `moduleSpecifier` is
- * the authored specifier to resolve against that file.
+ * `file` owns the statement, `exportedName` names the target export, and
+ * `moduleNode` resolves the target module without loading dependency sources.
  */
 type ForwardingReExport = {
   readonly file: SourceFile;
   readonly exportedName: string;
-  readonly moduleSpecifier: string;
   /** The authored string-literal node resolves its module symbol directly. */
   readonly moduleNode: Node;
 };
@@ -56,58 +56,78 @@ export function extendChain(scope: DescriptorScope, symbol: TsSymbol): readonly 
 const maxReexportHops = 64;
 
 /**
- * The full intermediate chain of a module re-export: this symbol's own
- * forwarding hop followed by every further file its specifier statement
- * forwards through, outermost first, up to the original declaration site.
+ * Recover the authored route through named and star re-exports. Each hop
+ * retains its module and symbol, since the checker collapses star aliases.
+ * Equivalent branches are tried in authored order; revisits and the depth
+ * bound stop cyclic routes without hiding a later valid branch.
  *
- * Each link resolves one statement at a time — the specifier's authored
- * module specifier resolves against its owning file and names one export of
- * the target module — so the walk never depends on how far the checker's
- * alias resolution collapses the chain in one step. A link that stops
- * resolving (the origin's own declaration, an unresolvable specifier, or a
- * revisit) ends the chain; the origin itself stays out because the draft's
- * declaration paths already carry it. The bound guards pathological barrels.
- *
- * `forwardingFilePath` is the compiler path of the innermost hop: the file
- * whose statement forwards the original declaration itself. Source inspection
- * reads a dependency-forwarding facade's directive prologue from it.
+ * The chain excludes the declaration site. `forwardingModulePath` names the
+ * innermost project module reached, including a local alias or implementation.
+ * Source inspection uses it when the value ends at a dependency declaration.
  */
 export function followedChain(
   session: TsgoModuleSession,
   scope: DescriptorScope,
   start: TsSymbol
 ): FollowedChain {
-  let chain = extendChain(scope, start);
-  let forwardingFilePath = forwardingReExport(session, start)?.file.fileName ?? scope.filePath;
-  const visited = new Set<TsSymbol>([start]);
-  let current = start;
-  for (let hop = 0; hop < maxReexportHops; hop += 1) {
-    const next = forwardedSymbol(session, current);
-    if (next === undefined || visited.has(next)) break;
-    visited.add(next);
-    const forwarding = forwardingReExport(session, next);
-    if (forwarding === undefined) break;
-    forwardingFilePath = forwarding.file.fileName;
-    const candidate = repositoryRelativePath(session.rootDirectory, forwarding.file.fileName);
-    if (chain[chain.length - 1] !== candidate) chain = [...chain, candidate];
-    current = next;
+  if (scope.source === undefined) return unforwardedChain(scope);
+  const followed = followModule(session, scope.source, start, new Map(), 0);
+  if (followed === undefined) return unforwardedChain(scope);
+  return {
+    ...followed,
+    chain: [...scope.chain, ...followed.chain].filter(
+      (path, index, paths) => index === 0 || paths[index - 1] !== path
+    ),
+  };
+}
+
+/** A state includes its module because stars reuse the target's symbol. */
+function followModule(
+  session: TsgoModuleSession,
+  source: SourceFile,
+  symbol: TsSymbol,
+  visited: Map<SourceFile, Set<TsSymbol>>,
+  depth: number
+): FollowedChain | undefined {
+  const symbols = visited.get(source) ?? new Set<TsSymbol>();
+  if (depth >= maxReexportHops || symbols.has(symbol)) return undefined;
+  symbols.add(symbol);
+  visited.set(source, symbols);
+  const edges = moduleForwardings(session, source, symbol);
+  if (edges.length === 0) return { chain: [], forwardingModulePath: source.fileName };
+  for (const edge of edges) {
+    const step = forwardedSymbol(session, edge);
+    if (step === undefined) continue;
+    const followed =
+      step.source === undefined
+        ? { chain: [], forwardingModulePath: source.fileName }
+        : followModule(session, step.source, step.symbol, visited, depth + 1);
+    if (followed !== undefined) {
+      return {
+        ...followed,
+        chain: [repositoryRelativePath(session.rootDirectory, source.fileName), ...followed.chain],
+      };
+    }
   }
-  return { chain, forwardingFilePath };
+  return undefined;
 }
 
 export type FollowedChain = {
   readonly chain: readonly string[];
-  readonly forwardingFilePath: string;
+  readonly forwardingModulePath: string;
 };
+
+/** A chain that never leaves the described module. */
+export function unforwardedChain(scope: DescriptorScope): FollowedChain {
+  return { chain: scope.chain, forwardingModulePath: scope.filePath };
+}
 
 /**
  * The re-export statement that forwards a symbol from another module, when
  * its declarations contain one (`export { x } from '…'`, including renamed
  * and type-only forms).
  *
- * A chain resolves each symbol's forwarding statement twice — once as the hop
- * it steps to and once as the hop it steps from — so the answer, including an
- * absent one, is memoized for the walk.
+ * The answer, including an absent one, is memoized across module routes.
  */
 const forwardingReExport = memoizeWalkFact(
   (session: TsgoModuleSession, symbol: TsSymbol): ForwardingReExport | undefined =>
@@ -142,7 +162,6 @@ function readForwardingReExport(
     return {
       file: resolved.getSourceFile(),
       exportedName: specifier.propertyName?.text ?? specifier.name.text,
-      moduleSpecifier: owner.moduleSpecifier.text,
       moduleNode: owner.moduleSpecifier,
     };
   }
@@ -150,19 +169,63 @@ function readForwardingReExport(
 }
 
 /**
- * Steps ONE re-export link outward: the export of the specifier's target
- * module that the statement names, without collapsing further aliases.
+ * One re-export link: the export the statement names and, when the target
+ * module is project-owned, its source file. A dependency
+ * module is never a forwarding hop, so it stays unresolved and absent.
  */
-function forwardedSymbol(session: TsgoModuleSession, symbol: TsSymbol): TsSymbol | undefined {
-  const forwarding = forwardingReExport(session, symbol);
-  if (forwarding === undefined) return undefined;
-  // The module-specifier node belongs to the already materialized forwarding
-  // source file. Its checker symbol exposes the target module exports without
-  // resolving the target source file (which may be an excluded dependency).
+type ForwardedStep = {
+  readonly symbol: TsSymbol;
+  readonly source: SourceFile | undefined;
+};
+
+/**
+ * Find this module's authored edge before following the symbol. Star exports
+ * reuse their target symbol, so its declaration alone cannot identify the
+ * intermediate modules. Local exports shadow every star contribution.
+ */
+function moduleForwardings(
+  session: TsgoModuleSession,
+  source: SourceFile,
+  symbol: TsSymbol
+): readonly ForwardingReExport[] {
+  if (symbol.declarations.some((declaration) => session.sameSourceFile(declaration.path, source.fileName))) {
+    const named = forwardingReExport(session, symbol);
+    return named === undefined ? [] : [named];
+  }
+  if (symbol.name === "default") return [];
+  const target = ultimateSymbol(session.checker, symbol);
+  const runtimeValue = target.status === "resolved" && (target.symbol.flags & SymbolFlags.Value) !== 0;
+  const contributions: ForwardingReExport[] = [];
+  for (const statement of source.statements) {
+    if (!isStarExport(statement, runtimeValue ? false : undefined)) continue;
+    const forwarding = {
+      file: source,
+      exportedName: symbol.name,
+      moduleNode: statement.moduleSpecifier,
+    };
+    const member = forwardedSymbol(session, forwarding)?.symbol;
+    if (member === undefined) continue;
+    // Distinct declarations make this name ambiguous. The module walk owns
+    // its warning; provenance must not choose a route through the collision.
+    if (!sameUltimateSymbol(session.checker, symbol, member)) return [];
+    contributions.push(forwarding);
+  }
+  return contributions;
+}
+
+/** Resolve one authored edge without collapsing subsequent aliases or stars. */
+function forwardedSymbol(
+  session: TsgoModuleSession,
+  forwarding: ForwardingReExport
+): ForwardedStep | undefined {
   const moduleSymbol = session.symbolAt(forwarding.moduleNode);
   if (moduleSymbol === undefined || session.checker.isUnknownSymbol(moduleSymbol)) return undefined;
-  for (const member of exportsOf(session, moduleSymbol)) {
-    if (member.name === forwarding.exportedName) return member;
-  }
-  return undefined;
+  const member = exportsOf(session, moduleSymbol).find(
+    (candidate) => candidate.name === forwarding.exportedName
+  );
+  if (member === undefined) return undefined;
+  return {
+    symbol: member,
+    source: resolveOwnedDeclaration(session, moduleSymbol.declarations[0])?.getSourceFile(),
+  };
 }

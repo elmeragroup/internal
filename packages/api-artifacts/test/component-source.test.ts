@@ -1,64 +1,11 @@
-import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
-import { createRequire } from "node:module";
-import { tmpdir } from "node:os";
+import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { generateApiArtifacts } from "../src/index.ts";
+import { artifactOptions as options, projectFixtures } from "./support/project-fixture.ts";
 
-const require = createRequire(import.meta.url);
-const roots: string[] = [];
-
-afterEach(async () => {
-  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
-});
-
-async function linkWorkspaceReact(root: string): Promise<void> {
-  const reactRoot = path.dirname(require.resolve("react/package.json"));
-  const typesRoot = path.dirname(require.resolve("@types/react/package.json"));
-  await mkdir(path.join(root, "node_modules/@types"), { recursive: true });
-  await symlink(reactRoot, path.join(root, "node_modules/react"));
-  await symlink(typesRoot, path.join(root, "node_modules/@types/react"));
-}
-
-async function fixture(files: Readonly<Record<string, string>>): Promise<string> {
-  const root = await mkdtemp(path.join(tmpdir(), "api-artifacts-source-"));
-  roots.push(root);
-  await writeFile(
-    path.join(root, "tsconfig.json"),
-    JSON.stringify({
-      compilerOptions: {
-        strict: true,
-        types: [],
-        module: "ESNext",
-        moduleResolution: "Bundler",
-        jsx: "react-jsx",
-        lib: ["ES2022", "DOM"],
-        skipLibCheck: false,
-      },
-      include: ["**/*.ts", "**/*.tsx"],
-    })
-  );
-  for (const [relative, source] of Object.entries(files)) {
-    const filePath = path.join(root, relative);
-    await mkdir(path.dirname(filePath), { recursive: true });
-    await writeFile(filePath, source);
-  }
-  await linkWorkspaceReact(root);
-  return root;
-}
-
-function options(
-  projectRoot: string,
-  components: readonly {
-    slug: string;
-    entryFile: string;
-    exportNames: readonly string[];
-    outputFile: string;
-  }[]
-) {
-  return { projectRoot, tsconfigPath: "tsconfig.json", components };
-}
+const fixture = projectFixtures({ prefix: "api-artifacts-source-", include: ["**/*.ts", "**/*.tsx"] });
 
 describe("component implementation source", () => {
   it("recovers nested memo/forwardRef source, client status, and destructuring defaults", async () => {

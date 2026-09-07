@@ -33,7 +33,8 @@ import { exportsOf, orderedContainerExports } from "./module-ordering.ts";
 import { aliasedSymbol, resolveModule } from "./module-resolution.ts";
 import { memoizeWalkFact } from "./module-walk-memo.ts";
 import { repositoryRelativePath } from "./path-identity.ts";
-import { extendChain, followedChain } from "./reexport-chain.ts";
+import type { FollowedChain } from "./reexport-chain.ts";
+import { extendChain, followedChain, unforwardedChain } from "./reexport-chain.ts";
 import { authoredLocation, enclosingExportDeclaration, isStarExport } from "./syntax.ts";
 import { sameUltimateSymbol, ultimateSymbol } from "./ultimate-symbol.ts";
 
@@ -285,11 +286,8 @@ function appendDescriptors(
   }
   const defaultNamedTarget = defaultExportNameSymbol(scope.session, first);
   const target = defaultNamedTarget ?? exportTarget(scope.session, scope.symbol);
-  const specifierReExport = isModuleReExportSpecifier(scope.session, scope.symbol);
-  const followed = specifierReExport
-    ? followedChain(scope.session, scope, scope.symbol)
-    : { chain: scope.chain, forwardingFilePath: undefined };
-  out.push(exportDescriptor(scope, target, followed.chain, followed.forwardingFilePath));
+  const followed = followedChain(scope.session, scope, scope.symbol);
+  out.push(exportDescriptor(scope, target, followed));
   // A re-exported value can carry a namespace merged onto its ORIGINAL
   // declaration (`function f() {}; namespace f {}` forwarded with
   // `export { f } from …`). Upstream merges those member descriptors onto the
@@ -373,6 +371,8 @@ function appendNamespaceMembers(
     appendDescriptors(
       {
         ...memberScope,
+        filePath: containerFile?.fileName ?? scope.filePath,
+        source: containerFile ?? scope.source,
         symbol: member,
         publicName: member.name,
         symbolStack: [...scope.symbolStack, member.name],
@@ -401,14 +401,13 @@ function appendDefaultExport(scope: DescriptorScope, assignment: Node, out: Back
     });
     return;
   }
-  out.push(exportDescriptor({ ...scope, symbol: exported }, exported, scope.chain, undefined));
+  out.push(exportDescriptor({ ...scope, symbol: exported }, exported, unforwardedChain(scope)));
 }
 
 function exportDescriptor(
   scope: DescriptorScope,
   target: TsSymbol,
-  chain: readonly string[],
-  forwardingFilePath: string | undefined
+  followed: FollowedChain
 ): BackendExportDraft {
   const session = scope.session;
   const declarationHandle = valueOrFirstDeclarationHandle(target);
@@ -441,8 +440,8 @@ function exportDescriptor(
         : explicitValueReExport(session, scope.symbol, scope.source, scope.publicName),
     ...definedFields({
       reexportedFrom,
-      reexportChain: chain.length === 0 ? undefined : chain,
-      forwardingFilePath: chain.length === 0 ? undefined : forwardingFilePath,
+      reexportChain: followed.chain.length === 0 ? undefined : followed.chain,
+      forwardingModulePath: followed.forwardingModulePath,
       extendsTypes: inheritedTypes,
     }),
   };

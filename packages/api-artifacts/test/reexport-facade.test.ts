@@ -1,16 +1,14 @@
-import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
-import { createRequire } from "node:module";
-import { tmpdir } from "node:os";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { generateApiArtifacts } from "../src/index.ts";
+import { artifactOptions as options, projectFixtures } from "./support/project-fixture.ts";
 
-const require = createRequire(import.meta.url);
-const roots: string[] = [];
-
-afterEach(async () => {
-  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
+const fixture = projectFixtures({
+  prefix: "api-artifacts-facade-",
+  include: ["src/**/*.ts", "src/**/*.tsx"],
+  skipLibCheck: true,
 });
 
 /** A declaration-only dependency, like `react-aria`: the facade forwards its values. */
@@ -22,7 +20,8 @@ const dependencyFiles = {
     main: "./index.js",
     types: "./index.d.ts",
   }),
-  "node_modules/dep-aria/index.js": "export function Focusable() {}\nexport function useFocusable() {}\n",
+  "node_modules/dep-aria/index.js":
+    "export function Focusable() {}\nexport function useFocusable() {}\nexport const Group = { Focusable };\n",
   "node_modules/dep-aria/index.d.ts": `import type { ReactNode } from "react";
 export interface FocusableOptions {
   /** Whether the element is disabled. */
@@ -33,38 +32,12 @@ export interface FocusableProps extends FocusableOptions {
 }
 export declare function Focusable(props: FocusableProps): ReactNode;
 export declare function useFocusable(props: FocusableOptions): { focusableProps: object };
+export declare const Group: { Focusable: (props: FocusableProps) => ReactNode };
 `,
 };
 
-async function fixture(files: Readonly<Record<string, string>>): Promise<string> {
-  const root = await mkdtemp(path.join(tmpdir(), "api-artifacts-facade-"));
-  roots.push(root);
-  await writeFile(
-    path.join(root, "tsconfig.json"),
-    JSON.stringify({
-      compilerOptions: {
-        strict: true,
-        types: [],
-        module: "ESNext",
-        moduleResolution: "Bundler",
-        jsx: "react-jsx",
-        lib: ["ES2022", "DOM"],
-        skipLibCheck: true,
-      },
-      include: ["src/**/*.ts", "src/**/*.tsx"],
-    })
-  );
-  for (const [relative, source] of Object.entries({ ...dependencyFiles, ...files })) {
-    const filePath = path.join(root, relative);
-    await mkdir(path.dirname(filePath), { recursive: true });
-    await writeFile(filePath, source);
-  }
-  const reactRoot = path.dirname(require.resolve("react/package.json"));
-  const typesRoot = path.dirname(require.resolve("@types/react/package.json"));
-  await mkdir(path.join(root, "node_modules/@types"), { recursive: true });
-  await symlink(reactRoot, path.join(root, "node_modules/react"));
-  await symlink(typesRoot, path.join(root, "node_modules/@types/react"));
-  return root;
+function facade(files: Readonly<Record<string, string>>): Promise<string> {
+  return fixture({ ...dependencyFiles, ...files });
 }
 
 const focusableFacade = {
@@ -85,23 +58,21 @@ const focusableComponent = {
   outputFile: "docs/focusable/api.json",
 };
 
+const focusablePart = {
+  name: "Focusable",
+  rsc: "client",
+  sourcePath: "src/focusable/focusable.tsx",
+  props: [],
+  forwardedFrom: ["dep-aria"],
+  forwardedCount: 2,
+};
+
 describe("re-export-only facades (issue #4)", () => {
   it("publishes zero-prop parts for dependency values forwarded through an authored client module", async () => {
-    const root = await fixture(focusableFacade);
-    const result = await generateApiArtifacts({
-      projectRoot: root,
-      tsconfigPath: "tsconfig.json",
-      components: [focusableComponent],
-    });
+    const root = await facade(focusableFacade);
+    const result = await generateApiArtifacts(options(root, [focusableComponent]));
     expect(result.components[0]?.parts).toEqual([
-      {
-        name: "Focusable",
-        rsc: "client",
-        sourcePath: "src/focusable/focusable.tsx",
-        props: [],
-        forwardedFrom: ["dep-aria"],
-        forwardedCount: 2,
-      },
+      focusablePart,
       {
         name: "useFocusable",
         rsc: "client",
@@ -119,90 +90,115 @@ describe("re-export-only facades (issue #4)", () => {
   });
 
   it("passes check mode once the forwarded artifact is written, and reports drift before", async () => {
-    const root = await fixture(focusableFacade);
-    const options = { projectRoot: root, tsconfigPath: "tsconfig.json", components: [focusableComponent] };
-    await expect(generateApiArtifacts({ ...options, mode: "check" })).rejects.toMatchObject({
+    const root = await facade(focusableFacade);
+    const generate = options(root, [focusableComponent]);
+    await expect(generateApiArtifacts({ ...generate, mode: "check" })).rejects.toMatchObject({
       name: "ApiArtifactsDriftError",
       files: [path.join(root, "docs/focusable/api.json")],
     });
-    await generateApiArtifacts(options);
-    const checked = await generateApiArtifacts({ ...options, mode: "check" });
+    await generateApiArtifacts(generate);
+    const checked = await generateApiArtifacts({ ...generate, mode: "check" });
     expect(checked.components[0]?.changed).toBe(false);
   });
 
   it("reads the directive from the entry itself when it forwards the dependency directly", async () => {
-    const root = await fixture({
-      "src/entry.ts": `export { Focusable } from "dep-aria";\n`,
-    });
-    const result = await generateApiArtifacts({
-      projectRoot: root,
-      tsconfigPath: "tsconfig.json",
-      components: [
+    const root = await facade({ "src/entry.ts": `export { Focusable } from "dep-aria";\n` });
+    const result = await generateApiArtifacts(
+      options(root, [
         {
           slug: "direct",
           entryFile: "src/entry.ts",
           exportNames: ["Focusable"],
           outputFile: "docs/direct/api.json",
         },
-      ],
-    });
-    expect(result.components[0]?.parts[0]).toMatchObject({
-      name: "Focusable",
+      ])
+    );
+    expect(result.components[0]?.parts[0]).toEqual({
+      ...focusablePart,
       rsc: "server",
       sourcePath: "src/entry.ts",
-      props: [],
-      forwardedFrom: ["dep-aria"],
     });
   });
 
-  it("publishes an authored value alias of a dependency declaration from the aliasing module", async () => {
-    const root = await fixture({
+  it.each([
+    { form: "export * from the dependency", source: `"use client";\nexport * from "dep-aria";\n` },
+    {
+      form: "an imported binding exported by name",
+      source: `"use client";\nimport { Focusable } from "dep-aria";\nexport { Focusable };\n`,
+    },
+    {
+      form: "an authored value alias",
+      source: `"use client";\nimport { Focusable as DepFocusable } from "dep-aria";\nexport const Focusable = DepFocusable;\n`,
+    },
+  ])("publishes a facade that forwards through $form from that facade", async ({ source }) => {
+    const root = await facade({
       "src/entry.ts": `export { Focusable } from "./focusable/focusable";\n`,
-      "src/focusable/focusable.tsx": `"use client";
-import { Focusable as DepFocusable } from "dep-aria";
-export const Focusable = DepFocusable;
-`,
+      "src/focusable/focusable.tsx": source,
     });
-    const result = await generateApiArtifacts({
-      projectRoot: root,
-      tsconfigPath: "tsconfig.json",
-      components: [
+    const result = await generateApiArtifacts(
+      options(root, [
         {
-          slug: "alias",
+          slug: "form",
           entryFile: "src/entry.ts",
           exportNames: ["Focusable"],
-          outputFile: "docs/alias/api.json",
+          outputFile: "docs/form/api.json",
         },
-      ],
+      ])
+    );
+    expect(result.components[0]?.parts).toEqual([focusablePart]);
+  });
+
+  it.each(["src/barrel.ts", "src/entry.ts"])(
+    "follows consecutive star exports from %s to the client facade",
+    async (entryFile) => {
+      const root = await facade({
+        "src/entry.ts": `export { Focusable } from "./barrel";\n`,
+        "src/barrel.ts": `export * from "./focusable/focusable";\n`,
+        "src/focusable/focusable.tsx": `"use client";\nexport * from "dep-aria";\n`,
+      });
+      const result = await generateApiArtifacts(
+        options(root, [{ ...focusableComponent, entryFile, exportNames: ["Focusable"] }])
+      );
+      expect(result.components[0]?.parts).toEqual([focusablePart]);
+    }
+  );
+
+  it("publishes a member of a forwarded container from the module that aliases the container", async () => {
+    const root = await facade({
+      "src/entry.ts": `export { Group } from "./focusable/group";\n`,
+      "src/focusable/group.tsx": `"use client";\nimport { Group as DepGroup } from "dep-aria";\nexport const Group = DepGroup;\n`,
     });
-    expect(result.components[0]?.parts[0]).toMatchObject({
-      name: "Focusable",
-      rsc: "client",
-      sourcePath: "src/focusable/focusable.tsx",
-      props: [],
-      forwardedFrom: ["dep-aria"],
-      forwardedCount: 2,
-    });
+    const result = await generateApiArtifacts(
+      options(root, [
+        {
+          slug: "group",
+          entryFile: "src/entry.ts",
+          exportNames: ["Group"],
+          outputFile: "docs/group/api.json",
+        },
+      ])
+    );
+    expect(result.components[0]?.parts).toEqual([
+      { ...focusablePart, name: "Group.Focusable", sourcePath: "src/focusable/group.tsx" },
+    ]);
   });
 
   it("still rejects a declaration-only value the project itself declares", async () => {
-    const root = await fixture({
+    const root = await facade({
       "src/declared.d.ts": `export declare function DeclaredOnly(props: { label: string }): null;\n`,
       "src/entry.ts": `export { DeclaredOnly } from "./declared";\n`,
     });
     await expect(
-      generateApiArtifacts({
-        projectRoot: root,
-        tsconfigPath: "tsconfig.json",
-        components: [
+      generateApiArtifacts(
+        options(root, [
           {
             slug: "declared",
             entryFile: "src/entry.ts",
             exportNames: ["DeclaredOnly"],
             outputFile: "docs/declared/api.json",
           },
-        ],
-      })
+        ])
+      )
     ).rejects.toThrow(/DeclaredOnly: could not recover the authored implementation \(no-implementation\)/u);
   });
 });

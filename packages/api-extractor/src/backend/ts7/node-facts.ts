@@ -8,6 +8,8 @@ import {
   isClassDeclaration,
   isFunctionLikeDeclaration,
   isIdentifier,
+  isImportClause,
+  isImportSpecifier,
   isImportTypeNode,
   isIndexSignatureDeclaration,
   isInterfaceDeclaration,
@@ -49,7 +51,6 @@ import type {
 import { callExpressionFacts } from "./call-facts.ts";
 import { declarationModifiers } from "./class-facts.ts";
 import type { TsgoFactsSession } from "./facts.ts";
-import { declarationOwnershipOfPath } from "./file-ownership.ts";
 import { aliasedSymbol } from "./module-resolution.ts";
 import { authoredLocation } from "./syntax.ts";
 
@@ -205,11 +206,6 @@ export function nodeFacts(
     kind: nodeKind(node),
     text: node.getText().replaceAll(/\s+/gu, " ").trim(),
     ...authoredLocation(node, sourceFile),
-    ...definedFields({
-      ownership: session.componentSources
-        ? declarationOwnershipOfPath(session, sourceFile.fileName)
-        : undefined,
-    }),
   };
   const type = sourceNodeType(node);
   const result: BackendNodeFacts =
@@ -334,7 +330,7 @@ export function nodeFacts(
   if (isTransparentExpression(node)) {
     return { ...result, innerExpression: session.nodeHandle(node.expression) };
   }
-  if (isIdentifier(node) || isPropertyAccessExpression(node)) {
+  if (isIdentifier(node) || isPropertyAccessExpression(node) || isImportAlias(node)) {
     return {
       ...result,
       ...definedFields({ referencedValueSymbol: referencedValueSymbol(session, node) }),
@@ -394,12 +390,24 @@ function sourceBindingDefaults(
   });
 }
 
+/**
+ * An import binding (`import { F }`, `import F`) declares an alias whose value
+ * is the imported declaration, so it references that value the way an
+ * identifier does. `export default F` over an import lands the source walk on
+ * this declaration.
+ */
+function isImportAlias(node: Node): node is Node & { readonly name: Node } {
+  return isImportSpecifier(node) || (isImportClause(node) && node.name !== undefined);
+}
+
 function referencedValueSymbol(session: TsgoFactsSession, node: Node): BackendSymbolHandle | undefined {
   const raw = isShorthandPropertyAssignment(node)
     ? session.checker.getShorthandAssignmentValueSymbol(node)
     : isIdentifier(node) || isPropertyAccessExpression(node)
       ? session.rawSymbolAt(node)
-      : undefined;
+      : isImportAlias(node)
+        ? session.rawSymbolAt(node.name)
+        : undefined;
   if (raw === undefined) return undefined;
   return session.symbolHandle(aliasedSymbol(session.checker, raw) ?? raw);
 }

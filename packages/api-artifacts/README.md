@@ -36,10 +36,11 @@ flags, printed types, and forwarded counts stay authoritative. Unknown wrappers,
 declaration-only components the project itself declares fail generation with an explicit diagnostic
 naming the component and reason; they do not publish React's type-declaration path or empty defaults.
 
-A facade that only forwards a dependency's value, through `export { X } from "dep"` chains or an
-authored `export const X = DepX` alias, publishes a part with no props. Its `sourcePath` and `rsc`
-come from the innermost authored module that forwards the value, and `forwardedFrom` names the
-declaring dependency together with the packages that declare the forwarded props.
+A facade that only forwards a dependency's value, through named or `export *` re-export chains, an
+exported import binding, or an authored `export const X = DepX` alias, publishes a part with no
+props. Its `sourcePath` and `rsc` come from the innermost authored module that forwards the value,
+and `forwardedFrom` names the declaring dependency together with the packages that declare the
+forwarded props.
 
 Each part's `rsc` value is classified from the recovered implementation module's directive prologue
 in the parsed syntax. Only an exact authored `"use client"` or `'use client'` expression statement in

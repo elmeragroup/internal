@@ -8,5 +8,28 @@
     "jsx": "react-jsx",
     "noEmit": true
   },
-  "include": ["input.tsx", "render.tsx", "declared.d.ts", "default-expression.ts", "facade.ts", "forwarded.ts"]
+  "include": [
+    "input.tsx",
+    "render.tsx",
+    "declared.d.ts",
+    "default-expression.ts",
+    "facade.ts",
+    "forwarded.ts",
+    "star.ts",
+    "outer-star.ts",
+    "star-barrel.ts",
+    "star-mixed.ts",
+    "star-diamond.ts",
+    "star-shadow.ts",
+    "star-namespace.ts",
+    "star-type-only.ts",
+    "star-cycle-a.ts",
+    "star-cycle-b.ts",
+
+    "named-star-entry.ts",
+    "alias-export.ts",
+    "default-alias.ts",
+    "group-facade.ts",
+    "group-entry.ts"
+  ]
 }
