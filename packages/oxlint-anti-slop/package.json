@@ -5,7 +5,10 @@
   "type": "module",
   "license": "MIT",
   "exports": {
-    ".": "./index.ts"
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./index.ts"
+    }
   },
   "scripts": {
     "test": "node --experimental-strip-types --test rules/*.test.ts"

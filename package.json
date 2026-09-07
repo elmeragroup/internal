@@ -36,7 +36,9 @@
     "yaml": "catalog:",
     "@elmeragroup/internal": "workspace:*",
     "@elmeragroup/api-extractor": "workspace:*",
-    "effect": "catalog:"
+    "effect": "catalog:",
+    "tsdown": "catalog:",
+    "esbuild": "catalog:"
   },
   "engines": {
     "node": ">=24.13.0 <25"

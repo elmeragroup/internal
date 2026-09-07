@@ -5,7 +5,7 @@ This pnpm workspace contains shared engineering packages for the Elmera Group. R
 
 ## Package responsibilities
 
-- `packages/internal` is the consumer entry point and supplies Elmera defaults.
+- `packages/internal` is the only published package and supplies Elmera defaults through explicit exports.
 - `packages/api-artifacts` generates component API JSON and checks for drift.
 - `packages/api-extractor` extracts a semantic API model from TypeScript projects.
 - `packages/oxlint-plugin` and `packages/oxlint-anti-slop` contain private lint rules.
@@ -82,8 +82,13 @@ Preserve the distinction between artifact `check` and `write` modes. Check mode 
 or create directories. Keep generation limited to the explicit output inventory. Update the relevant
 README and tests when changing public options, defaults, diagnostics, or serialized output.
 
-For release preparation, follow the root README. The three public packages share one coordinated
-Changesets version. Package verification accepts a coordinated stable or canary version. Publication
+For release preparation, follow the root README. Only `@elmeragroup/internal` is published and receives Changesets versions. The extractor, artifact,
+and lint workspaces are private. Package verification accepts a stable or canary version. Publication
 remains canary-only through the manual Publish Canary workflow and does not publish `latest`. CI
 checks changeset presence for ordinary pull requests unless they carry the `no-changeset` label.
 Include a changeset for publishable changes and explain when a change needs no release.
+
+Bundle private implementations and declarations with the pinned tsdown build. Keep external runtime
+dependencies pinned. New public entries require explicit export mappings and packed-consumer coverage.
+Keep the model entry free of runtime imports and lint entries free of TypeScript and Effect loads.
+Preserve side-effect-free module initialization so consumers can remove unused exports.

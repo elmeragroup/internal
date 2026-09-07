@@ -1,9 +1,9 @@
-# @elmeragroup/api-artifacts
+# API artifacts
 
-Generate committed component API JSON with one call. Requires Node >=24.13.0 <25. TypeScript is included as a runtime dependency.
+Generate committed component API JSON with one call. Requires Node >=24.13.0 <25. This private workspace implements generation for `@elmeragroup/internal`. TypeScript is included as a runtime dependency of the published package.
 
 ```ts
-import { generateApiArtifacts } from "@elmeragroup/api-artifacts";
+import { generateApiArtifacts } from "@elmeragroup/internal/api-artifacts";
 
 const { components } = await generateApiArtifacts({
   projectRoot: process.cwd(),
@@ -18,6 +18,10 @@ const { components } = await generateApiArtifacts({
   ],
 });
 ```
+
+The public generator defaults to `includeExternalTypes: ["@base-ui/react"]` and
+`allowedWarningCodes: ["unsupported-type-fallback"]`. Override these options as needed.
+The private workspace generator supplies no consumer defaults.
 
 All relative paths resolve against `projectRoot`. Each output must be a distinct `.json` file. The returned components include the generated parts, serialized `text`, absolute `outputFile`, and a `changed` flag. `generatedBy` optionally supplies the artifact's `$generated` banner.
 
@@ -37,4 +41,4 @@ in the parsed syntax. Only an exact authored `"use client"` or `'use client'` ex
 that prologue is `client`. `server` means that module has no client directive; it is not a transitive
 React server/client module-graph analysis.
 
-Import artifact types through `@elmeragroup/api-artifacts/model`. Generate the JSON during the build, then import it from MDX or other rendering code.
+Import artifact types through `@elmeragroup/internal/api-artifacts/model`. Generate the JSON during the build, then import it from MDX or other rendering code.

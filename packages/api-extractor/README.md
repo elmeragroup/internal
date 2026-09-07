@@ -1,10 +1,10 @@
-# `@elmeragroup/api-extractor`
+# API extractor
 
 Effect-native TypeScript API extraction for build tooling. It reads one source file from a
 configured TypeScript project and returns a package-owned semantic model, recoverable warnings, and
 provenance. Compiler objects never cross the package boundary.
 
-The public canary ships compiled JavaScript, declarations, and the pinned TypeScript runtime. Tests and fixtures remain in this repository. Elmera docs consumers can install `@elmeragroup/internal@canary` for the configured artifact generator.
+This private workspace is bundled into `@elmeragroup/internal/api-extractor`. The published package ships compiled JavaScript, declarations, and the pinned TypeScript runtime. Tests and fixtures remain in this repository.
 
 ## Use the extractor
 
@@ -12,7 +12,7 @@ Create one scoped `ProjectExtractor` layer for a TypeScript project, then call `
 files included by that project's `tsconfig.json`.
 
 ```ts
-import { ProjectExtractor } from "@elmeragroup/api-extractor";
+import { ProjectExtractor } from "@elmeragroup/internal/api-extractor";
 import { Effect } from "effect";
 import { resolve } from "node:path";
 

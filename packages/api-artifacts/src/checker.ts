@@ -11,7 +11,7 @@ import type {
   Type,
 } from "typescript/unstable/sync";
 
-import type { ComponentSourceResult } from "@elmeragroup/api-extractor";
+import type { ComponentSourceRequest, ComponentSourceResult } from "@elmeragroup/api-extractor";
 
 import type { ProblemLog } from "./errors.ts";
 import type { ApiPart, ApiProp, RscStatus } from "./model.ts";
@@ -127,7 +127,7 @@ export function propOrigin(declarationPaths: readonly string[], synthesized: boo
  * Turns one source-inspection result into artifact source metadata. Unresolved
  * implementations become an actionable problem instead of React declaration paths.
  */
-export function partSourceFromInspection(
+function partSourceFromInspection(
   context: LibraryProject,
   partName: string,
   result: ComponentSourceResult,
@@ -201,13 +201,9 @@ export function shortTypeOf(propName: string, printedType: string): string | nul
   return null;
 }
 
-export type PartRequest = {
+export type PartRequest = ComponentSourceRequest & {
   /** Display name, e.g. `Dialog.Content`. */
   name: string;
-  /** Public export that owns this part. */
-  exportName: string;
-  /** Object-member identity when the part is not the exported callable itself. */
-  memberName?: string;
   type: Type;
 };
 
@@ -262,9 +258,6 @@ export type ComponentApiRequest = {
    */
   exportNames: readonly string[];
 };
-
-/** One component of the docs inventory: its slug plus the entry surface to walk. */
-export type LibraryApiRequest = ComponentApiRequest & { readonly slug: string };
 
 /**
  * Resolves the checker-backed part requests for one public component.  This is
@@ -372,6 +365,7 @@ export type LibraryPartApi = {
 /** One component's API model: the published parts plus the facts behind them. */
 export type ComponentApi = {
   readonly slug: string;
+  readonly exportNames: readonly string[];
   /** The parts the docs publish, in walk order. */
   readonly parts: readonly ApiPart[];
   /** One entry per traversed part, described or not. */
@@ -461,9 +455,10 @@ function describePart(
 export function extractPart(
   context: LibraryProject,
   request: PartRequest,
-  source: PartSource | null,
+  sourceResult: ComponentSourceResult,
   problems: ProblemLog
 ): LibraryPartApi {
+  const source = partSourceFromInspection(context, request.name, sourceResult, problems);
   const { checker } = context;
   const signature = callSignature(checker, request.type);
   const declarationPaths = signature?.declaration === undefined ? [] : [signature.declaration.path];

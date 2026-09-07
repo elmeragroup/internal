@@ -3,28 +3,53 @@
   "type": "module",
   "license": "MIT",
   "scripts": {
-    "build": "node ../../scripts/build-package.ts",
+    "build": "tsdown",
     "type-check": "tsc --noEmit",
     "test": "vitest run"
   },
   "dependencies": {
-    "@elmeragroup/api-artifacts": "workspace:*"
+    "effect": "catalog:",
+    "typescript": "catalog:",
+    "@oxlint/plugins": "catalog:"
   },
   "devDependencies": {
     "@elmeragroup/typescript-config": "workspace:*",
     "@types/node": "catalog:",
-    "typescript": "catalog:",
-    "vitest": "catalog:"
+    "vitest": "catalog:",
+    "@elmeragroup/api-artifacts": "workspace:*",
+    "@elmeragroup/api-extractor": "workspace:*",
+    "@elmeragroup/oxlint-plugin": "workspace:*",
+    "@elmeragroup/oxlint-plugin-anti-slop": "workspace:*",
+    "tsdown": "catalog:"
   },
-  "version": "0.1.0-canary.0",
+  "version": "0.1.0-canary.1",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "default": "./dist/index.js"
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs"
+    },
+    "./api-artifacts": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs"
+    },
+    "./api-artifacts/model": {
+      "types": "./dist/api-artifacts/model.d.mts",
+      "import": "./dist/api-artifacts/model.mjs"
+    },
+    "./api-extractor": {
+      "types": "./dist/api-extractor.d.mts",
+      "import": "./dist/api-extractor.mjs"
+    },
+    "./oxlint": {
+      "types": "./dist/oxlint.d.mts",
+      "import": "./dist/oxlint.mjs"
+    },
+    "./oxlint/anti-slop": {
+      "types": "./dist/oxlint/anti-slop.d.mts",
+      "import": "./dist/oxlint/anti-slop.mjs"
     }
   },
-  "types": "./dist/index.d.ts",
+  "types": "./dist/index.d.mts",
   "files": [
     "dist/**",
     "README.md",
@@ -42,5 +67,6 @@
     "type": "git",
     "url": "git+https://github.com/elmeragroup/internal.git",
     "directory": "packages/internal"
-  }
+  },
+  "sideEffects": false
 }

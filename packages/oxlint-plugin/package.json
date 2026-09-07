@@ -4,7 +4,10 @@
   "version": "0.0.0",
   "type": "module",
   "exports": {
-    ".": "./index.js"
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./index.js"
+    }
   },
   "scripts": {
     "test": "vitest run"

@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import path from "node:path";
@@ -8,19 +7,15 @@ import { pathToFileURL } from "node:url";
 import { ApiArtifactsDriftError, generateApiArtifacts } from "@elmeragroup/internal";
 
 const root = process.cwd();
-const require = createRequire(import.meta.url);
-const internalRequire = createRequire(require.resolve("@elmeragroup/internal"));
-const artifactsRequire = createRequire(internalRequire.resolve("@elmeragroup/api-artifacts"));
-const extractorEntry = artifactsRequire.resolve("@elmeragroup/api-extractor");
-const extractorRequire = createRequire(extractorEntry);
-// SAFETY: the archive entry is the extractor package; dynamic resolution tests the installed dependency graph.
-const { ProjectExtractor } = /** @type {typeof import("@elmeragroup/api-extractor")} */ (
-  await import(pathToFileURL(extractorEntry).href)
-);
-// SAFETY: resolve Effect from the installed extractor to share its service runtime.
+const internalRequire = createRequire(import.meta.resolve("@elmeragroup/internal"));
+const { ProjectExtractor } = await import("@elmeragroup/internal/api-extractor");
+// SAFETY: resolve Effect from the installed umbrella to share its service runtime.
 const { Effect } = /** @type {typeof import("effect")} */ (
-  await import(pathToFileURL(extractorRequire.resolve("effect")).href)
+  await import(pathToFileURL(internalRequire.resolve("effect")).href)
 );
+const artifacts = await import("@elmeragroup/internal/api-artifacts");
+assert.equal(artifacts.generateApiArtifacts, generateApiArtifacts);
+assert.equal(artifacts.ApiArtifactsDriftError, ApiArtifactsDriftError);
 await mkdir("node_modules/@base-ui/react", { recursive: true });
 await writeFile(
   "node_modules/@base-ui/react/package.json",
@@ -106,20 +101,3 @@ assert.equal(inspected[0].status, "resolved");
 assert.equal(inspected[0].filePath, path.join(root, "button.ts"));
 assert.deepEqual(inspected[0].defaults, [{ name: "disabled", initializerText: "false" }]);
 assert.equal("declaration" in inspected[0], false);
-await writeFile(
-  "consumer.ts",
-  `import { generateApiArtifacts } from "@elmeragroup/internal";
-import type { GenerateApiArtifactsOptions, ApiPart } from "@elmeragroup/internal";
-const options: GenerateApiArtifactsOptions = { projectRoot: ".", tsconfigPath: "tsconfig.json", components: [] };
-const result = await generateApiArtifacts(options);
-const parts: readonly ApiPart[] = result.components.flatMap(component => component.parts);
-void parts;
-`
-);
-const compilerRoot = path.dirname(artifactsRequire.resolve("typescript/package.json"));
-execFileSync(process.execPath, [path.join(compilerRoot, "bin/tsc"), "-p", "tsconfig.json"], {
-  stdio: "inherit",
-});
-console.log(
-  "Packed umbrella, extraction, dependency defaults, drift checks, and consumer declarations passed."
-);

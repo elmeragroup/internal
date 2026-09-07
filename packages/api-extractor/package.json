@@ -1,6 +1,6 @@
 {
   "name": "@elmeragroup/api-extractor",
-  "version": "0.1.0-canary.0",
+  "version": "0.0.0",
   "type": "module",
   "license": "MIT",
   "exports": {
@@ -44,22 +44,13 @@
     "vitest": "catalog:"
   },
   "types": "./dist/index.d.ts",
-  "files": [
-    "dist/**",
-    "README.md",
-    "LICENSE",
-    "NOTICE"
-  ],
   "engines": {
     "node": ">=24.13.0 <25"
-  },
-  "publishConfig": {
-    "access": "public",
-    "tag": "canary"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/elmeragroup/internal.git",
     "directory": "packages/api-extractor"
-  }
+  },
+  "private": true
 }

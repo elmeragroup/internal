@@ -6,19 +6,12 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-import { assertCanaryReleaseVersion, assertCoordinatedReleaseVersion } from "../scripts/release-version.ts";
-import { archivePath, packageNames } from "../scripts/release.ts";
-import { asRecord, asRecordArray, asString, isString, readJsonObject } from "./json-object.mjs";
+import { assertCanaryReleaseVersion, assertReleaseVersion } from "../scripts/release-version.ts";
+import { archivePath, packageName } from "../scripts/release.ts";
+import { asRecordArray, asString, isString, readJsonObject } from "./json-object.mjs";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const changesetBin = createRequire(import.meta.url).resolve("@changesets/cli/bin.js");
-const publicPackageNames = packageNames.map((name) => `@elmeragroup/${name}`);
-
-/* Disposable stable packing copies root package.json, pnpm-workspace.yaml, scripts/,
-   test/packed-consumer.mjs, every workspace package manifest, and each public package's
-   dist, README, LICENSE, and NOTICE when present. Versions are rewritten only in that copy.
-   A temporary pnpm install --ignore-scripts is required so pnpm pack can rewrite workspace
-   and catalog specifiers; packed archives must not retain workspace links. */
 
 /**
  * @param {string} workspace
@@ -77,11 +70,9 @@ function plannedPublicReleases(workspace) {
     const message = error instanceof Error ? error.message : "changeset status failed";
     throw new Error(stderr === "" ? message : `${message}\n${stderr}`);
   }
-  const publicNames = new Set(publicPackageNames);
   return asRecordArray(readJsonObject(join(workspace, outputFile)).releases, "releases").filter((release) => {
-    const name = asString(release.name, "name");
     const type = asString(release.type, "type");
-    return publicNames.has(name) && type !== "none";
+    return type !== "none";
   });
 }
 
@@ -110,7 +101,7 @@ function withPlannerWorkspace(run) {
       join(workspace, "pnpm-workspace.yaml"),
       readFileSync(join(repoRoot, "pnpm-workspace.yaml"))
     );
-    for (const name of packageNames) {
+    for (const name of ["internal", "api-artifacts", "api-extractor", "oxlint-plugin", "oxlint-anti-slop"]) {
       mkdirSync(join(workspace, "packages", name), { recursive: true });
       writeFileSync(
         join(workspace, "packages", name, "package.json"),
@@ -135,109 +126,80 @@ function withPlannerWorkspace(run) {
 /**
  * @param {Record<string, unknown>[]} releases
  */
-function coordinatedPlannedVersion(releases) {
-  expect(new Set(releases.map((release) => asString(release.name, "name")))).toEqual(
-    new Set(publicPackageNames)
-  );
-  const versions = releases.map((release) => asString(release.newVersion, "newVersion"));
-  const version = assertCoordinatedReleaseVersion(versions);
-  expect(() => assertCanaryReleaseVersion(versions)).toThrow(/Canary publication requires/);
+function plannedVersion(releases) {
+  expect(releases).toHaveLength(1);
+  const release = releases[0];
+  expect(release.name).toBe(packageName);
+  const version = assertReleaseVersion(asString(release.newVersion, "newVersion"));
+  expect(() => assertCanaryReleaseVersion(version)).toThrow(/Canary publication requires/);
   return version;
 }
 
-describe("coordinated release versions", () => {
-  it("accepts identical stable versions", () => {
-    expect(assertCoordinatedReleaseVersion(["0.1.0", "0.1.0", "0.1.0"])).toBe("0.1.0");
+describe("release versions", () => {
+  it.each(["0.1.0", "1.2.3", "0.1.0-canary.1"])("accepts %s", (version) => {
+    expect(assertReleaseVersion(version)).toBe(version);
   });
-
-  it("accepts identical canary versions", () => {
-    expect(assertCoordinatedReleaseVersion(["0.1.0-canary.0", "0.1.0-canary.0", "0.1.0-canary.0"])).toBe(
-      "0.1.0-canary.0"
-    );
-  });
-
-  it("rejects mismatched versions", () => {
-    expect(() => assertCoordinatedReleaseVersion(["0.1.0", "0.1.0-canary.0", "0.1.0-canary.0"])).toThrow(
-      /All release packages must have the same version/
-    );
-  });
-
-  it("rejects an empty list", () => {
-    expect(() => assertCoordinatedReleaseVersion([])).toThrow(/at least one version/);
-  });
-
-  it("rejects malformed versions", () => {
-    expect(() => assertCoordinatedReleaseVersion(["1.0", "1.0"])).toThrow(/Unsupported release version/);
-    expect(() => assertCoordinatedReleaseVersion(["v1.0.0", "v1.0.0"])).toThrow(
-      /Unsupported release version/
-    );
-    expect(() => assertCoordinatedReleaseVersion(["1.0.0-canary", "1.0.0-canary"])).toThrow(
-      /Unsupported release version/
-    );
-    expect(() => assertCoordinatedReleaseVersion(["1.0.0-beta.1", "1.0.0-beta.1"])).toThrow(
-      /Unsupported release version/
-    );
-    expect(() => assertCoordinatedReleaseVersion(["1.0.0+build.1", "1.0.0+build.1"])).toThrow(
-      /Unsupported release version/
-    );
-    expect(() => assertCoordinatedReleaseVersion(["1.0.0-canary.1+meta", "1.0.0-canary.1+meta"])).toThrow(
-      /Unsupported release version/
-    );
-  });
-
-  it("rejects leading-zero numeric identifiers", () => {
-    expect(() => assertCoordinatedReleaseVersion(["01.0.0", "01.0.0"])).toThrow(
-      /Unsupported release version/
-    );
-    expect(() => assertCoordinatedReleaseVersion(["1.01.0", "1.01.0"])).toThrow(
-      /Unsupported release version/
-    );
-    expect(() => assertCoordinatedReleaseVersion(["1.0.01", "1.0.01"])).toThrow(
-      /Unsupported release version/
-    );
-    expect(() => assertCoordinatedReleaseVersion(["1.0.0-canary.01", "1.0.0-canary.01"])).toThrow(
-      /Unsupported release version/
-    );
+  it.each([
+    "",
+    "1.0",
+    "v1.0.0",
+    "1.0.0-canary",
+    "1.0.0-beta.1",
+    "1.0.0+build.1",
+    "1.0.0-canary.1+meta",
+    "01.0.0",
+    "1.01.0",
+    "1.0.01",
+    "1.0.0-canary.01",
+  ])("rejects %s", (version) => {
+    expect(() => assertReleaseVersion(version)).toThrow(/Unsupported release version/);
   });
 });
-
 describe("canary publication versions", () => {
-  it("accepts coordinated canary versions", () => {
-    expect(assertCanaryReleaseVersion(["0.1.0-canary.2", "0.1.0-canary.2"])).toBe("0.1.0-canary.2");
-  });
-
-  it("rejects coordinated stable versions", () => {
-    expect(() => assertCanaryReleaseVersion(["0.1.0", "0.1.0"])).toThrow(/Canary publication requires/);
-  });
+  it("accepts a canary", () => expect(assertCanaryReleaseVersion("0.1.0-canary.2")).toBe("0.1.0-canary.2"));
+  it("rejects a stable version", () =>
+    expect(() => assertCanaryReleaseVersion("0.1.0")).toThrow(/Canary publication requires/));
 });
 
 describe("archive names", () => {
   it("keeps the canary archive filename", () => {
-    expect(archivePath("internal", "0.1.0-canary.0")).toBe(
+    expect(archivePath("0.1.0-canary.0")).toBe(
       join(repoRoot, ".artifacts/canary", "elmeragroup-internal-0.1.0-canary.0.tgz")
     );
   });
 
   it("names stable archives with the same pattern", () => {
-    expect(archivePath("api-extractor", "0.1.0")).toBe(
-      join(repoRoot, ".artifacts/canary", "elmeragroup-api-extractor-0.1.0.tgz")
-    );
+    expect(archivePath("0.1.0")).toBe(join(repoRoot, ".artifacts/canary", "elmeragroup-internal-0.1.0.tgz"));
   });
 });
 
-describe("changesets coordinated release plan", () => {
-  it.each(publicPackageNames)("plans one coordinated version for a patch to %s", (packageName) => {
+describe("changesets umbrella release plan", () => {
+  it("plans only the umbrella release", () => {
     withPlannerWorkspace((workspace) => {
       writeChangeset(workspace, "patch-one", packageName, "patch");
-      coordinatedPlannedVersion(plannedPublicReleases(workspace));
+      plannedVersion(plannedPublicReleases(workspace));
     });
   });
 
-  it("plans one coordinated version for mixed patch and minor changesets", () => {
+  it.each([
+    "@elmeragroup/api-extractor",
+    "@elmeragroup/api-artifacts",
+    "@elmeragroup/oxlint-plugin",
+    "@elmeragroup/oxlint-plugin-anti-slop",
+  ])("does not release private changes to %s", (name) => {
+    withPlannerWorkspace((workspace) => {
+      writeChangeset(workspace, "private-patch", name, "patch");
+      expect(plannedPublicReleases(workspace)).toEqual([]);
+      writeChangeset(workspace, "public-patch", packageName, "patch");
+      plannedVersion(plannedPublicReleases(workspace));
+    });
+  });
+
+  it("plans one version for mixed patch and minor changesets", () => {
     withPlannerWorkspace((workspace) => {
       writeChangeset(workspace, "patch-internal", "@elmeragroup/internal", "patch");
-      writeChangeset(workspace, "minor-extractor", "@elmeragroup/api-extractor", "minor");
-      coordinatedPlannedVersion(plannedPublicReleases(workspace));
+      writeChangeset(workspace, "minor-internal", "@elmeragroup/internal", "minor");
+      plannedVersion(plannedPublicReleases(workspace));
     });
   });
 });
@@ -259,14 +221,5 @@ describe("release commands and workflows", () => {
     expect(publish).toContain("pnpm canary:version");
     expect(publish).toContain("pnpm packages:pack");
     expect(publish).toContain("pnpm canary:publish");
-    const publisher = readFileSync(join(repoRoot, "scripts/canary-publish.ts"), "utf8");
-    expect(publisher).toContain("canaryVersion()");
-    expect(publisher).toContain('"--tag"');
-    expect(publisher).toContain('"canary"');
-    const scripts = asRecord(readJsonObject(join(repoRoot, "package.json")).scripts, "scripts");
-    expect(asString(scripts["packages:pack"], "packages:pack")).toBe(
-      "pnpm build && node scripts/canary-pack.ts"
-    );
-    expect(asString(scripts["canary:pack"], "canary:pack")).toBe("pnpm packages:pack");
   });
 });

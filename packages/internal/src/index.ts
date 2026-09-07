@@ -1,4 +1,3 @@
-import { generateApiArtifacts as generate } from "@elmeragroup/api-artifacts";
 import type { GenerateApiArtifactsOptions, GenerateApiArtifactsResult } from "@elmeragroup/api-artifacts";
 
 export type {
@@ -13,12 +12,13 @@ export type {
   GenerateApiArtifactsResult,
   RscStatus,
 } from "@elmeragroup/api-artifacts";
-export { ApiArtifactsError, ApiArtifactsDriftError } from "@elmeragroup/api-artifacts";
+export { ApiArtifactsError, ApiArtifactsDriftError } from "@elmeragroup/api-artifacts/errors";
 
 /** Generates API artifacts with the Elmera UI documentation defaults. */
-export function generateApiArtifacts(
+export async function generateApiArtifacts(
   options: GenerateApiArtifactsOptions
 ): Promise<GenerateApiArtifactsResult> {
+  const { generateApiArtifacts: generate } = await import("@elmeragroup/api-artifacts");
   return generate({
     ...options,
     includeExternalTypes: options.includeExternalTypes ?? ["@base-ui/react"],
