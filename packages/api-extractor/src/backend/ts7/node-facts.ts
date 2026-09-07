@@ -2,6 +2,7 @@ import type { Node, TypeNode } from "typescript/unstable/ast";
 import { SyntaxKind } from "typescript/unstable/ast";
 import {
   isArrayTypeNode,
+  isAsExpression,
   isBindingElement,
   isCallExpression,
   isClassDeclaration,
@@ -13,16 +14,22 @@ import {
   isIntersectionTypeNode,
   isMappedTypeNode,
   isNamedTupleMember,
+  isNonNullExpression,
   isObjectBindingPattern,
   isOptionalTypeNode,
   isParameterDeclaration,
+  isParenthesizedExpression,
   isParenthesizedTypeNode,
   isPropertyAssignment,
+  isPropertyAccessExpression,
   isPropertyDeclaration,
   isPropertySignatureDeclaration,
   isRestTypeNode,
+  isSatisfiesExpression,
+  isShorthandPropertyAssignment,
   isTupleTypeNode,
   isTypeAliasDeclaration,
+  isTypeAssertion,
   isTypeNode,
   isTypeOperatorNode,
   isTypeParameterDeclaration,
@@ -42,6 +49,7 @@ import type {
 import { callExpressionFacts } from "./call-facts.ts";
 import { declarationModifiers } from "./class-facts.ts";
 import type { TsgoFactsSession } from "./facts.ts";
+import { aliasedSymbol } from "./module-resolution.ts";
 import { authoredLocation } from "./syntax.ts";
 
 /**
@@ -273,6 +281,10 @@ export function nodeFacts(
             )
           : undefined,
       declarationFlags: modifierFlags(node),
+      ...definedFields({
+        hasImplementationBody:
+          session.componentSources && isFunctionLikeDeclaration(node) ? node.body !== undefined : undefined,
+      }),
     };
   }
   if (isTypeParameterDeclaration(node)) {
@@ -300,11 +312,28 @@ export function nodeFacts(
       declarationFlags: modifierFlags(node),
       ...definedFields({
         bindingDefaults: isParameterDeclaration(node) ? bindingDefaults(node.name) : undefined,
+        sourceBindingDefaults: isParameterDeclaration(node) ? sourceBindingDefaults(node.name) : undefined,
       }),
     };
     return propertyFacts;
   }
+  if (isShorthandPropertyAssignment(node)) {
+    return {
+      ...result,
+      name: isIdentifier(node.name) ? node.name.text : undefined,
+      ...definedFields({ referencedValueSymbol: referencedValueSymbol(session, node) }),
+    };
+  }
   if (isCallExpression(node)) return { ...result, ...callExpressionFacts(session, node, originOf) };
+  if (isTransparentExpression(node)) {
+    return { ...result, innerExpression: session.nodeHandle(node.expression) };
+  }
+  if (isIdentifier(node) || isPropertyAccessExpression(node)) {
+    return {
+      ...result,
+      ...definedFields({ referencedValueSymbol: referencedValueSymbol(session, node) }),
+    };
+  }
   if (isIndexSignatureDeclaration(node)) {
     return {
       ...result,
@@ -339,6 +368,44 @@ function bindingDefaults(
       },
     ];
   });
+}
+
+function sourceBindingDefaults(
+  name: Node | undefined
+): readonly { readonly name: string; readonly initializerText: string }[] {
+  if (name === undefined || !isObjectBindingPattern(name)) return [];
+  return name.elements.flatMap((element) => {
+    if (!isBindingElement(element) || element.initializer === undefined) return [];
+    const propertyName = element.propertyName;
+    if (propertyName !== undefined) {
+      if (!isIdentifier(propertyName)) return [];
+      return [{ name: propertyName.text, initializerText: element.initializer.getText().trim() }];
+    }
+    if (element.name !== undefined && isIdentifier(element.name)) {
+      return [{ name: element.name.text, initializerText: element.initializer.getText().trim() }];
+    }
+    return [];
+  });
+}
+
+function referencedValueSymbol(session: TsgoFactsSession, node: Node): BackendSymbolHandle | undefined {
+  const raw = isShorthandPropertyAssignment(node)
+    ? session.checker.getShorthandAssignmentValueSymbol(node)
+    : isIdentifier(node) || isPropertyAccessExpression(node)
+      ? session.rawSymbolAt(node)
+      : undefined;
+  if (raw === undefined) return undefined;
+  return session.symbolHandle(aliasedSymbol(session.checker, raw) ?? raw);
+}
+
+function isTransparentExpression(node: Node): node is Node & { readonly expression: Node } {
+  return (
+    isParenthesizedExpression(node) ||
+    isAsExpression(node) ||
+    isSatisfiesExpression(node) ||
+    isNonNullExpression(node) ||
+    isTypeAssertion(node)
+  );
 }
 
 function typeQueryExpressionName(node: Node, sourceFile: ReturnType<Node["getSourceFile"]>): string {

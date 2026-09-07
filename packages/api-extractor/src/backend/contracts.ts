@@ -269,6 +269,20 @@ export type BackendNodeFacts = {
   readonly declarationFlags?: readonly ("readonly" | "private" | "protected" | "static")[];
   /** Defaults authored on object-binding elements, normalized at the backend seam. */
   readonly bindingDefaults?: readonly BackendBindingDefaultFact[];
+  /**
+   * Source-inspection defaults for a parameter. Unlike `bindingDefaults`, a
+   * nested binding pattern still reports its outer property name.
+   */
+  readonly sourceBindingDefaults?: readonly BackendBindingDefaultFact[];
+  /**
+   * The value symbol an identifier or shorthand assignment refers to, with
+   * aliases resolved. Distinct from the expression's type symbol.
+   */
+  readonly referencedValueSymbol?: BackendSymbolHandle;
+  /** Inner expression of parentheses, assertions, non-null, and satisfies. */
+  readonly innerExpression?: BackendNodeHandle;
+  /** Whether a function-like declaration has an implementation body. */
+  readonly hasImplementationBody?: boolean;
 };
 
 type BackendBindingDefaultFact = {
@@ -436,6 +450,8 @@ export type BackendExtractionSession = {
 /** Per-extraction policy the parser settled before the session opened. */
 export type BackendExtractionOptions = {
   readonly externalTypes?: BackendExternalTypeSelection;
+  /** Read implementation bodies for source inspection, without expanding semantic extraction work. */
+  readonly componentSources?: boolean;
 };
 
 export type BackendProject = {

@@ -1,38 +1,40 @@
 import type { CallSignatureNode, FunctionNode, SemanticType, TypeName, TypeParameterNode } from "../model.ts";
 import { renderType, typeNameOf } from "./render.ts";
 
-/** Right-to-left generic parameter renames scoped to one signature comparison. */
-type TypeParameterRenames = ReadonlyMap<string, string>;
+/** Comparison-local identity for one paired generic declaration. Never serialized. */
+type BindingIdentity = symbol;
+
+type LexicalEnvironment = ReadonlyMap<string, BindingIdentity>;
+
+type ComparisonContext = {
+  readonly anyIsWildcard: boolean;
+  readonly leftBindings: LexicalEnvironment;
+  readonly rightBindings: LexicalEnvironment;
+};
+
+const emptyBindings: LexicalEnvironment = new Map();
+
+function emptyContext(anyIsWildcard: boolean): ComparisonContext {
+  return { anyIsWildcard, leftBindings: emptyBindings, rightBindings: emptyBindings };
+}
 
 /**
  * Compares model types structurally for canonicalization. An unaliased `any` is
  * a wildcard, which lets a generated overload union prefer a concrete signature
  * over an otherwise identical fallback signature containing `any`.
  */
-export function areEquivalentIgnoringAny(
-  left: SemanticType,
-  right: SemanticType,
-  renames?: TypeParameterRenames
-): boolean {
-  return areEquivalent(left, right, true, renames);
+export function areEquivalentIgnoringAny(left: SemanticType, right: SemanticType): boolean {
+  return areEquivalent(left, right, emptyContext(true));
 }
 
 /** Compares model types structurally without wildcard `any` matching. */
-export function areEquivalentStrictly(
-  left: SemanticType,
-  right: SemanticType,
-  renames?: TypeParameterRenames
-): boolean {
-  return areEquivalent(left, right, false, renames);
+export function areEquivalentStrictly(left: SemanticType, right: SemanticType): boolean {
+  return areEquivalent(left, right, emptyContext(false));
 }
 
 /** Compares two function models, including generic constraints and defaults. */
-export function areFunctionsEquivalentIgnoringAny(
-  left: FunctionNode,
-  right: FunctionNode,
-  renames?: TypeParameterRenames
-): boolean {
-  return areFunctionsEquivalent(left, right, true, renames);
+export function areFunctionsEquivalentIgnoringAny(left: FunctionNode, right: FunctionNode): boolean {
+  return areFunctionsEquivalent(left, right, emptyContext(true));
 }
 
 /** Detects an intrinsic `any` anywhere in the model. */
@@ -69,29 +71,55 @@ function isUnaliasedAny(type: SemanticType): boolean {
   return type.kind === "intrinsic" && type.intrinsic === "any" && type.typeName === undefined;
 }
 
-function areEquivalent(
-  left: SemanticType,
-  right: SemanticType,
-  anyIsWildcard: boolean,
-  renames?: TypeParameterRenames
-): boolean {
-  if (anyIsWildcard && (isUnaliasedAny(left) || isUnaliasedAny(right))) return true;
+function withoutWildcard(context: ComparisonContext): ComparisonContext {
+  return context.anyIsWildcard ? { ...context, anyIsWildcard: false } : context;
+}
 
-  // Type parameters compare by identity so `<T>(value: T)` and `<U>(value: U)`
-  // remain equivalent under a scoped alpha-rename, while a type parameter named
-  // `string` never matches the intrinsic `string`.
+function hasActiveBindings(context: ComparisonContext): boolean {
+  return context.leftBindings.size > 0 || context.rightBindings.size > 0;
+}
+
+/**
+ * Extends both lexical environments with one shared identity per corresponding
+ * parameter pair. The parent maps are copied, so inner names shadow only inside
+ * this signature and sibling signatures do not inherit each other's bindings.
+ */
+function withSignatureBindings(
+  context: ComparisonContext,
+  left: readonly TypeParameterNode[],
+  right: readonly TypeParameterNode[]
+): ComparisonContext | undefined {
+  if (left.length !== right.length) return undefined;
+  if (left.length === 0) return context;
+  const leftBindings = new Map(context.leftBindings);
+  const rightBindings = new Map(context.rightBindings);
+  for (const [index, leftParameter] of left.entries()) {
+    const rightParameter = right[index];
+    if (rightParameter === undefined) return undefined;
+    const identity = Symbol();
+    leftBindings.set(leftParameter.name, identity);
+    rightBindings.set(rightParameter.name, identity);
+  }
+  return { ...context, leftBindings, rightBindings };
+}
+
+function typeParameterNamesAreEquivalent(left: string, right: string, context: ComparisonContext): boolean {
+  const leftBinding = context.leftBindings.get(left);
+  const rightBinding = context.rightBindings.get(right);
+  if (leftBinding !== undefined && rightBinding !== undefined) return leftBinding === rightBinding;
+  if (leftBinding !== undefined || rightBinding !== undefined) return false;
+  return left === right;
+}
+
+function areEquivalent(left: SemanticType, right: SemanticType, context: ComparisonContext): boolean {
+  if (context.anyIsWildcard && (isUnaliasedAny(left) || isUnaliasedAny(right))) return true;
+
+  // Type parameters compare by lexical binding identity so `<T>(value: T)` and
+  // `<U>(value: U)` remain equivalent, while a bound name never matches a free
+  // parameter or the intrinsic `string`.
   if (left.kind === "typeParameter" && right.kind === "typeParameter")
-    return left.name === (renames?.get(right.name) ?? right.name);
+    return typeParameterNamesAreEquivalent(left.name, right.name, context);
   if (left.kind === "typeParameter" || right.kind === "typeParameter") return false;
-
-  // Render-identity is a safe fast path for kinds whose rendering is lossless.
-  if (
-    (renames === undefined || renames.size === 0) &&
-    !isRenderFastPathExcluded(left) &&
-    !isRenderFastPathExcluded(right) &&
-    renderType(left) === renderType(right)
-  )
-    return true;
 
   // Alias identity wins over shape: equal names with equal arguments match, and
   // an aliased form never matches its inline expansion.
@@ -99,30 +127,29 @@ function areEquivalent(
   const rightName = typeNameOf(right);
   if (leftName !== undefined || rightName !== undefined) {
     return leftName !== undefined && rightName !== undefined
-      ? typeNamesAreEquivalent(leftName, rightName, anyIsWildcard, renames)
+      ? typeNamesAreEquivalent(leftName, rightName, context)
       : false;
   }
 
   if (left.kind === "function" && right.kind === "function")
-    return areFunctionsEquivalent(left, right, anyIsWildcard, renames);
+    return areFunctionsEquivalent(left, right, context);
 
   if (left.kind === "union" && right.kind === "union")
-    return membersAreEquivalentUnordered(left.types, right.types, anyIsWildcard, renames);
+    return membersAreEquivalentUnordered(left.types, right.types, context);
 
   if (left.kind === "intersection" && right.kind === "intersection")
-    return membersAreEquivalentUnordered(left.types, right.types, anyIsWildcard, renames);
+    return membersAreEquivalentUnordered(left.types, right.types, context);
 
   if (left.kind === "array" && right.kind === "array")
     return (
-      areEquivalent(left.elementType, right.elementType, anyIsWildcard, renames) &&
-      left.isReadonly === right.isReadonly
+      areEquivalent(left.elementType, right.elementType, context) && left.isReadonly === right.isReadonly
     );
 
   if (left.kind === "tuple" && right.kind === "tuple") {
     if (left.types.length !== right.types.length || left.isReadonly !== right.isReadonly) return false;
     return left.types.every((member, index) => {
       const other = right.types[index];
-      return other !== undefined && areEquivalent(member, other, anyIsWildcard, renames);
+      return other !== undefined && areEquivalent(member, other, context);
     });
   }
 
@@ -132,16 +159,16 @@ function areEquivalent(
     // traversing that result. `any` inside authored operator syntax is semantic
     // (`keyof any`), never a generated fallback. The model has one operator, so
     // only the resolution provenance and the operand can differ today.
-    if (left.resolutionKind !== right.resolutionKind || !areEquivalent(left.type, right.type, false, renames))
+    const operandContext = withoutWildcard(context);
+    if (left.resolutionKind !== right.resolutionKind || !areEquivalent(left.type, right.type, operandContext))
       return false;
-    return areEquivalent(left.resolvedType, right.resolvedType, false, renames);
+    return areEquivalent(left.resolvedType, right.resolvedType, operandContext);
   }
 
   if (left.kind === "external" && right.kind === "external")
-    return typeNamesAreEquivalent(left.typeName, right.typeName, anyIsWildcard, renames);
+    return typeNamesAreEquivalent(left.typeName, right.typeName, context);
 
-  if (left.kind === "object" && right.kind === "object")
-    return objectsAreEquivalent(left, right, anyIsWildcard, renames);
+  if (left.kind === "object" && right.kind === "object") return objectsAreEquivalent(left, right, context);
 
   // Leaf models without nested type parameters fall back to rendering identity.
   return renderType(left) === renderType(right);
@@ -150,8 +177,7 @@ function areEquivalent(
 function areFunctionsEquivalent(
   left: FunctionNode,
   right: FunctionNode,
-  anyIsWildcard: boolean,
-  outerRenames?: TypeParameterRenames
+  context: ComparisonContext
 ): boolean {
   const leftName = left.typeName;
   const rightName = right.typeName;
@@ -159,7 +185,7 @@ function areFunctionsEquivalent(
   if (
     leftName !== undefined &&
     rightName !== undefined &&
-    !typeNamesAreEquivalent(leftName, rightName, anyIsWildcard, outerRenames)
+    !typeNamesAreEquivalent(leftName, rightName, context)
   )
     return false;
 
@@ -167,26 +193,22 @@ function areFunctionsEquivalent(
 
   return left.callSignatures.every((leftSignature, index) => {
     const rightSignature = right.callSignatures[index];
-    return (
-      rightSignature !== undefined &&
-      signaturesAreEquivalent(leftSignature, rightSignature, anyIsWildcard, outerRenames)
-    );
+    return rightSignature !== undefined && signaturesAreEquivalent(leftSignature, rightSignature, context);
   });
 }
 
 function signaturesAreEquivalent(
   left: CallSignatureNode,
   right: CallSignatureNode,
-  anyIsWildcard: boolean,
-  outerRenames?: TypeParameterRenames
+  context: ComparisonContext
 ): boolean {
   const leftParameters = left.typeParameters ?? [];
   const rightParameters = right.typeParameters ?? [];
-  const renames = signatureTypeParameterRenames(leftParameters, rightParameters, outerRenames);
-  if (renames === undefined) return false;
-  if (!typeParametersAreEquivalent(leftParameters, rightParameters, anyIsWildcard, renames)) return false;
+  const inner = withSignatureBindings(context, leftParameters, rightParameters);
+  if (inner === undefined) return false;
+  if (!typeParametersAreEquivalent(leftParameters, rightParameters, inner)) return false;
   if (left.parameters.length !== right.parameters.length) return false;
-  if (!areEquivalent(left.returnValueType, right.returnValueType, anyIsWildcard, renames)) return false;
+  if (!areEquivalent(left.returnValueType, right.returnValueType, inner)) return false;
 
   return left.parameters.every((leftParameter, index) => {
     const rightParameter = right.parameters[index];
@@ -194,7 +216,7 @@ function signaturesAreEquivalent(
       rightParameter !== undefined &&
       leftParameter.name === rightParameter.name &&
       leftParameter.optional === rightParameter.optional &&
-      areEquivalent(leftParameter.type, rightParameter.type, anyIsWildcard, renames)
+      areEquivalent(leftParameter.type, rightParameter.type, inner)
     );
   });
 }
@@ -202,25 +224,14 @@ function signaturesAreEquivalent(
 function typeParametersAreEquivalent(
   left: readonly TypeParameterNode[],
   right: readonly TypeParameterNode[],
-  anyIsWildcard: boolean,
-  renames: TypeParameterRenames
+  context: ComparisonContext
 ): boolean {
   return left.every((leftParameter, index) => {
     const rightParameter = right[index];
     if (rightParameter === undefined) return false;
     return (
-      optionalTypesAreEquivalent(
-        leftParameter.constraint,
-        rightParameter.constraint,
-        anyIsWildcard,
-        renames
-      ) &&
-      optionalTypesAreEquivalent(
-        leftParameter.defaultValue,
-        rightParameter.defaultValue,
-        anyIsWildcard,
-        renames
-      )
+      optionalTypesAreEquivalent(leftParameter.constraint, rightParameter.constraint, context) &&
+      optionalTypesAreEquivalent(leftParameter.defaultValue, rightParameter.defaultValue, context)
     );
   });
 }
@@ -228,33 +239,13 @@ function typeParametersAreEquivalent(
 function optionalTypesAreEquivalent(
   left: SemanticType | undefined,
   right: SemanticType | undefined,
-  anyIsWildcard: boolean,
-  renames: TypeParameterRenames
+  context: ComparisonContext
 ): boolean {
-  if (left !== undefined && right !== undefined) return areEquivalent(left, right, anyIsWildcard, renames);
+  if (left !== undefined && right !== undefined) return areEquivalent(left, right, context);
   return left === undefined && right === undefined;
 }
 
-function signatureTypeParameterRenames(
-  left: readonly TypeParameterNode[],
-  right: readonly TypeParameterNode[],
-  outerRenames?: TypeParameterRenames
-): TypeParameterRenames | undefined {
-  if (left.length !== right.length) return undefined;
-  const renames = new Map<string, string>(outerRenames);
-  for (const [index, parameter] of right.entries()) {
-    const leftParameter = left[index];
-    if (leftParameter !== undefined) renames.set(parameter.name, leftParameter.name);
-  }
-  return renames;
-}
-
-function typeNamesAreEquivalent(
-  left: TypeName,
-  right: TypeName,
-  anyIsWildcard: boolean,
-  renames?: TypeParameterRenames
-): boolean {
+function typeNamesAreEquivalent(left: TypeName, right: TypeName, context: ComparisonContext): boolean {
   if (left.name !== right.name) return false;
   const leftNamespaces = left.namespaces ?? [];
   const rightNamespaces = right.namespaces ?? [];
@@ -269,15 +260,14 @@ function typeNamesAreEquivalent(
   if (leftArguments.length !== rightArguments.length) return false;
   return leftArguments.every((argument, index) => {
     const other = rightArguments[index];
-    return other !== undefined && areEquivalent(argument.type, other.type, anyIsWildcard, renames);
+    return other !== undefined && areEquivalent(argument.type, other.type, context);
   });
 }
 
 function objectsAreEquivalent(
   left: Extract<SemanticType, { kind: "object" }>,
   right: Extract<SemanticType, { kind: "object" }>,
-  anyIsWildcard: boolean,
-  renames?: TypeParameterRenames
+  context: ComparisonContext
 ): boolean {
   if (left.properties.length !== right.properties.length) return false;
   const leftIndex = left.indexSignature;
@@ -285,7 +275,7 @@ function objectsAreEquivalent(
   if (leftIndex !== undefined && rightIndex !== undefined) {
     if (
       leftIndex.keyType !== rightIndex.keyType ||
-      !areEquivalent(leftIndex.valueType, rightIndex.valueType, anyIsWildcard, renames)
+      !areEquivalent(leftIndex.valueType, rightIndex.valueType, context)
     )
       return false;
   } else if (leftIndex !== undefined || rightIndex !== undefined) return false;
@@ -293,7 +283,7 @@ function objectsAreEquivalent(
   const rightProperties = new Map(right.properties.map((property) => [propertyKey(property), property]));
   return left.properties.every((property) => {
     const other = rightProperties.get(propertyKey(property));
-    return other !== undefined && areEquivalent(property.type, other.type, anyIsWildcard, renames);
+    return other !== undefined && areEquivalent(property.type, other.type, context);
   });
 }
 
@@ -310,8 +300,7 @@ function propertyKey(property: { readonly name: string; readonly optional: boole
 function membersAreEquivalentUnordered(
   left: readonly SemanticType[],
   right: readonly SemanticType[],
-  anyIsWildcard: boolean,
-  renames?: TypeParameterRenames
+  context: ComparisonContext
 ): boolean {
   const size = left.length;
   if (size !== right.length) return false;
@@ -325,23 +314,20 @@ function membersAreEquivalentUnordered(
   let matchesInOrder = true;
   for (let index = 0; index < size; index += 1) {
     const pair = pairsAt(index);
-    if (pair === undefined || !areEquivalent(pair[0], pair[1], anyIsWildcard, renames)) {
+    if (pair === undefined || !areEquivalent(pair[0], pair[1], context)) {
       matchesInOrder = false;
       break;
     }
   }
   if (matchesInOrder) return true;
 
-  // A cheap key-multiset pre-check runs before the bipartite match, but only
-  // when neither wildcard `any` nor a rename map can make the keys unsafe.
-  const hasWildcard = anyIsWildcard && [...left, ...right].some(isUnaliasedAny);
-  const hasRenames = renames !== undefined && renames.size > 0;
-  if (!hasWildcard && !hasRenames && !structuralKeyMultisetsMatch(left, right)) return false;
+  // Raw name-based keys are unsafe under wildcard `any` or active generic
+  // bindings (`T | string` versus `string | U`), so skip that rejection then.
+  const hasWildcard = context.anyIsWildcard && [...left, ...right].some(isUnaliasedAny);
+  if (!hasWildcard && !hasActiveBindings(context) && !structuralKeyMultisetsMatch(left, right)) return false;
 
   const adjacency = left.map((leftMember) =>
-    right.flatMap((rightMember, index) =>
-      areEquivalent(leftMember, rightMember, anyIsWildcard, renames) ? [index] : []
-    )
+    right.flatMap((rightMember, index) => (areEquivalent(leftMember, rightMember, context) ? [index] : []))
   );
   return hasCompleteMatching(adjacency, size);
 }
@@ -390,18 +376,4 @@ function memberStructuralKey(type: SemanticType): string {
   const value = type.kind === "literal" ? String(type.value) : "";
   const intrinsic = type.kind === "intrinsic" ? `|${type.intrinsic}` : "";
   return `${type.kind}|${name}|${value}${intrinsic}`;
-}
-
-/**
- * Kinds whose rendering is lossy enough that equal text does not imply
- * equivalence: function signatures omit constraints and defaults, and compounds
- * plus type operators carry member identity the rendered form flattens away.
- */
-function isRenderFastPathExcluded(type: SemanticType): boolean {
-  return (
-    type.kind === "function" ||
-    type.kind === "typeOperator" ||
-    type.kind === "union" ||
-    type.kind === "intersection"
-  );
 }

@@ -3,9 +3,9 @@ import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:f
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 
-import { archiveDirectory, archivePath, canaryVersion, packageNames, repoRoot, run } from "./release.ts";
+import { archiveDirectory, archivePath, packageNames, releaseVersion, repoRoot, run } from "./release.ts";
 
-const version = canaryVersion();
+const version = releaseVersion();
 const consumer = mkdtempSync(resolve(tmpdir(), "elmera-packed-consumer-"));
 rmSync(resolve(archiveDirectory, "verified.json"), { force: true });
 try {

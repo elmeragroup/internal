@@ -65,7 +65,15 @@ export function orderedView<T extends { readonly order: number }>(
   return result;
 }
 
-export function boundaryTimingBudget(metadata: BoundaryTimingMetadata) {
+export function boundaryTimingBudget(
+  metadata: Pick<
+    BoundaryTimingMetadata,
+    | "maxFetchedToMaterializedRatio"
+    | "maxRequestCount"
+    | "maxBytesReceived"
+    | "bytesReceivedPathLengthHeadroom"
+  >
+) {
   if (metadata.bytesReceivedPathLengthHeadroom === undefined) {
     return {
       maxFetchedToMaterializedRatio: metadata.maxFetchedToMaterializedRatio,

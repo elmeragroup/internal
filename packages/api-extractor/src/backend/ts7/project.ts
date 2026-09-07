@@ -177,6 +177,7 @@ class TsgoProject implements BackendProject {
       this.cwd,
       this.pathIdentity,
       options.externalTypes ?? { kind: "none" },
+      options.componentSources ?? false,
       (closedSession) => sessions.delete(closedSession)
     );
     this.sessions.add(session);

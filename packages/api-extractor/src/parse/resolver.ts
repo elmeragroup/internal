@@ -782,9 +782,11 @@ function typeNameFor(
  * Probes a substitution's base type and then its constraint, the way upstream's
  * `resolveSubstitutionFallback` does.
  *
- * A candidate that itself degrades to an unauthored `any`, or that pushed new
- * warnings while being probed, is rejected so the ORIGINAL location reports a
- * single fallback warning instead of several misleading ones.
+ * Each candidate collects warnings and provenance locally. A candidate that
+ * degrades to an unauthored `any`, emits a warning, or drops preservable
+ * `keyof` syntax is rejected without merging that evidence, so the ORIGINAL
+ * location reports a single fallback warning instead of several misleading
+ * ones. Accepted provenance is committed through `recordProvenance`.
  */
 function substitutionFallback(
   facts: BackendTypeFacts,
@@ -793,15 +795,17 @@ function substitutionFallback(
 ): SemanticType | undefined {
   for (const candidate of [facts.substitutionBaseType, facts.substitutionConstraint]) {
     if (candidate === undefined) continue;
-    const warningCount = context.warnings.length;
-    const resolved = typeNode(candidate, undefined, undefined, { ...context });
-    if (context.warnings.length > warningCount) continue;
+    const warnings: BackendWarningFact[] = [];
+    const provenance: ProvenanceEntry[] = [];
+    const resolved = typeNode(candidate, undefined, undefined, { ...context, warnings, provenance });
+    if (warnings.length > 0) continue;
     if (isUnauthoredAny(resolved)) continue;
     if (sourceNode !== undefined && authoredContainsPreservableKeyof(sourceNode, context)) {
       // The authored syntax still describes something the probe dropped; keep
       // the operator reconstruction in charge rather than the semantic view.
       continue;
     }
+    for (const entry of provenance) recordProvenance(context, entry);
     return resolved;
   }
   return undefined;

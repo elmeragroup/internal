@@ -31,13 +31,24 @@ The scoped lifetime is required: opening a project starts a native compiler proc
 the scope closes it on success, typed failure, interruption, or defect. Reuse the service for every
 file in the same project rather than opening one project per file.
 
+`inspectComponentSources(filePath, requests)` recovers authored implementation files and
+destructuring defaults without running semantic extraction or admitting warnings. It follows React
+`memo` and `forwardRef` wrappers, including nested wrappers, aliased React imports, re-exported
+values, namespace and object property references, and an implementation in another project file.
+Overloaded functions use the declaration with an actual syntax body, excluding return-type annotations.
+Each request produces one result at the same
+index. Unsupported wrappers, cycles, missing exports or members, declaration-only sources, and
+unsupported default expressions return `{ status: "unresolved", reason }` instead of guessing.
+Compiler objects never cross this boundary.
+
 `extractModule` returns:
 
 - `module`: the semantic API model. Preserved type operators carry both the authored operand and
   the checker's resolved key set. Tuple spread elements retain their own generic substitution
   environments, including repeated instantiations of the same donor alias and nested spreads.
-- `warnings`: recoverable losses. A warning has a stable `code`, location, and code-specific fields;
-  `message` explains what failed, what the extractor did, and what a maintainer can do next.
+- `warnings`: recoverable losses in the returned model. A warning has a stable `code`, location, and
+  code-specific fields; `message` explains what failed, what the extractor did, and what a maintainer
+  can do next. Diagnostics from a discarded speculative candidate are not published.
 - `provenance`: repository-relative declaration and re-export paths for model nodes.
 
 Fatal setup, compiler, missing-file, and resolver failures remain typed Effect errors. Recoverable
@@ -69,7 +80,10 @@ The public model, warnings, errors, provenance, options, and service contain no 
 graphs; `test/boundary.test.ts` pins both the compiler boundary and that Effect-free walk.
 Each `extractModule` call gets an isolated synchronous extraction session, so recursion state and
 warning collection cannot leak between calls. Output ordering and canonicalization are
-deterministic for the pinned toolchain.
+deterministic for the pinned toolchain. Canonicalization compares nested generic signatures by
+structure and lexical bindings rather than rendered text, so distinct constraints, defaults, and
+inner-versus-outer parameter references stay distinct inside objects, arrays, tuples, and type
+arguments.
 
 The ts7 adapter fetches each source file at most once per extraction session and keeps the
 materialized tree for later node lookups; the compiler's project-scoped source-file cache keeps

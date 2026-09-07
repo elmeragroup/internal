@@ -1,6 +1,3 @@
-import { Effect } from "effect";
-
-import { ProjectExtractor } from "@elmeragroup/api-extractor";
 import type { ExtractionResult, PropertyNode, SemanticType } from "@elmeragroup/api-extractor";
 
 import { dedupeDocumentation, readPartPropFact, shortTypeOf } from "./checker.ts";
@@ -110,21 +107,18 @@ function enrichPart(
   };
 }
 
-export async function enrichComponents(
+export type EnrichedLibraryApi = {
+  readonly components: readonly ComponentApi[];
+  readonly diagnostics: readonly ApiArtifactDiagnostic[];
+};
+
+export function enrichComponents(
   context: LibraryProject,
-  tsconfigPath: string,
+  results: readonly ExtractionResult[],
   inventory: readonly { slug: string; entryFile: string; exportNames: readonly string[] }[],
   model: readonly ComponentApi[],
   packages: readonly string[]
-): Promise<{ components: readonly ComponentApi[]; diagnostics: readonly ApiArtifactDiagnostic[] }> {
-  const results = await Effect.runPromise(
-    Effect.gen(function* () {
-      const extractor = yield* ProjectExtractor;
-      return yield* Effect.forEach(inventory, (entry) =>
-        extractor.extractModule(entry.entryFile, { includeExternalTypes: packages })
-      );
-    }).pipe(Effect.provide(ProjectExtractor.live({ tsconfigPath, cwd: context.projectRoot })))
-  );
+): EnrichedLibraryApi {
   const diagnostics: ApiArtifactDiagnostic[] = [];
   const components = model.map((component, index) => {
     const result = results[index];

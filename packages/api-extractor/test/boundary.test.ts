@@ -122,6 +122,65 @@ describe("compiler boundary", () => {
     ).toEqual(["effect"]);
   });
 
+  it("retains a default import when the named bindings are type-only", () => {
+    expect(scanValueModuleSpecifiers('import Default, { type Thing } from "./bridge.js";')).toEqual([
+      "./bridge.js",
+    ]);
+    expect(
+      scanValueModuleSpecifiers('import Default, { type Thing as T, type Other } from "./bridge.js";')
+    ).toEqual(["./bridge.js"]);
+    expect(scanValueModuleSpecifiers('import Default, {} from "./bridge.js";')).toEqual(["./bridge.js"]);
+    expect(scanValueModuleSpecifiers('import Default from "./bridge.js";')).toEqual(["./bridge.js"]);
+    expect(scanValueModuleSpecifiers('import Default, * as NS from "./bridge.js";')).toEqual(["./bridge.js"]);
+    expect(scanValueModuleSpecifiers('import { value, type Thing } from "./bridge.js";')).toEqual([
+      "./bridge.js",
+    ]);
+    expect(scanValueModuleSpecifiers('import Default,\n  { type Thing } from "./bridge.js";')).toEqual([
+      "./bridge.js",
+    ]);
+    expect(
+      scanValueModuleSpecifiers('import Default, /* type-looking */ { type Thing } from "./bridge.js";')
+    ).toEqual(["./bridge.js"]);
+    expect(
+      scanValueModuleSpecifiers(
+        'import type { A } from "./a.ts";\nimport Default, { type Thing } from "./bridge.js";\n'
+      )
+    ).toEqual(["./bridge.js"]);
+    expect(scanValueModuleSpecifiers('import "./bridge.js";')).toEqual(["./bridge.js"]);
+    expect(scanValueModuleSpecifiers('const d = import("./bridge.js");')).toEqual(["./bridge.js"]);
+    expect(scanValueModuleSpecifiers('const d = require("./bridge.js");')).toEqual(["./bridge.js"]);
+    expect(scanValueModuleSpecifiers('import { type Thing, type Other } from "./bridge.js";')).toEqual([]);
+    expect(scanValueModuleSpecifiers('import type Default from "./bridge.js";')).toEqual([]);
+    expect(scanValueModuleSpecifiers('export type { Thing } from "./bridge.js";')).toEqual([]);
+  });
+
+  it.each([
+    'import é, { type Thing } from "./bridge.js";',
+    String.raw`import \u0044efault, { type Thing } from "./bridge.js";`,
+    String.raw`import \u{44}efault, { type Thing } from "./bridge.js";`,
+    'import type, { type Thing } from "./bridge.js";',
+    'import type /* default binding */,\n { type Thing } from "./bridge.js";',
+    'import type from "./bridge.js";',
+    'import type, * as Namespace from "./bridge.js";',
+    'import typeé, { type Thing } from "./bridge.js";',
+    'import é, * as Namespace from "./bridge.js";',
+  ])("retains runtime default bindings regardless of identifier spelling: %s", (source) => {
+    expect(scanValueModuleSpecifiers(source)).toEqual(["./bridge.js"]);
+  });
+
+  it.each([
+    'import type é from "./bridge.js";',
+    String.raw`import type \u0044efault from "./bridge.js";`,
+    'import type type from "./bridge.js";',
+    'import type /* modifier */ { Thing } from "./bridge.js";',
+    'import type{ Thing } from "./bridge.js";',
+    'import type * as Namespace from "./bridge.js";',
+    'export type{ Thing } from "./bridge.js";',
+    'export type * as Namespace from "./bridge.js";',
+  ])("recognizes the type modifier independently of default binding names: %s", (source) => {
+    expect(scanValueModuleSpecifiers(source)).toEqual([]);
+  });
+
   it("reports a transitive Effect import reached through a file that opens with `import type`", () => {
     const directory = mkdtempSync(join(tmpdir(), "api-extractor-effect-anchored-"));
     try {
@@ -184,6 +243,56 @@ describe("compiler boundary", () => {
       writeFileSync(
         modelPath,
         'import { Schema } from "effect";\nexport type SemanticType = typeof Schema.String;\n'
+      );
+
+      expect(scanValueModuleSpecifiers(readFileSync(leafPath, "utf8"))).toEqual([]);
+      expect(effectImportViolations([leafPath])).toEqual([]);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it.each(["Bridge", "é", String.raw`\u0044efault`, String.raw`\u{44}efault`, "type"])(
+    "reports a transitive Effect import through the mixed default binding %s",
+    (binding) => {
+      const directory = mkdtempSync(join(tmpdir(), "api-extractor-effect-mixed-"));
+      try {
+        const parseDirectory = join(directory, "src/parse");
+        mkdirSync(parseDirectory, { recursive: true });
+        const leafPath = join(parseDirectory, "leaf.ts");
+        const helperPath = join(directory, "src/bridge.ts");
+        writeFileSync(
+          leafPath,
+          `import ${binding}, { type Thing } from "../bridge.js";\nexport const leaf = ${binding};\nexport type T = Thing;\n`
+        );
+        writeFileSync(
+          helperPath,
+          'import { Data } from "effect";\nexport type Thing = string;\nexport default Data;\n'
+        );
+
+        expect(effectImportViolations([leafPath])).toEqual([
+          {
+            path: helperPath,
+            reason: "Effect import effect",
+          },
+        ]);
+      } finally {
+        rmSync(directory, { recursive: true, force: true });
+      }
+    }
+  );
+
+  it("does not treat a wholly type-only import of a mixed bridge as a parse-layer leak", () => {
+    const directory = mkdtempSync(join(tmpdir(), "api-extractor-effect-mixed-typeonly-"));
+    try {
+      const parseDirectory = join(directory, "src/parse");
+      mkdirSync(parseDirectory, { recursive: true });
+      const leafPath = join(parseDirectory, "leaf.ts");
+      const helperPath = join(directory, "src/bridge.ts");
+      writeFileSync(leafPath, 'import type { Thing } from "../bridge.js";\nexport type T = Thing;\n');
+      writeFileSync(
+        helperPath,
+        'import { Data } from "effect";\nexport type Thing = typeof Data;\nexport default Data;\n'
       );
 
       expect(scanValueModuleSpecifiers(readFileSync(leafPath, "utf8"))).toEqual([]);

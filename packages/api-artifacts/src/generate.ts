@@ -1,11 +1,23 @@
+import { Effect } from "effect";
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-import type { ExtractWarning } from "@elmeragroup/api-extractor";
+import { ProjectExtractor } from "@elmeragroup/api-extractor";
+import type {
+  ComponentSourceRequest,
+  ComponentSourceResult,
+  ExtractWarning,
+  ExtractionResult,
+} from "@elmeragroup/api-extractor";
 
-import { extractLibraryApi, openLibraryProject } from "./checker.ts";
-import type { ComponentApi } from "./checker.ts";
+import {
+  componentPartRequests,
+  extractPart,
+  openLibraryProject,
+  partSourceFromInspection,
+} from "./checker.ts";
+import type { ComponentApi, LibraryProject, PartRequest } from "./checker.ts";
 import { enrichComponents } from "./enrichment.ts";
 import { ApiArtifactsDriftError, ApiArtifactsError, ProblemLog } from "./errors.ts";
 import type { ApiArtifactDiagnostic } from "./model.ts";
@@ -85,6 +97,48 @@ async function writeArtifact(file: string, text: string): Promise<void> {
   }
 }
 
+function inspectRequestsFor(parts: readonly PartRequest[]): readonly ComponentSourceRequest[] {
+  return parts.map((part) =>
+    part.memberName === undefined
+      ? { exportName: part.exportName }
+      : { exportName: part.exportName, memberName: part.memberName }
+  );
+}
+
+type DiscoveredComponent = {
+  readonly request: ApiArtifactComponent;
+  readonly parts: readonly PartRequest[];
+};
+
+function describeInventory(
+  context: LibraryProject,
+  discoveries: readonly DiscoveredComponent[],
+  problems: ProblemLog,
+  sourceResults: readonly (readonly ComponentSourceResult[])[]
+): readonly ComponentApi[] {
+  return discoveries.map((discovery, index) => {
+    const inspected = sourceResults[index] ?? [];
+    const partApis = discovery.parts.map((part, partIndex) => {
+      const sourceResult = inspected[partIndex];
+      if (sourceResult === undefined) {
+        problems.add(`${part.name}: could not recover the authored implementation (export-not-found)`);
+        return extractPart(context, part, null, problems);
+      }
+      return extractPart(
+        context,
+        part,
+        partSourceFromInspection(context, part.name, sourceResult, problems),
+        problems
+      );
+    });
+    return {
+      slug: discovery.request.slug,
+      parts: partApis.flatMap((entry) => (entry.part === null ? [] : [entry.part])),
+      partApis,
+    };
+  });
+}
+
 /** Extracts and validates the entire inventory before writing any artifact. */
 export async function generateApiArtifacts(
   options: GenerateApiArtifactsOptions
@@ -98,21 +152,46 @@ export async function generateApiArtifacts(
   let model: readonly ComponentApi[];
   let diagnostics: readonly ApiArtifactDiagnostic[] = [];
   try {
-    model = extractLibraryApi(context, requests, problems);
-    problems.throwIfFailed();
-    const packages = options.includeExternalTypes ?? [];
-    if (packages.length > 0) {
-      const enriched = await enrichComponents(context, tsconfigPath, requests, model, packages);
-      model = enriched.components;
-      diagnostics = enriched.diagnostics;
-      const rejected = diagnostics.filter(
-        (diagnostic) => !options.allowedWarningCodes?.includes(diagnostic.warning.code)
-      );
-      if (rejected.length > 0)
-        throw new ApiArtifactsError(
-          rejected.map(({ component, warning }) => `${component}: ${warning.code}: ${warning.message}`)
-        );
-    }
+    const generated = await Effect.runPromise(
+      Effect.scoped(
+        Effect.gen(function* () {
+          const extractor = yield* ProjectExtractor;
+          const discoveries = requests.map((request) => ({
+            request,
+            parts: componentPartRequests(context, request, problems),
+          }));
+          const sourceResults = yield* Effect.forEach(discoveries, (discovery) =>
+            extractor.inspectComponentSources(
+              discovery.request.entryFile,
+              inspectRequestsFor(discovery.parts)
+            )
+          );
+          const described = describeInventory(context, discoveries, problems, sourceResults);
+          if (problems.problems.length > 0) {
+            return yield* Effect.fail(new ApiArtifactsError(problems.problems));
+          }
+          const packages = options.includeExternalTypes ?? [];
+          if (packages.length === 0) return { components: described, diagnostics: [] };
+          const extracted: readonly ExtractionResult[] = yield* Effect.forEach(requests, (entry) =>
+            extractor.extractModule(entry.entryFile, { includeExternalTypes: packages })
+          );
+          const enriched = enrichComponents(context, extracted, requests, described, packages);
+          const rejected = enriched.diagnostics.filter(
+            (diagnostic) => !options.allowedWarningCodes?.includes(diagnostic.warning.code)
+          );
+          if (rejected.length > 0) {
+            return yield* Effect.fail(
+              new ApiArtifactsError(
+                rejected.map(({ component, warning }) => `${component}: ${warning.code}: ${warning.message}`)
+              )
+            );
+          }
+          return enriched;
+        }).pipe(Effect.provide(ProjectExtractor.live({ tsconfigPath, cwd: projectRoot })))
+      )
+    );
+    model = generated.components;
+    diagnostics = generated.diagnostics;
   } finally {
     context.close();
   }

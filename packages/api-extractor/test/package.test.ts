@@ -5,7 +5,11 @@ import { resolve } from "node:path";
 import { describe, expect, expectTypeOf, it } from "vitest";
 
 import { ProjectExtractor as PackageProjectExtractor } from "@elmeragroup/api-extractor";
-import type { ExtractionResult, ProjectExtractorService } from "@elmeragroup/api-extractor";
+import type {
+  ComponentSourceResult,
+  ExtractionResult,
+  ProjectExtractorService,
+} from "@elmeragroup/api-extractor";
 import type { BackendError, ExtractError, FileNotInProgramError } from "@elmeragroup/api-extractor";
 
 import { CompilerBackend } from "../src/backend/service.ts";
@@ -20,8 +24,14 @@ const inputPath = resolve(fixtureDirectory, "input.ts");
 
 type ExtractModuleError = EffectError<ReturnType<ProjectExtractorService["extractModule"]>>;
 type ExtractModuleEffect = ReturnType<ProjectExtractorService["extractModule"]>;
+type InspectEffect = ReturnType<ProjectExtractorService["inspectComponentSources"]>;
 type ExpectedExtractModuleEffect = Effect.Effect<
   ExtractionResult,
+  BackendError | FileNotInProgramError | ExtractError,
+  never
+>;
+type ExpectedInspectEffect = Effect.Effect<
+  readonly ComponentSourceResult[],
   BackendError | FileNotInProgramError | ExtractError,
   never
 >;
@@ -29,6 +39,7 @@ type ExpectedExtractModuleEffect = Effect.Effect<
 describe("package entry point", () => {
   it("keeps the public extraction effect environment-free", () => {
     expectTypeOf<ExtractModuleEffect>().toEqualTypeOf<ExpectedExtractModuleEffect>();
+    expectTypeOf<InspectEffect>().toEqualTypeOf<ExpectedInspectEffect>();
   });
 
   it("keeps configuration failures on layer acquisition, not extraction", () => {
@@ -51,7 +62,7 @@ describe("package entry point", () => {
       Effect.scoped(
         Effect.gen(function* () {
           const extractor = yield* PackageProjectExtractor;
-          expect(Reflect.ownKeys(extractor)).toEqual(["extractModule"]);
+          expect(Reflect.ownKeys(extractor)).toEqual(["extractModule", "inspectComponentSources"]);
         }).pipe(Effect.provide(PackageProjectExtractor.live({ tsconfigPath })))
       )
     );

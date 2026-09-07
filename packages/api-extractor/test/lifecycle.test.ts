@@ -20,9 +20,11 @@ childProcess.spawn = ((...args: Parameters<typeof originalSpawn>) => {
 }) as typeof originalSpawn;
 syncBuiltinESMExports();
 
-const { Effect, Schema } = await import("effect");
+const { Effect, Layer, Schema } = await import("effect");
 const { ConfigError, ProjectExtractor } = await import("../src/index.ts");
 const { openTsgoProject } = await import("../src/backend/ts7/project.ts");
+const { CompilerBackend } = await import("../src/backend/service.ts");
+const { projectExtractorLayer } = await import("../src/extractor.ts");
 
 const fixtureDirectory = resolve(import.meta.dirname, "fixtures/basic");
 const tsconfigPath = resolve(fixtureDirectory, "tsconfig.json");
@@ -215,6 +217,71 @@ describe("ProjectExtractor native compiler lifecycle", () => {
           const extractor = yield* ProjectExtractor;
           const child = yield* Effect.sync(() => nativeChildSince(startIndex));
           const exit = yield* Effect.exit(extractor.extractModule(missingPath));
+          return { child, exit };
+        }).pipe(Effect.provide(ProjectExtractor.live({ tsconfigPath })))
+      )
+    );
+
+    expect(exit._tag).toBe("Failure");
+    await waitForProcessExit(child);
+    expect(isProcessAlive(nativeChildPid(child))).toBe(false);
+  });
+
+  it("inspects component sources, unresolved results, and repeated calls on one project", async () => {
+    const startIndex = nativeChildren.length;
+    const sourceModes: (boolean | undefined)[] = [];
+    const backend = Layer.succeed(CompilerBackend, {
+      openProject: (options) =>
+        Effect.gen(function* () {
+          const project = yield* Effect.acquireRelease(
+            Effect.sync(() => openTsgoProject(options)),
+            (opened) => Effect.sync(() => opened.close())
+          );
+          return {
+            openExtraction: (sessionOptions) => {
+              sourceModes.push(sessionOptions?.componentSources);
+              return project.openExtraction(sessionOptions);
+            },
+            close: () => project.close(),
+          };
+        }),
+    });
+    const { child, resolved, unresolved, repeated, extracted } = await Effect.runPromise(
+      Effect.scoped(
+        Effect.gen(function* () {
+          const extractor = yield* ProjectExtractor;
+          const child = yield* Effect.sync(() => nativeChildSince(startIndex));
+          const resolved = yield* extractor.inspectComponentSources(inputPath, [{ exportName: "greet" }]);
+          const unresolved = yield* extractor.inspectComponentSources(inputPath, [{ exportName: "missing" }]);
+          const repeated = yield* extractor.inspectComponentSources(inputPath, [
+            { exportName: "greet" },
+            { exportName: "greet" },
+          ]);
+          const extracted = yield* extractor.extractModule(inputPath);
+          return { child, resolved, unresolved, repeated, extracted };
+        }).pipe(Effect.provide(projectExtractorLayer({ tsconfigPath }).pipe(Layer.provide(backend))))
+      )
+    );
+
+    expect(resolved).toEqual([{ status: "resolved", filePath: inputPath, defaults: [] }]);
+    expect(unresolved).toEqual([{ status: "unresolved", reason: "export-not-found" }]);
+    expect(repeated).toEqual([resolved[0], resolved[0]]);
+    expect(extracted.module.exports.map((entry) => entry.name)).toEqual(["greet"]);
+    expect(sourceModes).toEqual([true, true, true, undefined]);
+    await waitForProcessExit(child);
+    expect(isProcessAlive(nativeChildPid(child))).toBe(false);
+  });
+
+  it("closes the compiler child after a thrown source inspection failure", async () => {
+    const startIndex = nativeChildren.length;
+    const { child, exit } = await Effect.runPromise(
+      Effect.scoped(
+        Effect.gen(function* () {
+          const extractor = yield* ProjectExtractor;
+          const child = yield* Effect.sync(() => nativeChildSince(startIndex));
+          const exit = yield* Effect.exit(
+            extractor.inspectComponentSources(missingPath, [{ exportName: "greet" }])
+          );
           return { child, exit };
         }).pipe(Effect.provide(ProjectExtractor.live({ tsconfigPath })))
       )

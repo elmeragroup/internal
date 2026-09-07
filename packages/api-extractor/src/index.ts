@@ -1,5 +1,21 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 
+export {
+  ComponentSourceDefaultSchema,
+  ComponentSourceRequestSchema,
+  ComponentSourceResolvedSchema,
+  ComponentSourceResultSchema,
+  ComponentSourceResultsSchema,
+  ComponentSourceUnresolvedReasonSchema,
+  ComponentSourceUnresolvedSchema,
+  type ComponentSourceDefault,
+  type ComponentSourceRequest,
+  type ComponentSourceResolved,
+  type ComponentSourceResult,
+  type ComponentSourceResults,
+  type ComponentSourceUnresolved,
+  type ComponentSourceUnresolvedReason,
+} from "./component-sources.ts";
 export { ProjectExtractor, type ExtractionResult, type ProjectExtractorService } from "./extractor.ts";
 export { BackendError, ConfigError, ExtractError, FileNotInProgramError } from "./errors.ts";
 export {

@@ -35,7 +35,7 @@ jobs:
           CANARY_VERSION: ${{ inputs.version }}
       - run: pnpm install --lockfile-only
       - run: pnpm ci:checks
-      - run: pnpm canary:pack
+      - run: pnpm packages:pack
       - run: pnpm test:packed-consumer
       - uses: actions/upload-artifact@v4
         with:

@@ -6,6 +6,13 @@ import { afterEach, describe, expect, it } from "vitest";
 import { ApiArtifactsDriftError, ApiArtifactsError, generateApiArtifacts } from "../src/index.ts";
 
 const roots: string[] = [];
+const documentedComponent = `export type Props = {
+  /** Label shown on the button. */
+  label: string;
+};
+export function Button({ label }: Props) { return label; }
+export const Compound = { Root: Button };
+`;
 async function fixture(
   source = `"use client";
 export type Props = {
@@ -210,5 +217,25 @@ undocumented?: string;
       required: false,
     });
     expect(result.components[0]?.parts[0]?.forwardedCount).toBe(1);
+  });
+
+  it("classifies a client module when a trailing comment follows the directive", async () => {
+    const root = await fixture(`"use client"; // comment
+${documentedComponent}`);
+    const result = await generateApiArtifacts(options(root));
+    expect(result.components[0]?.parts[0]).toMatchObject({ rsc: "client", sourcePath: "button.ts" });
+  });
+
+  it("classifies a client module when an export follows the directive on the same line", async () => {
+    const root = await fixture(`"use client"; ${documentedComponent}`);
+    const result = await generateApiArtifacts(options(root));
+    expect(result.components[0]?.parts[0]).toMatchObject({ rsc: "client", sourcePath: "button.ts" });
+  });
+
+  it("classifies a comment-shaped string as server rather than a client directive", async () => {
+    const root = await fixture(`"use /* comment */client";
+${documentedComponent}`);
+    const result = await generateApiArtifacts(options(root));
+    expect(result.components[0]?.parts[0]).toMatchObject({ rsc: "server", sourcePath: "button.ts" });
   });
 });

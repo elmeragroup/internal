@@ -10,6 +10,6 @@
       "@fixture/source.js": ["./test/fixtures/module-resolution-alias/source.d.ts"]
     }
   },
-  "include": ["src", "test", "vitest.config.ts"],
+  "include": ["src", "test", "scripts", "vitest.config.ts"],
   "exclude": ["test/fixtures/module-imports-only/**"]
 }

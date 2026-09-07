@@ -93,6 +93,19 @@ const extracted = await Effect.runPromise(
   )
 );
 assert.ok(extracted.module.exports.some((entry) => entry.name === "Button"));
+const inspected = await Effect.runPromise(
+  Effect.gen(function* () {
+    const extractor = yield* ProjectExtractor;
+    return yield* extractor.inspectComponentSources(path.join(root, "button.ts"), [{ exportName: "Button" }]);
+  }).pipe(
+    Effect.provide(ProjectExtractor.live({ tsconfigPath: path.join(root, "tsconfig.json"), cwd: root }))
+  )
+);
+assert.equal(inspected.length, 1);
+assert.equal(inspected[0].status, "resolved");
+assert.equal(inspected[0].filePath, path.join(root, "button.ts"));
+assert.deepEqual(inspected[0].defaults, [{ name: "disabled", initializerText: "false" }]);
+assert.equal("declaration" in inspected[0], false);
 await writeFile(
   "consumer.ts",
   `import { generateApiArtifacts } from "@elmeragroup/internal";

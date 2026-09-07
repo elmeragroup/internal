@@ -164,8 +164,12 @@ function currentStatement(before: string): string {
 
 function isTypeOnlySpecifierContext(beforeSpecifier: string): boolean {
   const before = currentStatement(beforeSpecifier);
-  if (/^(?:import|export)\s+type\b/u.test(before)) return true;
-  const inline = /\{([^}]*)\}\s*$/u.exec(before)?.[1];
+  // `type` is also a valid default binding, followed by a comma or the module's `from`.
+  if (/^import\s+type\s*(?:,|$)/u.test(before)) return false;
+  if (/^(?:import|export)\s+type(?:\s|[{*])/u.test(before)) return true;
+  // Only a complete named-only clause can be erased. A prefix before its braces is
+  // a runtime default binding, whatever Unicode or escaped spelling it uses.
+  const inline = /^(?:import|export)\s*\{([^}]*)\}\s*$/u.exec(before)?.[1];
   if (inline === undefined) return false;
   const bindings = inline
     .split(",")
