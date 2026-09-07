@@ -115,21 +115,18 @@ export type EnrichedLibraryApi = {
 export function enrichComponents(
   context: LibraryProject,
   results: readonly ExtractionResult[],
-  inventory: readonly { slug: string; entryFile: string; exportNames: readonly string[] }[],
   model: readonly ComponentApi[],
   packages: readonly string[]
 ): EnrichedLibraryApi {
   const diagnostics: ApiArtifactDiagnostic[] = [];
   const components = model.map((component, index) => {
     const result = results[index];
-    const request = inventory[index];
-    if (result === undefined || request === undefined)
-      throw new Error(`Missing extraction for ${component.slug}`);
+    if (result === undefined) throw new Error(`Missing extraction for ${component.slug}`);
     diagnostics.push(...result.warnings.map((warning) => ({ component: component.slug, warning })));
     return {
       ...component,
       parts: component.parts.map((part) =>
-        enrichPart(context, component, part, result, request.exportNames, packages)
+        enrichPart(context, component, part, result, component.exportNames, packages)
       ),
     };
   });

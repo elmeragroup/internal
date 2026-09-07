@@ -37,12 +37,6 @@
     "vitest": "catalog:"
   },
   "types": "./dist/index.d.ts",
-  "files": [
-    "dist/**",
-    "README.md",
-    "LICENSE",
-    "NOTICE"
-  ],
   "engines": {
     "node": ">=24.13.0 <25"
   },

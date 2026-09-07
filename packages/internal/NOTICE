@@ -1,11 +1,11 @@
 Portions of the extraction model and resolver design are informed by
 typescript-api-extractor, copyright (c) 2025 Michał Dudak, at commit e145350.
 The compound-type canonicalization, equivalence, and rendering policy in
-`src/canonical/` is ported from that project. The array, tuple, and mapped-type
-resolution policy in `src/parse/container.ts` and `src/parse/mapped.ts` follows
+`packages/api-extractor/src/canonical/` is ported from that project. The array, tuple, and mapped-type
+resolution policy in `packages/api-extractor/src/parse/container.ts` and `packages/api-extractor/src/parse/mapped.ts` follows
 its resolvers.
 
-Fixtures under `test/fixtures/` whose record in `scripts/fixture-catalog.ts` is
+Repository fixtures under `packages/api-extractor/test/fixtures/` whose record in `packages/api-extractor/scripts/fixture-catalog.ts` is
 marked `immutable-upstream` carry that project's inputs and `output.json`
 oracles unchanged. Every `output.tsgo.json`, `warnings.tsgo.json`, and
 `ts7-oracle.json` file, and every fixture not so marked, was written in this

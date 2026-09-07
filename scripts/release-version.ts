@@ -18,24 +18,17 @@ function isSupportedReleaseVersion(version: string): boolean {
   return isStableReleaseVersion(version) || isCanaryReleaseVersion(version);
 }
 
-export function assertCoordinatedReleaseVersion(versions: readonly string[]): string {
-  const first = versions[0];
-  if (first === undefined) {
-    throw new Error("Release packages must include at least one version");
-  }
-  if (versions.some((version) => version !== first)) {
-    throw new Error(`All release packages must have the same version; received ${versions.join(", ")}`);
-  }
-  if (!isSupportedReleaseVersion(first)) {
+export function assertReleaseVersion(version: string): string {
+  if (!isSupportedReleaseVersion(version)) {
     throw new Error(
-      `Unsupported release version ${first}; expected x.y.z or x.y.z-canary.N without leading zeros`
+      `Unsupported release version ${version}; expected x.y.z or x.y.z-canary.N without leading zeros`
     );
   }
-  return first;
+  return version;
 }
 
-export function assertCanaryReleaseVersion(versions: readonly string[]): string {
-  const version = assertCoordinatedReleaseVersion(versions);
+export function assertCanaryReleaseVersion(version: string): string {
+  assertReleaseVersion(version);
   if (!isCanaryReleaseVersion(version)) {
     throw new Error(`Canary publication requires x.y.z-canary.N; received ${version}`);
   }

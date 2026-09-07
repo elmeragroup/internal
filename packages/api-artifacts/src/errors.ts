@@ -20,7 +20,4 @@ export class ProblemLog {
   get problems(): readonly string[] {
     return this.entries;
   }
-  throwIfFailed(): void {
-    if (this.entries.length > 0) throw new ApiArtifactsError(this.entries);
-  }
 }

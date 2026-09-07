@@ -37,7 +37,8 @@
     "@elmeragroup/internal": "workspace:*",
     "@elmeragroup/api-extractor": "workspace:*",
     "effect": "catalog:",
-    "tsdown": "catalog:"
+    "tsdown": "catalog:",
+    "esbuild": "catalog:"
   },
   "engines": {
     "node": ">=24.13.0 <25"

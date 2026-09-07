@@ -23,10 +23,10 @@ try {
         packageManager: "pnpm@11.20.0",
         private: true,
         type: "module",
-        dependencies: { "@elmeragroup/internal": `file:${archivePath("internal", version)}` },
+        dependencies: { "@elmeragroup/internal": `file:${archivePath(version)}` },
         devDependencies: {
           oxlint: asString(catalog.oxlint, "oxlint"),
-          tsdown: asString(catalog.tsdown, "tsdown"),
+          esbuild: asString(catalog.esbuild, "esbuild"),
         },
       },
       null,
@@ -35,6 +35,7 @@ try {
   );
   writeFileSync(resolve(consumer, "pnpm-workspace.yaml"), "autoInstallPeers: false\n");
   cpSync(resolve(repoRoot, "test/packed-consumer.mjs"), resolve(consumer, "check.mjs"));
+  cpSync(resolve(repoRoot, "test/packed-consumer"), resolve(consumer, "checks"), { recursive: true });
   run("pnpm", ["install", "--ignore-scripts"], consumer);
   // Node's type stripping is disabled to prove only compiled JavaScript is loaded.
   run(process.execPath, ["--no-experimental-strip-types", "check.mjs"], consumer);
@@ -43,8 +44,8 @@ try {
     `${JSON.stringify(
       {
         version,
-        archivesSha256: createHash("sha256")
-          .update(readFileSync(resolve(archiveDirectory, "archives.json")))
+        archiveReportSha256: createHash("sha256")
+          .update(readFileSync(resolve(archiveDirectory, "archive.json")))
           .digest("hex"),
         status: "pass",
       },

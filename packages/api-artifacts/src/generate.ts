@@ -4,19 +4,9 @@ import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { ProjectExtractor } from "@elmeragroup/api-extractor";
-import type {
-  ComponentSourceRequest,
-  ComponentSourceResult,
-  ExtractWarning,
-  ExtractionResult,
-} from "@elmeragroup/api-extractor";
+import type { ComponentSourceResult, ExtractWarning, ExtractionResult } from "@elmeragroup/api-extractor";
 
-import {
-  componentPartRequests,
-  extractPart,
-  openLibraryProject,
-  partSourceFromInspection,
-} from "./checker.ts";
+import { componentPartRequests, extractPart, openLibraryProject } from "./checker.ts";
 import type { ComponentApi, LibraryProject, PartRequest } from "./checker.ts";
 import { enrichComponents } from "./enrichment.ts";
 import { ApiArtifactsDriftError, ApiArtifactsError, ProblemLog } from "./errors.ts";
@@ -97,46 +87,29 @@ async function writeArtifact(file: string, text: string): Promise<void> {
   }
 }
 
-function inspectRequestsFor(parts: readonly PartRequest[]): readonly ComponentSourceRequest[] {
-  return parts.map((part) =>
-    part.memberName === undefined
-      ? { exportName: part.exportName }
-      : { exportName: part.exportName, memberName: part.memberName }
-  );
-}
-
-type DiscoveredComponent = {
-  readonly request: ApiArtifactComponent;
-  readonly parts: readonly PartRequest[];
-};
-
-function describeInventory(
+function describeComponent(
   context: LibraryProject,
-  discoveries: readonly DiscoveredComponent[],
-  problems: ProblemLog,
-  sourceResults: readonly (readonly ComponentSourceResult[])[]
-): readonly ComponentApi[] {
-  return discoveries.map((discovery, index) => {
-    const inspected = sourceResults[index] ?? [];
-    const partApis = discovery.parts.map((part, partIndex) => {
-      const sourceResult = inspected[partIndex];
-      if (sourceResult === undefined) {
-        problems.add(`${part.name}: could not recover the authored implementation (export-not-found)`);
-        return extractPart(context, part, null, problems);
-      }
-      return extractPart(
-        context,
-        part,
-        partSourceFromInspection(context, part.name, sourceResult, problems),
-        problems
-      );
-    });
-    return {
-      slug: discovery.request.slug,
-      parts: partApis.flatMap((entry) => (entry.part === null ? [] : [entry.part])),
-      partApis,
-    };
+  request: ApiArtifactComponent,
+  parts: readonly PartRequest[],
+  inspected: readonly ComponentSourceResult[],
+  problems: ProblemLog
+): ComponentApi {
+  if (inspected.length !== parts.length) {
+    throw new ApiArtifactsError([
+      `${request.slug}: source inspection returned ${inspected.length} results for ${parts.length} parts`,
+    ]);
+  }
+  const partApis = parts.map((part, index) => {
+    const source = inspected[index];
+    if (source === undefined) throw new ApiArtifactsError([`${part.name}: missing source inspection result`]);
+    return extractPart(context, part, source, problems);
   });
+  return {
+    slug: request.slug,
+    exportNames: request.exportNames,
+    parts: partApis.flatMap((entry) => (entry.part === null ? [] : [entry.part])),
+    partApis,
+  };
 }
 
 /** Extracts and validates the entire inventory before writing any artifact. */
@@ -156,17 +129,13 @@ export async function generateApiArtifacts(
       Effect.scoped(
         Effect.gen(function* () {
           const extractor = yield* ProjectExtractor;
-          const discoveries = requests.map((request) => ({
-            request,
-            parts: componentPartRequests(context, request, problems),
-          }));
-          const sourceResults = yield* Effect.forEach(discoveries, (discovery) =>
-            extractor.inspectComponentSources(
-              discovery.request.entryFile,
-              inspectRequestsFor(discovery.parts)
-            )
+          const described = yield* Effect.forEach(requests, (request) =>
+            Effect.gen(function* () {
+              const parts = componentPartRequests(context, request, problems);
+              const inspected = yield* extractor.inspectComponentSources(request.entryFile, parts);
+              return describeComponent(context, request, parts, inspected, problems);
+            })
           );
-          const described = describeInventory(context, discoveries, problems, sourceResults);
           if (problems.problems.length > 0) {
             return yield* Effect.fail(new ApiArtifactsError(problems.problems));
           }
@@ -175,7 +144,7 @@ export async function generateApiArtifacts(
           const extracted: readonly ExtractionResult[] = yield* Effect.forEach(requests, (entry) =>
             extractor.extractModule(entry.entryFile, { includeExternalTypes: packages })
           );
-          const enriched = enrichComponents(context, extracted, requests, described, packages);
+          const enriched = enrichComponents(context, extracted, described, packages);
           const rejected = enriched.diagnostics.filter(
             (diagnostic) => !options.allowedWarningCodes?.includes(diagnostic.warning.code)
           );
