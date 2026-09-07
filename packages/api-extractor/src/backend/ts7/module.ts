@@ -286,8 +286,10 @@ function appendDescriptors(
   const defaultNamedTarget = defaultExportNameSymbol(scope.session, first);
   const target = defaultNamedTarget ?? exportTarget(scope.session, scope.symbol);
   const specifierReExport = isModuleReExportSpecifier(scope.session, scope.symbol);
-  const chain = specifierReExport ? followedChain(scope.session, scope, scope.symbol) : scope.chain;
-  out.push(exportDescriptor(scope, target, chain));
+  const followed = specifierReExport
+    ? followedChain(scope.session, scope, scope.symbol)
+    : { chain: scope.chain, forwardingFilePath: undefined };
+  out.push(exportDescriptor(scope, target, followed.chain, followed.forwardingFilePath));
   // A re-exported value can carry a namespace merged onto its ORIGINAL
   // declaration (`function f() {}; namespace f {}` forwarded with
   // `export { f } from …`). Upstream merges those member descriptors onto the
@@ -399,13 +401,14 @@ function appendDefaultExport(scope: DescriptorScope, assignment: Node, out: Back
     });
     return;
   }
-  out.push(exportDescriptor({ ...scope, symbol: exported }, exported, scope.chain));
+  out.push(exportDescriptor({ ...scope, symbol: exported }, exported, scope.chain, undefined));
 }
 
 function exportDescriptor(
   scope: DescriptorScope,
   target: TsSymbol,
-  chain: readonly string[]
+  chain: readonly string[],
+  forwardingFilePath: string | undefined
 ): BackendExportDraft {
   const session = scope.session;
   const declarationHandle = valueOrFirstDeclarationHandle(target);
@@ -439,6 +442,7 @@ function exportDescriptor(
     ...definedFields({
       reexportedFrom,
       reexportChain: chain.length === 0 ? undefined : chain,
+      forwardingFilePath: chain.length === 0 ? undefined : forwardingFilePath,
       extendsTypes: inheritedTypes,
     }),
   };

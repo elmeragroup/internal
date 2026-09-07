@@ -67,13 +67,18 @@ const maxReexportHops = 64;
  * resolving (the origin's own declaration, an unresolvable specifier, or a
  * revisit) ends the chain; the origin itself stays out because the draft's
  * declaration paths already carry it. The bound guards pathological barrels.
+ *
+ * `forwardingFilePath` is the compiler path of the innermost hop: the file
+ * whose statement forwards the original declaration itself. Source inspection
+ * reads a dependency-forwarding facade's directive prologue from it.
  */
 export function followedChain(
   session: TsgoModuleSession,
   scope: DescriptorScope,
   start: TsSymbol
-): readonly string[] {
+): FollowedChain {
   let chain = extendChain(scope, start);
+  let forwardingFilePath = forwardingReExport(session, start)?.file.fileName ?? scope.filePath;
   const visited = new Set<TsSymbol>([start]);
   let current = start;
   for (let hop = 0; hop < maxReexportHops; hop += 1) {
@@ -82,12 +87,18 @@ export function followedChain(
     visited.add(next);
     const forwarding = forwardingReExport(session, next);
     if (forwarding === undefined) break;
+    forwardingFilePath = forwarding.file.fileName;
     const candidate = repositoryRelativePath(session.rootDirectory, forwarding.file.fileName);
     if (chain[chain.length - 1] !== candidate) chain = [...chain, candidate];
     current = next;
   }
-  return chain;
+  return { chain, forwardingFilePath };
 }
+
+export type FollowedChain = {
+  readonly chain: readonly string[];
+  readonly forwardingFilePath: string;
+};
 
 /**
  * The re-export statement that forwards a symbol from another module, when

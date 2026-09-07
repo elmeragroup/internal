@@ -105,6 +105,11 @@ export type PartSource = {
   rsc: RscStatus;
   /** Destructuring defaults, keyed by prop name. */
   defaults: ReadonlyMap<string, string>;
+  /**
+   * The dependency that declares a value the authored module only forwards, so
+   * the part is published from the facade with the package in `forwardedFrom`.
+   */
+  forwardedPackage: string | null;
 };
 
 function isRecipeAxisDeclaration(declarationPath: string): boolean {
@@ -126,6 +131,8 @@ export function propOrigin(declarationPaths: readonly string[], synthesized: boo
 /**
  * Turns one source-inspection result into artifact source metadata. Unresolved
  * implementations become an actionable problem instead of React declaration paths.
+ * A forwarded dependency value reads its metadata from the authored facade that
+ * forwards it: that module's directive decides `rsc`, and it has no defaults.
  */
 function partSourceFromInspection(
   context: LibraryProject,
@@ -145,8 +152,20 @@ function partSourceFromInspection(
   return {
     sourcePath: path.relative(context.projectRoot, sourceFile.fileName).replaceAll("\\", "/"),
     rsc: readRscStatus(sourceFile),
-    defaults: new Map(result.defaults.map((entry) => [entry.name, entry.initializerText])),
+    defaults:
+      result.status === "forwarded"
+        ? new Map()
+        : new Map(result.defaults.map((entry) => [entry.name, entry.initializerText])),
+    forwardedPackage: result.status === "forwarded" ? result.packageName : null,
   };
+}
+
+/** The declaring packages a part forwards from, including a forwarded value's own package. */
+function forwardedFrom(source: PartSource, forwarded: PartForwarded): readonly string[] {
+  if (source.forwardedPackage === null || forwarded.from.includes(source.forwardedPackage)) {
+    return forwarded.from;
+  }
+  return [...forwarded.from, source.forwardedPackage].sort((left, right) => left.localeCompare(right));
 }
 
 /**
@@ -397,7 +416,7 @@ function describePart(
       rsc: source.rsc,
       sourcePath: source.sourcePath,
       props: [],
-      forwardedFrom: [],
+      forwardedFrom: forwardedFrom(source, emptyForwarded),
       forwardedCount: 0,
     };
   }
@@ -446,7 +465,7 @@ function describePart(
     rsc: source.rsc,
     sourcePath: source.sourcePath,
     props: rows,
-    forwardedFrom: forwarded.from,
+    forwardedFrom: forwardedFrom(source, forwarded),
     forwardedCount: forwarded.count,
   };
 }

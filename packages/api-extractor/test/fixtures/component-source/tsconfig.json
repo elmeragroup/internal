@@ -8,5 +8,5 @@
     "jsx": "react-jsx",
     "noEmit": true
   },
-  "include": ["input.tsx", "render.tsx", "declared.d.ts", "default-expression.ts"]
+  "include": ["input.tsx", "render.tsx", "declared.d.ts", "default-expression.ts", "facade.ts", "forwarded.ts"]
 }

@@ -27,6 +27,8 @@ const inputPath = resolve(fixtureDirectory, "input.tsx");
 const renderPath = resolve(fixtureDirectory, "render.tsx");
 const declaredPath = resolve(fixtureDirectory, "declared.d.ts");
 const defaultExpressionPath = resolve(fixtureDirectory, "default-expression.ts");
+const facadePath = resolve(fixtureDirectory, "facade.ts");
+const forwardedPath = resolve(fixtureDirectory, "forwarded.ts");
 
 const reactMemoFacts = {
   identity: { name: "memo", namespaces: ["React"] },
@@ -510,6 +512,71 @@ describe("component source resolver doubles", () => {
     ]);
   });
 
+  it("publishes dependency declarations forwarded by authored modules from the forwarding file", () => {
+    const declared = nodeHandle(40);
+    const declaredSymbol = symbolHandle(40);
+    const alias = nodeHandle(41);
+    const aliasSymbol = symbolHandle(41);
+    const aliasIdentifier = nodeHandle(42);
+    const projectDeclared = nodeHandle(43);
+    const projectSymbol = symbolHandle(43);
+    const ops = operations({
+      symbols: new Map([
+        [declaredSymbol, symbolFacts("Forwarded", [declared], { valueDeclaration: declared })],
+        [aliasSymbol, symbolFacts("Aliased", [alias], { valueDeclaration: alias })],
+        [projectSymbol, symbolFacts("Declared", [projectDeclared], { valueDeclaration: projectDeclared })],
+      ]),
+      nodes: new Map([
+        [
+          declared,
+          baseFacts("function", {
+            hasImplementationBody: false,
+            filePath: "/virtual/node_modules/dep-aria/index.d.ts",
+            ownership: { kind: "dependency", packageName: "dep-aria" },
+          }),
+        ],
+        [
+          alias,
+          baseFacts("variable", {
+            initializer: aliasIdentifier,
+            filePath: "/virtual/facade.ts",
+            ownership: { kind: "project" },
+          }),
+        ],
+        [aliasIdentifier, baseFacts("unknown", { referencedValueSymbol: declaredSymbol })],
+        [
+          projectDeclared,
+          baseFacts("function", { hasImplementationBody: false, ownership: { kind: "project" } }),
+        ],
+      ]),
+    });
+    expect(
+      inspectRequestedComponentSources(
+        {
+          name: "input",
+          exports: [
+            { name: "Forwarded", symbol: declaredSymbol, forwardingFilePath: "/virtual/facade.ts" },
+            { name: "Aliased", symbol: aliasSymbol },
+            { name: "Unforwarded", symbol: declaredSymbol },
+            { name: "Declared", symbol: projectSymbol, forwardingFilePath: "/virtual/input.tsx" },
+          ],
+        },
+        ops,
+        [
+          { exportName: "Forwarded" },
+          { exportName: "Aliased" },
+          { exportName: "Unforwarded" },
+          { exportName: "Declared" },
+        ]
+      )
+    ).toEqual([
+      { status: "forwarded", filePath: "/virtual/facade.ts", packageName: "dep-aria" },
+      { status: "forwarded", filePath: "/virtual/facade.ts", packageName: "dep-aria" },
+      { status: "unresolved", reason: "no-implementation" },
+      { status: "unresolved", reason: "no-implementation" },
+    ]);
+  });
+
   it("does not let unrelated module-walk warnings block a different request", () => {
     const result = inspectRequestedComponentSources(
       {
@@ -668,6 +735,22 @@ export function CommentAfterBody() { return "value"; } // implementation
     });
     expect(result[17]).toMatchObject({ status: "resolved", filePath: inputPath });
     expect(result[18]).toEqual({ status: "unresolved", reason: "unsupported-wrapper" });
+  });
+
+  it("reports a dependency value forwarded through a re-export chain from its innermost authored module", async () => {
+    withSession(forwardedPath, (session, draft) => {
+      const forwarded = draft.exports.find((entry) => entry.name === "Forwarded");
+      expect(forwarded?.forwardingFilePath).toBe(facadePath);
+      expect(
+        session.compiler.nodeFacts(primaryNode(session, exportSymbol(draft, "Forwarded"))).ownership
+      ).toEqual({ kind: "dependency", packageName: "dep-aria" });
+    });
+    expect(await inspectNative(forwardedPath, [{ exportName: "Forwarded" }])).toEqual([
+      { status: "forwarded", filePath: facadePath, packageName: "dep-aria" },
+    ]);
+    expect(await inspectNative(facadePath, [{ exportName: "Forwarded" }])).toEqual([
+      { status: "forwarded", filePath: facadePath, packageName: "dep-aria" },
+    ]);
   });
 
   it("returns unresolved results for declaration-only and unsupported default expressions", async () => {

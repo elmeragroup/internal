@@ -2,6 +2,7 @@
 
 export {
   ComponentSourceDefaultSchema,
+  ComponentSourceForwardedSchema,
   ComponentSourceRequestSchema,
   ComponentSourceResolvedSchema,
   ComponentSourceResultSchema,
@@ -9,6 +10,7 @@ export {
   ComponentSourceUnresolvedReasonSchema,
   ComponentSourceUnresolvedSchema,
   type ComponentSourceDefault,
+  type ComponentSourceForwarded,
   type ComponentSourceRequest,
   type ComponentSourceResolved,
   type ComponentSourceResult,

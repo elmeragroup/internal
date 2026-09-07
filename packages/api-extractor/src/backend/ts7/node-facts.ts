@@ -49,6 +49,7 @@ import type {
 import { callExpressionFacts } from "./call-facts.ts";
 import { declarationModifiers } from "./class-facts.ts";
 import type { TsgoFactsSession } from "./facts.ts";
+import { declarationOwnershipOfPath } from "./file-ownership.ts";
 import { aliasedSymbol } from "./module-resolution.ts";
 import { authoredLocation } from "./syntax.ts";
 
@@ -204,6 +205,11 @@ export function nodeFacts(
     kind: nodeKind(node),
     text: node.getText().replaceAll(/\s+/gu, " ").trim(),
     ...authoredLocation(node, sourceFile),
+    ...definedFields({
+      ownership: session.componentSources
+        ? declarationOwnershipOfPath(session, sourceFile.fileName)
+        : undefined,
+    }),
   };
   const type = sourceNodeType(node);
   const result: BackendNodeFacts =

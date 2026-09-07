@@ -1,5 +1,6 @@
 import type {
   BackendCompilerOperations,
+  BackendExportDraft,
   BackendModuleDraft,
   BackendNodeFacts,
   BackendNodeHandle,
@@ -17,6 +18,21 @@ type SourceOperations = Pick<
   BackendCompilerOperations,
   "nodeFacts" | "propertiesOfType" | "symbolFacts" | "typeOfSymbol"
 >;
+
+/**
+ * Mutable bookkeeping for one request's walk.
+ *
+ * `authoredFilePath` is the last project-owned file the walk passed through.
+ * When the walk ends on a dependency declaration, that file (or, for a pure
+ * re-export chain the walk never steps through, the export's own forwarding
+ * statement) is the authored module the value is published from.
+ */
+type Walk = {
+  readonly visitedSymbols: Set<BackendSymbolHandle>;
+  readonly visitedNodes: Set<BackendNodeHandle>;
+  readonly forwardingFilePath: string | undefined;
+  authoredFilePath: string | undefined;
+};
 
 /** Resolves requested component implementation files without semantic extraction. */
 export function inspectRequestedComponentSources(
@@ -41,7 +57,16 @@ function inspectRequestedComponentSource(
       ? exported.symbol
       : findMember(operations, exported.symbol, request.memberName);
   if (root === undefined) return unresolved("member-not-found");
-  return followSymbol(operations, root, new Set(), new Set());
+  return followSymbol(operations, root, startWalk(exported));
+}
+
+function startWalk(exported: BackendExportDraft): Walk {
+  return {
+    visitedSymbols: new Set(),
+    visitedNodes: new Set(),
+    forwardingFilePath: exported.forwardingFilePath,
+    authoredFilePath: undefined,
+  };
 }
 
 function blockingWarning(draft: BackendModuleDraft, exportName: string): ComponentSourceResult | undefined {
@@ -74,37 +99,36 @@ function findMember(
 function followSymbol(
   operations: SourceOperations,
   symbol: BackendSymbolHandle,
-  visitedSymbols: Set<BackendSymbolHandle>,
-  visitedNodes: Set<BackendNodeHandle>
+  walk: Walk
 ): ComponentSourceResult {
-  if (visitedSymbols.has(symbol)) return unresolved("cycle");
-  visitedSymbols.add(symbol);
+  if (walk.visitedSymbols.has(symbol)) return unresolved("cycle");
+  walk.visitedSymbols.add(symbol);
   const facts = operations.symbolFacts(symbol);
   const implementations = functionImplementations(operations, facts);
   if (implementations.length > 1) return unresolved("ambiguous-implementation");
   const implementation = implementations[0];
   if (implementation !== undefined) {
-    return followNode(operations, implementation, visitedSymbols, visitedNodes);
+    return followNode(operations, implementation, walk);
   }
   const declaration = facts.valueDeclaration ?? facts.declarations[0];
   if (declaration === undefined) return unresolved("no-implementation");
-  return followNode(operations, declaration, visitedSymbols, visitedNodes);
+  return followNode(operations, declaration, walk);
 }
 
 function followNode(
   operations: SourceOperations,
   node: BackendNodeHandle,
-  visitedSymbols: Set<BackendSymbolHandle>,
-  visitedNodes: Set<BackendNodeHandle>
+  walk: Walk
 ): ComponentSourceResult {
-  if (visitedNodes.has(node)) return unresolved("cycle");
-  visitedNodes.add(node);
+  if (walk.visitedNodes.has(node)) return unresolved("cycle");
+  walk.visitedNodes.add(node);
   const facts = operations.nodeFacts(node);
+  if (facts.ownership?.kind === "project") walk.authoredFilePath = facts.filePath;
   if (facts.innerExpression !== undefined) {
-    return followNode(operations, facts.innerExpression, visitedSymbols, visitedNodes);
+    return followNode(operations, facts.innerExpression, walk);
   }
   if (isFunctionKind(facts)) {
-    if (facts.hasImplementationBody !== true) return unresolved("no-implementation");
+    if (facts.hasImplementationBody !== true) return declarationOnly(facts, walk);
     const parameter = facts.parameters?.[0];
     return {
       status: "resolved",
@@ -116,21 +140,35 @@ function followNode(
     if (!isReactWrapperCall(facts.calleeFacts)) return unresolved("unsupported-wrapper");
     const firstArgument = facts.arguments?.[0];
     if (firstArgument === undefined) return unresolved("no-implementation");
-    return followNode(operations, firstArgument, visitedSymbols, visitedNodes);
+    return followNode(operations, firstArgument, walk);
   }
   if (facts.kind === "variable" || facts.kind === "property") {
     if (facts.initializer !== undefined) {
-      return followNode(operations, facts.initializer, visitedSymbols, visitedNodes);
+      return followNode(operations, facts.initializer, walk);
     }
     if (facts.referencedValueSymbol !== undefined) {
-      return followSymbol(operations, facts.referencedValueSymbol, visitedSymbols, visitedNodes);
+      return followSymbol(operations, facts.referencedValueSymbol, walk);
     }
-    return unresolved("no-implementation");
+    return declarationOnly(facts, walk);
   }
   if (facts.referencedValueSymbol !== undefined) {
-    return followSymbol(operations, facts.referencedValueSymbol, visitedSymbols, visitedNodes);
+    return followSymbol(operations, facts.referencedValueSymbol, walk);
   }
   return unresolved("no-implementation");
+}
+
+/**
+ * A declaration without a body is a forwarded dependency value when it is
+ * owned by a dependency and an authored module forwards it. A project
+ * declaration file, or a dependency reached without any authored hop, still
+ * has no recoverable implementation.
+ */
+function declarationOnly(facts: BackendNodeFacts, walk: Walk): ComponentSourceResult {
+  const filePath = walk.authoredFilePath ?? walk.forwardingFilePath;
+  if (facts.ownership?.kind !== "dependency" || filePath === undefined) {
+    return unresolved("no-implementation");
+  }
+  return { status: "forwarded", filePath, packageName: facts.ownership.packageName };
 }
 
 function functionImplementations(
