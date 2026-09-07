@@ -1,6 +1,6 @@
 # Elmera internal
 
-Shared engineering packages for the Elmera Group.
+Shared engineering tools for the Elmera Group.
 
 ## Usage
 
@@ -38,9 +38,25 @@ Generate artifacts during the build, then import the JSON from your docs pages. 
 - `packages/oxlint-anti-slop`: private code-quality rules.
 - `tooling/typescript`: private workspace TypeScript configuration.
 
-The three public packages are a Changesets fixed group and share one coordinated version,
-either stable `x.y.z` or canary `x.y.z-canary.N`. Packaging and installed-consumer
-verification accept either form. Publishing remains canary-only.
+Only `@elmeragroup/internal` is published, with one Changesets version. The extractor,
+artifact generator, and lint implementations remain private workspace packages with their own tests.
+Packaging accepts stable `x.y.z` and canary `x.y.z-canary.N` versions. Publishing remains canary-only.
+
+The package has explicit ESM entries:
+
+| Import                                      | Purpose                                                     |
+| ------------------------------------------- | ----------------------------------------------------------- |
+| `@elmeragroup/internal`                     | Artifact generation with Elmera defaults, errors, and types |
+| `@elmeragroup/internal/api-artifacts`       | The same generator, errors, and types as the root           |
+| `@elmeragroup/internal/api-artifacts/model` | Artifact types with an empty runtime module                 |
+| `@elmeragroup/internal/api-extractor`       | Low-level Effect extraction, models, schemas, and errors    |
+| `@elmeragroup/internal/oxlint`              | Elmera Oxlint plugin default export                         |
+| `@elmeragroup/internal/oxlint/anti-slop`    | Anti-slop Oxlint plugin default export                      |
+
+TypeScript, Effect, and `@oxlint/plugins` are pinned runtime dependencies. Installing the package
+includes the compiler. Importing lint entries does not load TypeScript or Effect. Consumer bundlers
+can remove unused exports. Future browser-safe helpers belong in separate entries; the root remains
+the convenient artifact generator.
 
 ## Development
 
@@ -53,9 +69,9 @@ pnpm packages:pack
 pnpm test:packed-consumer
 ```
 
-`packages:pack` builds local archives without publishing. `canary:pack` is a compatibility alias
-for the same command. The consumer test installs the packed packages in a temporary project and
-checks extraction, defaults, drift detection, and TypeScript compilation without workspace links.
+`packages:pack` builds the package archive without publishing. `canary:pack` is a compatibility alias
+for the same command. The consumer test installs the packed package in a temporary project and
+checks extraction, defaults, drift detection, all public declarations, both lint plugins, and consumer tree-shaking without workspace links.
 
 ## Canary release
 

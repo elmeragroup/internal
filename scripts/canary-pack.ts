@@ -19,7 +19,8 @@ for (const name of packageNames) {
   if (
     files.some(
       (file) =>
-        /\/(?:test|fixtures|node_modules)\//.test(file) || (file.endsWith(".ts") && !file.endsWith(".d.ts"))
+        /\/(?:test|fixtures|node_modules)\//.test(file) ||
+        (/\.[cm]?ts$/.test(file) && !/\.d\.[cm]?ts$/.test(file))
     )
   )
     throw new Error(`${name}: tests or TypeScript sources in archive`);
@@ -33,16 +34,43 @@ for (const name of packageNames) {
     const specifier = asString(value, dependency);
     if (/^(?:workspace|catalog|file|link):/.test(specifier))
       throw new Error(`${name}: unresolved dependency ${dependency}`);
-    if (dependency.startsWith("@elmeragroup/") && specifier !== version)
-      throw new Error(`${name}: release dependency version mismatch`);
+    if (dependency.startsWith("@elmeragroup/"))
+      throw new Error(`${name}: private workspace dependency ${dependency}`);
   }
-  if (name !== "internal" && !dependencies.typescript) throw new Error(`${name}: TypeScript runtime missing`);
+  if (!dependencies.typescript || !dependencies.effect || !dependencies["@oxlint/plugins"])
+    throw new Error(`${name}: external runtime dependency missing`);
   if (
-    !files.includes("package/dist/index.js") ||
-    !files.includes("package/dist/index.d.ts") ||
+    !files.includes("package/dist/index.mjs") ||
+    !files.includes("package/dist/index.d.mts") ||
     !files.includes("package/LICENSE")
   )
     throw new Error(`${name}: missing entry or license`);
+  const expectedExports = [
+    ".",
+    "./api-artifacts",
+    "./api-artifacts/model",
+    "./api-extractor",
+    "./oxlint",
+    "./oxlint/anti-slop",
+  ];
+  const exports = asRecord(manifest.exports, "exports");
+  if (JSON.stringify(Object.keys(exports)) !== JSON.stringify(expectedExports))
+    throw new Error(`${name}: unexpected public exports`);
+  for (const [entry, conditions] of Object.entries(exports)) {
+    for (const target of Object.values(asRecord(conditions, entry))) {
+      if (!files.includes(`package/${asString(target, entry).slice(2)}`))
+        throw new Error(`${name}: missing export target ${entry}`);
+    }
+  }
+  if (manifest.sideEffects !== false) throw new Error(`${name}: unexpected sideEffects metadata`);
+  for (const file of files.filter((file) => /\.[cm]?[jt]s$/.test(file))) {
+    const source = execFileSync("tar", ["-xOzf", archive, file], { encoding: "utf8" });
+    if (/(?:from\s*|import\s*\(?)["']@elmeragroup\//.test(source))
+      throw new Error(`${file}: unpublished workspace import`);
+  }
+  const notice = execFileSync("tar", ["-xOzf", archive, "package/NOTICE"], { encoding: "utf8" });
+  if (!notice.includes("Dillon Mulroy") || !notice.includes("Michał Dudak"))
+    throw new Error(`${name}: missing third-party attribution`);
   archives.push({
     name: asString(manifest.name, "name"),
     archive,

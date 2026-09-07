@@ -1,6 +1,6 @@
 {
   "name": "@elmeragroup/api-artifacts",
-  "version": "0.1.0-canary.0",
+  "version": "0.0.0",
   "type": "module",
   "license": "MIT",
   "exports": {
@@ -13,6 +13,10 @@
       "types": "./dist/model.d.ts",
       "import": "./dist/model.js",
       "default": "./dist/model.js"
+    },
+    "./errors": {
+      "types": "./dist/errors.d.ts",
+      "import": "./dist/errors.js"
     }
   },
   "scripts": {
@@ -42,13 +46,10 @@
   "engines": {
     "node": ">=24.13.0 <25"
   },
-  "publishConfig": {
-    "access": "public",
-    "tag": "canary"
-  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/elmeragroup/internal.git",
     "directory": "packages/api-artifacts"
-  }
+  },
+  "private": true
 }

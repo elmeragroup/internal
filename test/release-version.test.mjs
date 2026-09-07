@@ -219,8 +219,8 @@ describe("archive names", () => {
   });
 
   it("names stable archives with the same pattern", () => {
-    expect(archivePath("api-extractor", "0.1.0")).toBe(
-      join(repoRoot, ".artifacts/canary", "elmeragroup-api-extractor-0.1.0.tgz")
+    expect(archivePath("internal", "0.1.0")).toBe(
+      join(repoRoot, ".artifacts/canary", "elmeragroup-internal-0.1.0.tgz")
     );
   });
 });
@@ -236,7 +236,7 @@ describe("changesets coordinated release plan", () => {
   it("plans one coordinated version for mixed patch and minor changesets", () => {
     withPlannerWorkspace((workspace) => {
       writeChangeset(workspace, "patch-internal", "@elmeragroup/internal", "patch");
-      writeChangeset(workspace, "minor-extractor", "@elmeragroup/api-extractor", "minor");
+      writeChangeset(workspace, "minor-internal", "@elmeragroup/internal", "minor");
       coordinatedPlannedVersion(plannedPublicReleases(workspace));
     });
   });

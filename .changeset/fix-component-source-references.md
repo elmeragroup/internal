@@ -1,6 +1,5 @@
 ---
-"@elmeragroup/api-extractor": patch
-"@elmeragroup/api-artifacts": patch
+"@elmeragroup/internal": patch
 ---
 
 Recover authored component sources through namespace and object property aliases. Detect function

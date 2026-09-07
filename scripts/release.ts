@@ -6,7 +6,7 @@ import { assertCanaryReleaseVersion, assertCoordinatedReleaseVersion } from "./r
 
 export const repoRoot = resolve(import.meta.dirname, "..");
 export const archiveDirectory = resolve(repoRoot, ".artifacts/canary");
-export const packageNames = ["api-extractor", "api-artifacts", "internal"] as const;
+export const packageNames = ["internal"] as const;
 
 export function run(command: string, args: readonly string[], cwd = repoRoot): void {
   const result = spawnSync(command, args, { cwd, stdio: "inherit" });

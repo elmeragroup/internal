@@ -1,0 +1,15 @@
+{
+  "extends": "./tooling/typescript/internal-package.json",
+  "compilerOptions": {
+    "checkJs": false,
+    "incremental": false,
+    "declarationMap": false,
+    "rewriteRelativeImportExtensions": true,
+    "allowImportingTsExtensions": true
+  },
+  "include": [
+    "packages/internal/src",
+    "packages/oxlint-plugin/index.js",
+    "packages/oxlint-anti-slop/index.ts"
+  ]
+}

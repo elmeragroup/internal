@@ -51,6 +51,19 @@
     },
     "//#type-check:scripts": {
       "inputs": ["scripts/**", "tooling/typescript/**"]
+    },
+    "@elmeragroup/internal#build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/tsconfig.bundle.json",
+        "$TURBO_ROOT$/tooling/typescript/**",
+        "$TURBO_ROOT$/packages/api-extractor/src/**",
+        "$TURBO_ROOT$/packages/api-artifacts/src/**",
+        "$TURBO_ROOT$/packages/oxlint-plugin/**",
+        "$TURBO_ROOT$/packages/oxlint-anti-slop/**"
+      ]
     }
   }
 }
