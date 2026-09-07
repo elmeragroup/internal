@@ -21,6 +21,7 @@ import {
   isParenthesizedExpression,
   isParenthesizedTypeNode,
   isPropertyAssignment,
+  isPropertyAccessExpression,
   isPropertyDeclaration,
   isPropertySignatureDeclaration,
   isRestTypeNode,
@@ -281,9 +282,8 @@ export function nodeFacts(
           : undefined,
       declarationFlags: modifierFlags(node),
       ...definedFields({
-        hasImplementationBody: isFunctionLikeDeclaration(node)
-          ? functionLikeHasImplementationBody(node, result.text)
-          : undefined,
+        hasImplementationBody:
+          session.componentSources && isFunctionLikeDeclaration(node) ? node.body !== undefined : undefined,
       }),
     };
   }
@@ -328,7 +328,7 @@ export function nodeFacts(
   if (isTransparentExpression(node)) {
     return { ...result, innerExpression: session.nodeHandle(node.expression) };
   }
-  if (isIdentifier(node)) {
+  if (isIdentifier(node) || isPropertyAccessExpression(node)) {
     return {
       ...result,
       ...definedFields({ referencedValueSymbol: referencedValueSymbol(session, node) }),
@@ -391,7 +391,7 @@ function sourceBindingDefaults(
 function referencedValueSymbol(session: TsgoFactsSession, node: Node): BackendSymbolHandle | undefined {
   const raw = isShorthandPropertyAssignment(node)
     ? session.checker.getShorthandAssignmentValueSymbol(node)
-    : isIdentifier(node)
+    : isIdentifier(node) || isPropertyAccessExpression(node)
       ? session.rawSymbolAt(node)
       : undefined;
   if (raw === undefined) return undefined;
@@ -406,12 +406,6 @@ function isTransparentExpression(node: Node): node is Node & { readonly expressi
     isNonNullExpression(node) ||
     isTypeAssertion(node)
   );
-}
-
-function functionLikeHasImplementationBody(node: Node, text: string): boolean {
-  return node.kind === SyntaxKind.ArrowFunction || node.kind === SyntaxKind.FunctionExpression
-    ? true
-    : /\}\s*$/u.test(text);
 }
 
 function typeQueryExpressionName(node: Node, sourceFile: ReturnType<Node["getSourceFile"]>): string {

@@ -96,12 +96,17 @@ export function projectExtractorLayerWithTiming(
   return Layer.merge(extractorLayer, timingLayer).pipe(Layer.provide(openedProjectLayer(options)));
 }
 
-function openExtraction(project: BackendProject, options: ExtractorOptions | undefined) {
+function openExtraction(
+  project: BackendProject,
+  options: ExtractorOptions | undefined,
+  componentSources = false
+) {
   return Effect.acquireRelease(
     Effect.try({
       try: () =>
         project.openExtraction({
           externalTypes: normalizeExternalTypeSelection(options?.includeExternalTypes ?? false),
+          ...definedFields({ componentSources: componentSources ? true : undefined }),
         }),
       catch: (cause) => classifyThrown(cause, { filePath: "<session>", operation: "openExtraction" }),
     }),
@@ -114,7 +119,7 @@ const inspectComponentSources = Effect.fn("ProjectExtractor.inspectComponentSour
   filePath: string,
   requests: readonly ComponentSourceRequest[]
 ) {
-  const session = guardedExtractionSession(yield* openExtraction(project, undefined), filePath);
+  const session = guardedExtractionSession(yield* openExtraction(project, undefined, true), filePath);
   const draft = yield* Effect.try({
     try: () => readModuleDraft(session, filePath),
     catch: (cause) => classifyThrown(cause, { filePath, operation: "readModule" }),

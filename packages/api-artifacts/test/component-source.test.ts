@@ -108,7 +108,12 @@ export const NestedWrapped = memo(
     expect(part?.sourcePath).not.toMatch(/node_modules/u);
   });
 
-  it("recovers a memo render implementation imported from another local file", async () => {
+  it.each([
+    { name: "named import", expression: "memo(Render)" },
+    { name: "namespace import", expression: "memo(impl.Render)" },
+    { name: "object property wrapper", expression: "memo(components.Render)" },
+    { name: "object property alias", expression: "components.Render" },
+  ])("recovers source metadata through a $name", async ({ expression }) => {
     const root = await fixture({
       "render.ts": `"use client";
 export type RenderProps = {
@@ -121,7 +126,9 @@ export function Render({ title = "from-render" }: RenderProps) {
 `,
       "entry.ts": `import { memo } from "react";
 import { Render } from "./render.ts";
-export const ImportedWrapped = memo(Render);
+import * as impl from "./render.ts";
+const components = { Render };
+export const ImportedWrapped = ${expression};
 `,
     });
     const result = await generateApiArtifacts(
@@ -151,6 +158,50 @@ export const ImportedWrapped = memo(Render);
         required: false,
       },
     ]);
+  });
+
+  it("uses the implementation of an overload with a semicolon-free object return type", async () => {
+    const root = await fixture({
+      "render.ts": `"use client";
+export type Props = {
+  /** Visible label. */
+  label?: string;
+};
+export function Overloaded(props: Props): { type: "span"; props: { children: string }; key: null }
+export function Overloaded({ label = "actual" }: Props) {
+  return { type: "span", props: { children: label }, key: null };
+}
+`,
+      "entry.ts": `export { Overloaded } from "./render.ts";`,
+    });
+    const result = await generateApiArtifacts(
+      options(root, [
+        {
+          slug: "overloaded",
+          entryFile: "entry.ts",
+          exportNames: ["Overloaded"],
+          outputFile: "docs/overloaded/api.json",
+        },
+      ])
+    );
+    expect(result.components[0]?.parts[0]).toEqual({
+      name: "Overloaded",
+      rsc: "client",
+      sourcePath: "render.ts",
+      props: [
+        {
+          name: "label",
+          origin: "declared",
+          type: "string | undefined",
+          shortType: null,
+          defaultValue: '"actual"',
+          description: "Visible label.",
+          required: false,
+        },
+      ],
+      forwardedCount: 0,
+      forwardedFrom: [],
+    });
   });
 
   it("preserves outer-property defaults on nested bindings for a direct component", async () => {
@@ -290,7 +341,7 @@ export function Button({ label }: Props) {
   /** Visible label. */
   label: string;
 };
-export function DeclaredOnly(props: DeclaredProps): string;
+export function DeclaredOnly(props: DeclaredProps): { type: "span"; props: { children: string }; key: null }
 `,
     });
     const output = path.join(root, "docs/button/api.json");

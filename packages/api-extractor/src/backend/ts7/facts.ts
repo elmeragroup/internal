@@ -61,6 +61,7 @@ import { declaringParentIsClass, symbolFacts, symbolNamespaces, symbolOrigin } f
 import { authoredLocation } from "./syntax.ts";
 
 export type TsgoFactsSession = {
+  readonly componentSources: boolean;
   readonly checker: Checker;
   readonly program: Program;
   readonly sourceFileMetadata: (path: string) => ReturnType<Program["getSourceFileMetadata"]>;

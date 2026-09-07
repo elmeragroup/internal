@@ -48,6 +48,7 @@ export class TsgoExtractionSession implements BackendExtractionSession {
   private readonly cwd: string;
   private readonly pathIdentity: PathIdentity;
   private readonly externalTypes: BackendExternalTypeSelection;
+  private readonly componentSources: boolean;
   private readonly registry = new HandleRegistry();
   private readonly nodeInterner: NodeHandleInterner;
   private readonly symbolHandles = new Map<TsSymbol, BackendSymbolHandle>();
@@ -76,6 +77,7 @@ export class TsgoExtractionSession implements BackendExtractionSession {
     cwd: string,
     pathIdentity: PathIdentity,
     externalTypes: BackendExternalTypeSelection,
+    componentSources: boolean,
     onClose: (session: TsgoExtractionSession) => void
   ) {
     this.project = project;
@@ -86,6 +88,7 @@ export class TsgoExtractionSession implements BackendExtractionSession {
     this.cwd = cwd;
     this.pathIdentity = pathIdentity;
     this.externalTypes = externalTypes;
+    this.componentSources = componentSources;
     this.onClose = onClose;
     this.fileTrees = new SessionFileTrees(
       this.project,
@@ -107,6 +110,7 @@ export class TsgoExtractionSession implements BackendExtractionSession {
   private factsContext(): TsgoFactsSession {
     return {
       checker: this.checker,
+      componentSources: this.componentSources,
       program: this.project.program,
       sourceFileMetadata: (path) => this.sourceFileMetadata(path),
       rootDirectory: this.provenanceRoot,

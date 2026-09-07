@@ -450,6 +450,8 @@ export type BackendExtractionSession = {
 /** Per-extraction policy the parser settled before the session opened. */
 export type BackendExtractionOptions = {
   readonly externalTypes?: BackendExternalTypeSelection;
+  /** Read implementation bodies for source inspection, without expanding semantic extraction work. */
+  readonly componentSources?: boolean;
 };
 
 export type BackendProject = {

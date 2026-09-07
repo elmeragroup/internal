@@ -1,6 +1,7 @@
 import { forwardRef, memo } from "react";
 import { memo as memoAlias } from "react";
 
+import * as impl from "./render";
 import { Render } from "./render";
 
 export type LabelProps = {
@@ -29,6 +30,10 @@ export const AliasWrapped = memoAlias(function AliasWrapped({ label = "alias" }:
 });
 
 export const ImportedWrapped = memo(Render);
+export const NamespaceWrapped = memo(impl.Render);
+const components = { Render };
+export const PropertyAlias = components.Render;
+export const PropertyWrapped = memo(components.Render);
 
 export const ExplicitCompound = {
   Root: DirectFunction,

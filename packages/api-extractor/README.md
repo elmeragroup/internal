@@ -34,7 +34,9 @@ file in the same project rather than opening one project per file.
 `inspectComponentSources(filePath, requests)` recovers authored implementation files and
 destructuring defaults without running semantic extraction or admitting warnings. It follows React
 `memo` and `forwardRef` wrappers, including nested wrappers, aliased React imports, re-exported
-values, and an implementation in another project file. Each request produces one result at the same
+values, namespace and object property references, and an implementation in another project file.
+Overloaded functions use the declaration with an actual syntax body, excluding return-type annotations.
+Each request produces one result at the same
 index. Unsupported wrappers, cycles, missing exports or members, declaration-only sources, and
 unsupported default expressions return `{ status: "unresolved", reason }` instead of guessing.
 Compiler objects never cross this boundary.

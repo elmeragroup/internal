@@ -1,4 +1,6 @@
 import { Effect } from "effect";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -38,14 +40,15 @@ const reactForwardRefFacts = {
 
 function inspectNative(
   filePath: string,
-  requests: readonly ComponentSourceRequest[]
+  requests: readonly ComponentSourceRequest[],
+  projectConfig = tsconfigPath
 ): Promise<readonly ComponentSourceResult[]> {
   return Effect.runPromise(
     Effect.scoped(
       Effect.gen(function* () {
         const extractor = yield* ProjectExtractor;
         return yield* extractor.inspectComponentSources(filePath, requests);
-      }).pipe(Effect.provide(ProjectExtractor.live({ tsconfigPath })))
+      }).pipe(Effect.provide(ProjectExtractor.live({ tsconfigPath: projectConfig })))
     )
   );
 }
@@ -56,7 +59,7 @@ function withSession(
 ): void {
   const project = openTsgoProject({ tsconfigPath });
   try {
-    const session = project.openExtraction();
+    const session = project.openExtraction({ componentSources: true });
     try {
       run(session, session.readModule(filePath));
     } finally {
@@ -535,6 +538,72 @@ describe("component source resolver doubles", () => {
 });
 
 describe("component source native inspection", () => {
+  it("follows namespace and object property references to the authored implementation", async () => {
+    expect(
+      await inspectNative(inputPath, [
+        { exportName: "NamespaceWrapped" },
+        { exportName: "PropertyAlias" },
+        { exportName: "PropertyWrapped" },
+      ])
+    ).toEqual(
+      Array.from({ length: 3 }, () => ({
+        status: "resolved",
+        filePath: renderPath,
+        defaults: [{ name: "label", initializerText: '"imported"' }],
+      }))
+    );
+  });
+
+  it("distinguishes semicolon-free object return annotations from implementation bodies", async () => {
+    const root = await mkdtemp(resolve(tmpdir(), "component-source-body-"));
+    try {
+      const config = resolve(root, "tsconfig.json");
+      const declarations = resolve(root, "declared.d.ts");
+      const implementations = resolve(root, "implemented.ts");
+      await writeFile(
+        config,
+        JSON.stringify({ compilerOptions: { types: [], strict: true }, include: ["*.ts"] })
+      );
+      await writeFile(
+        declarations,
+        `export declare function Declared(): { value: string }
+export declare function Commented(): { value: string } // no body
+`
+      );
+      await writeFile(
+        implementations,
+        `export function Overloaded(props: { label?: string }): { value: string }
+export function Overloaded({ label = "actual" }: { label?: string }) {
+  return { value: label };
+}
+export function CommentAfterBody() { return "value"; } // implementation
+`
+      );
+      expect(
+        await inspectNative(declarations, [{ exportName: "Declared" }, { exportName: "Commented" }], config)
+      ).toEqual([
+        { status: "unresolved", reason: "no-implementation" },
+        { status: "unresolved", reason: "no-implementation" },
+      ]);
+      expect(
+        await inspectNative(
+          implementations,
+          [{ exportName: "Overloaded" }, { exportName: "CommentAfterBody" }],
+          config
+        )
+      ).toEqual([
+        {
+          status: "resolved",
+          filePath: implementations,
+          defaults: [{ name: "label", initializerText: '"actual"' }],
+        },
+        { status: "resolved", filePath: implementations, defaults: [] },
+      ]);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it("recovers React alias identity, imported implementations, and compound members", async () => {
     const result = await inspectNative(inputPath, [
       { exportName: "DirectFunction" },
