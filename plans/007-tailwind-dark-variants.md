@@ -7,7 +7,7 @@
 
 ## Status
 
-- Status: TODO
+- Status: DONE
 - Finding: 7 from the deep audit
 - Priority: P2
 - Effort: S, including regression coverage
@@ -263,16 +263,16 @@ In Step 1 the failing set must be exactly the newly-reported invalid cases and t
 
 ## Done criteria
 
-- [ ] `packages/oxlint-plugin/rules/no-tailwind-dark-variant.test.js` exists and `grep -c "dark:\[color:red\]\|dark:!bg-red-500\|dark:-mt-1\|not-dark:\|content:'dark:literal'" packages/oxlint-plugin/rules/no-tailwind-dark-variant.test.js` reports at least 5
-- [ ] `pnpm --filter @elmeragroup/oxlint-plugin test` exits 0 with 13 test files
-- [ ] `grep -n "/\\\\bdark:\[a-z\]" packages/oxlint-plugin/rules/no-tailwind-dark-variant.js` returns no match (old regex removed) and line 1 still carries the kumo attribution
-- [ ] `git diff --name-only -- packages/oxlint-plugin/index.js packages/oxlint-plugin/extract-strings.js test/packed-consumer/lint.mjs` is empty; rule name and message unchanged
-- [ ] `pnpm lint` exits 0
-- [ ] `pnpm ci:checks` exits 0
-- [ ] `pnpm packages:pack && pnpm test:packed-consumer` exits 0
-- [ ] `git diff --check` exits 0, and changed paths match Scope
-- [ ] `.changeset/tailwind-dark-variants.md` exists with the `"@elmeragroup/internal": patch` frontmatter and passes `oxfmt --check`
-- [ ] This plan and its index row reflect the actual completion state; no skipped gate is described as passing
+- [x] `packages/oxlint-plugin/rules/no-tailwind-dark-variant.test.js` exists and `grep -c "dark:\[color:red\]\|dark:!bg-red-500\|dark:-mt-1\|not-dark:\|content:'dark:literal'" packages/oxlint-plugin/rules/no-tailwind-dark-variant.test.js` reports at least 5
+- [x] `pnpm --filter @elmeragroup/oxlint-plugin test` exits 0 with 13 test files
+- [x] `grep -n "/\\\\bdark:\[a-z\]" packages/oxlint-plugin/rules/no-tailwind-dark-variant.js` returns no match (old regex removed) and line 1 still carries the kumo attribution
+- [x] `git diff --name-only -- packages/oxlint-plugin/index.js packages/oxlint-plugin/extract-strings.js test/packed-consumer/lint.mjs` is empty; rule name and message unchanged
+- [x] `pnpm lint` exits 0
+- [x] `pnpm ci:checks` exits 0
+- [x] `pnpm packages:pack && pnpm test:packed-consumer` exits 0
+- [x] `git diff --check` exits 0, and changed paths match Scope
+- [x] `.changeset/tailwind-dark-variants.md` exists with the `"@elmeragroup/internal": patch` frontmatter and passes `oxfmt --check`
+- [x] This plan and its index row reflect the actual completion state; no skipped gate is described as passing
 
 ## STOP conditions
 
@@ -295,4 +295,53 @@ Report pre-existing or environment failures (for example the pnpm signature boot
 
 ## Completion notes
 
-Not implemented. Record the implementing revision, regression results, full gate results and any reviewed scope changes here.
+Implemented uncommitted on `codex/deep-audit-plans` at HEAD `4a0e45e` (operator override: stay on
+this branch; no commit, no staging). Runtime: Node v24.13.0, pnpm 11.20.0. Drift vs `e9ad9b3`
+touched only this plan and `plans/README.md`. Live `hasDarkVariant` regex and visitor excerpts
+matched.
+
+`hasDarkVariant` now splits on whitespace and scans each token for unescaped depth-0 `:`
+segments. A segment is the dark axis when it equals `dark` or ends with `-dark`, and it reports
+only when a non-empty remainder follows. Bracket and parenthesis depth plus backslash escaping
+keep `dark:` inside arbitrary values from matching. `reportIfDark`, visitors, `RULE_NAME`, and
+the message text are unchanged. Line 1 still carries the kumo attribution.
+
+Step 1: `pnpm --filter @elmeragroup/oxlint-plugin test rules/no-tailwind-dark-variant.test.js` —
+22 tests, 10 failed, no import/syntax/setup error. Failed as expected: `dark:[color:red]`,
+`dark:!bg-red-500`, `dark:-mt-1`, `hover:dark:[color:red]`, `dark:[&>span]:text-red-500`, the
+JSX/`cn`/template forms of those, and valid `[content:'dark:literal']`. Extra valid failure:
+`before:content-['dark:x']` (same current false positive, listed in Current state). Invalid
+`[&:hover]:dark:text-red-500` already passed because `\bdark:[a-z]+` matches after `]:`.
+Already-supported `dark:bg-red-500`, `dark:bg-red-500!`, `not-dark:bg-red-500`, and the other
+valid cases passed.
+
+Step 2: scanner replaced the regex. Same focused command — 22 passed.
+
+Step 3: `pnpm --filter @elmeragroup/oxlint-plugin test` — 13 files, 212 tests.
+`pnpm lint` — 0 warnings, 0 errors.
+
+Step 4: one README sentence after the `jsPlugins` block; `.changeset/tailwind-dark-variants.md`
+with `"@elmeragroup/internal": patch`. `pnpm exec oxfmt --check` on the four files —
+`All matched files use the correct format.`
+
+Gates:
+
+1. `pnpm build` — exit 0.
+2. `pnpm ci:checks` — exit 0 on the first run (oxfmt 267 files; turbo 15/15; plugin 13 files /
+   212 tests; extractor 52 files / 634 tests; catalog 141/116; boundary clear; conformance
+   97 unchanged / 19 reviewed; timing go). No `test/release-version.test.mjs` timeout.
+3. `pnpm packages:pack && pnpm test:packed-consumer` — exit 0. Consumer declarations and
+   independent tree-shaking passed.
+4. `git diff --check` — exit 0. `git status --short` lists only in-scope paths:
+   `packages/internal/README.md`, `packages/oxlint-plugin/rules/no-tailwind-dark-variant.js`,
+   `.changeset/tailwind-dark-variants.md`, `packages/oxlint-plugin/rules/no-tailwind-dark-variant.test.js`,
+   plus this plan and `plans/README.md`. Out-of-scope `index.js` / `extract-strings.js` /
+   `lint.mjs` diffs empty. Coverage grep count 18. Old regex grep: no match.
+
+Follow-up (UTF-16 scan): `tokenHasDarkVariant` now walks UTF-16 units with
+`for (let i = 0; i < token.length; i += 1)` / `token[i]`. A `for...of` code-point loop
+desynchronized `slice(start, index)` after a non-BMP character, so
+`[aria-label='😀']:dark:bg-red-500` was a false negative. A backslash skips the next
+unit; there is no separate `escaped` flag. Added that class as an invalid RuleTester
+case. Algorithm (depth, unescaped depth-0 `:`, `dark` / `-dark`, non-empty remainder)
+is unchanged.
