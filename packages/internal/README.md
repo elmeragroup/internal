@@ -52,6 +52,8 @@ Configure the plugins explicitly in Oxlint:
 
 `no-tailwind-dark-variant` reports the `dark:` variant in any position, including before arbitrary values (`dark:[color:red]`), important or negative utilities and stacked variants; `dark:` text inside an arbitrary value is not reported.
 
+`enforce-variant-standard` requires a structural connection between a `tv()` recipe with axes and the component's props: `VariantProps` must be imported from `tailwind-variants` and applied to `typeof <recipe>` in an exported props type or a function parameter annotation.
+
 Both entries export a default plugin. They do not load TypeScript or Effect.
 The package is ESM-only. Installation includes the pinned compiler and Effect runtime, while
 consumer bundlers can remove unused exports. Browser-safe helpers must have separate entries;

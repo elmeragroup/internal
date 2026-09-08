@@ -7,7 +7,7 @@
 
 ## Status
 
-- Status: TODO
+- Status: DONE
 - Finding: 8 from the deep audit
 - Priority: P2
 - Effort: M, including regression coverage
@@ -295,15 +295,15 @@ Verification: `pnpm --filter @elmeragroup/oxlint-plugin test rules/enforce-varia
 
 ## Done criteria
 
-- [ ] `grep -n 'getText().includes("VariantProps")' packages/oxlint-plugin/rules/enforce-variant-standard.js` returns no matches.
-- [ ] The focused regression command exits 0 and every invalid/valid case named in Step 1 exists in the test file.
-- [ ] `pnpm --filter @elmeragroup/oxlint-plugin test` exits 0.
-- [ ] `pnpm ci:checks` exits 0.
-- [ ] `pnpm packages:pack && pnpm test:packed-consumer` exits 0.
-- [ ] `git diff --check` exits 0, and `git diff --name-only` plus untracked files match Scope.
-- [ ] `.changeset/structural-variant-props.md` exists with the `"@elmeragroup/internal": patch` frontmatter and a consumer-facing description.
-- [ ] `packages/oxlint-plugin/index.js`, `rule-tester.js` and `packages/oxlint-anti-slop/**` are unchanged.
-- [ ] This plan and its index row reflect the actual completion state; no skipped gate is described as passing.
+- [x] `grep -n 'getText().includes("VariantProps")' packages/oxlint-plugin/rules/enforce-variant-standard.js` returns no matches.
+- [x] The focused regression command exits 0 and every invalid/valid case named in Step 1 exists in the test file.
+- [x] `pnpm --filter @elmeragroup/oxlint-plugin test` exits 0.
+- [x] `pnpm ci:checks` exits 0.
+- [x] `pnpm packages:pack && pnpm test:packed-consumer` exits 0.
+- [x] `git diff --check` exits 0, and `git diff --name-only` plus untracked files match Scope.
+- [x] `.changeset/structural-variant-props.md` exists with the `"@elmeragroup/internal": patch` frontmatter and a consumer-facing description.
+- [x] `packages/oxlint-plugin/index.js`, `rule-tester.js` and `packages/oxlint-anti-slop/**` are unchanged.
+- [x] This plan and its index row reflect the actual completion state; no skipped gate is described as passing.
 
 ## STOP conditions
 
@@ -324,4 +324,57 @@ Stop and report (do not improvise) if:
 
 ## Completion notes
 
-Not implemented. Record the implementing revision, regression results, full gate results and any reviewed scope changes here.
+Implemented uncommitted on `codex/deep-audit-plans` at HEAD `1394eaf` (operator override: stay on
+this branch; no commit, no staging). Runtime: Node v24.13.0, pnpm 11.20.0. Drift vs `e9ad9b3`
+touched `packages/internal/README.md` (007's `no-tailwind-dark-variant` sentence), this plan, and
+`plans/README.md`. Live rule excerpts still matched. Operator asked for 008 README documentation
+without restructuring surrounding sections; the 007 sentence was preserved.
+
+The textual `getText().includes("VariantProps")` check is gone. Coverage now requires a
+`VariantProps` import from `"tailwind-variants"` applied to `typeof <that recipe>`, reached from
+an exported type/interface or a function parameter annotation, through local aliases, interfaces,
+and intersections. Unnamed and non-inline recipes stay on their existing diagnostics and are
+excluded from the props requirement. Line 1 still carries the kumo attribution. Messages and
+filename predicates are unchanged.
+
+Step 1: `pnpm --filter @elmeragroup/oxlint-plugin test rules/enforce-variant-standard.test.js` —
+24 tests, 9 failed, exit 1. Failures were exactly the new invalid cases (`comment only`, `unused
+import only`, `string literal only`, `different recipe`, `unused local alias`, `helper not from
+tailwind-variants`, `locally declared VariantProps`, `generic shadowing`, `alias cycle`), each
+`Should have 1 error but had 0`. All new valid cases passed.
+
+Step 2: visitors and helpers added; same nine failures, no thrown errors.
+
+Step 3: structural coverage wired. Same focused command — 24 passed (1 file).
+`pnpm --filter @elmeragroup/oxlint-plugin test` — 13 files, 231 tests (the extra file and tests
+beyond the planned-at 12/190 are from plan 007's `no-tailwind-dark-variant` suite, already DONE
+on this branch).
+
+Step 4: one README sentence after the 007 `no-tailwind-dark-variant` sentence;
+`.changeset/structural-variant-props.md` with `"@elmeragroup/internal": patch`.
+`pnpm exec oxfmt --check` on the in-scope implementation files — correct format.
+
+Gates:
+
+1. First `pnpm ci:checks` — lint failed (`typescript/no-unnecessary-condition` on
+   `specifier.local?.name`; type is `ModuleExportName`). Fixed in-scope to
+   `specifier.local.type === "Identifier"` then `specifier.local.name`.
+2. Second `pnpm ci:checks` — exit 0 (oxfmt 268 files; turbo 15/15; plugin 13 files / 231 tests;
+   extractor 52 files / 634 tests; catalog 141/116; boundary clear; conformance 97 unchanged /
+   19 reviewed; timing go). No `test/release-version.test.mjs` timeout.
+3. `pnpm packages:pack && pnpm test:packed-consumer` — exit 0. Consumer declarations and
+   independent tree-shaking passed.
+4. `git diff --check` — exit 0. `git status --short` lists only in-scope paths:
+   `packages/internal/README.md`, `packages/oxlint-plugin/rules/enforce-variant-standard.js`,
+   `packages/oxlint-plugin/rules/enforce-variant-standard.test.js`,
+   `.changeset/structural-variant-props.md`, plus this plan and `plans/README.md`.
+   Out-of-scope `index.js` / `rule-tester.js` / `packages/oxlint-anti-slop/**` diffs empty.
+   `grep -n 'getText().includes("VariantProps")'` on the rule file: no matches.
+
+Post-completion cleanup (still uncommitted): collapsed two `tvCalls` walks onto one
+`recipeBindingName(call)` pass that reports `unnamedRecipe` / `inlineObject` /
+`missingDefaultVariants` and fills `axesRecipes`. Exported aliases, interfaces, and
+specifier lists all go through `exportedNames` and resolve via `typeDeclarations` at
+exit. Parameter annotations are a plain `parameterTypes` node list; the unused
+`contractRoots` `kind` field is gone. Behavior unchanged: one `missingVariantProps`
+per file; unnamed and non-inline recipes stay excluded from the props requirement.
