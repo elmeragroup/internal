@@ -13,7 +13,7 @@ Each plan stands alone and includes current excerpts, an allowed file list, regr
 | -------------------------------------------------- | ----------------------------------------------------------------------- | -------- | ------ | ---------- | ------ |
 | [001](001-preserve-forwarded-facades.md)           | Keep forwarded facades prop-free during enrichment                      | P1       | S      | None       | DONE   |
 | [002](002-safe-comment-removal.md)                 | Preserve executable syntax in comment-removal suggestions               | P1       | S      | None       | DONE   |
-| [003](003-quoted-prop-defaults.md)                 | Preserve authored defaults for literal destructuring keys               | P1       | S      | None       | TODO   |
+| [003](003-quoted-prop-defaults.md)                 | Preserve authored defaults for literal destructuring keys               | P1       | S      | None       | DONE   |
 | [004](004-reject-unsupported-overloads.md)         | Reject unsupported multiple call signatures before generating artifacts | P1       | M      | None       | TODO   |
 | [005](005-discard-component-candidate-warnings.md) | Discard diagnostics from rejected authored component candidates         | P2       | M      | None       | TODO   |
 | [006](006-scope-aware-lint-types.md)               | Resolve lint type references in their lexical scope                     | P2       | M      | None       | TODO   |

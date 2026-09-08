@@ -17,6 +17,7 @@ import {
   isMappedTypeNode,
   isNamedTupleMember,
   isNonNullExpression,
+  isNumericLiteral,
   isObjectBindingPattern,
   isOptionalTypeNode,
   isParameterDeclaration,
@@ -29,6 +30,7 @@ import {
   isRestTypeNode,
   isSatisfiesExpression,
   isShorthandPropertyAssignment,
+  isStringLiteral,
   isTupleTypeNode,
   isTypeAliasDeclaration,
   isTypeAssertion,
@@ -348,6 +350,14 @@ export function nodeFacts(
   return result;
 }
 
+/** The property key a binding element destructures, when it is an identifier or a literal the checker names the same way. */
+function bindingPropertyKey(propertyName: Node): string | undefined {
+  if (isIdentifier(propertyName) || isStringLiteral(propertyName) || isNumericLiteral(propertyName)) {
+    return propertyName.text;
+  }
+  return undefined;
+}
+
 function bindingDefaults(
   name: Node | undefined
 ): readonly { readonly name: string; readonly initializerText: string }[] {
@@ -362,10 +372,11 @@ function bindingDefaults(
       return [];
     }
     const propertyName = element.propertyName;
-    if (propertyName !== undefined && !isIdentifier(propertyName)) return [];
+    const key = propertyName === undefined ? element.name.text : bindingPropertyKey(propertyName);
+    if (key === undefined) return [];
     return [
       {
-        name: propertyName?.text ?? element.name.text,
+        name: key,
         initializerText: element.initializer.getText().trim(),
       },
     ];
@@ -380,8 +391,9 @@ function sourceBindingDefaults(
     if (!isBindingElement(element) || element.initializer === undefined) return [];
     const propertyName = element.propertyName;
     if (propertyName !== undefined) {
-      if (!isIdentifier(propertyName)) return [];
-      return [{ name: propertyName.text, initializerText: element.initializer.getText().trim() }];
+      const key = bindingPropertyKey(propertyName);
+      if (key === undefined) return [];
+      return [{ name: key, initializerText: element.initializer.getText().trim() }];
     }
     if (element.name !== undefined && isIdentifier(element.name)) {
       return [{ name: element.name.text, initializerText: element.initializer.getText().trim() }];

@@ -7,7 +7,7 @@
 
 ## Status
 
-- Status: TODO
+- Status: DONE
 - Finding: 3 from the deep audit
 - Priority: P1
 - Effort: S, including regression coverage
@@ -271,16 +271,16 @@ Run the focused extractor command after Step 1 (only the intended assertions fai
 
 ## Done criteria
 
-- [ ] Both readers in `node-facts.ts` use one shared key helper accepting `Identifier`, `StringLiteral` and `NumericLiteral`; each keeps its own binding-target policy; computed keys are omitted.
-- [ ] `pnpm --filter @elmeragroup/api-extractor test -- test/component-source.test.ts` exits 0 and contains the quoted, escaped, numeric, shorthand, alias and computed-key cases plus the provenance assertion.
-- [ ] `pnpm --filter @elmeragroup/api-artifacts test -- test/component-source.test.ts` exits 0 after an extractor rebuild and contains the `aria-label` `defaultValue` case.
-- [ ] `pnpm --filter @elmeragroup/api-extractor check:all` exits 0.
-- [ ] `pnpm ci:checks` exits 0.
-- [ ] `pnpm packages:pack && pnpm test:packed-consumer` exits 0.
-- [ ] `git diff --check` exits 0, and `git diff --name-only` lists only Scope paths; `git status --short` shows no other tracked or untracked source changes.
-- [ ] `.changeset/quoted-prop-defaults.md` exists with the `"@elmeragroup/internal": patch` frontmatter and the consumer-facing description.
-- [ ] `packages/api-extractor/README.md` documents literal-key support and the computed-key limitation; `pnpm exec oxfmt --check` passes on every edited markdown file.
-- [ ] This plan and its index row reflect the actual completion state; no skipped gate is described as passing.
+- [x] Both readers in `node-facts.ts` use one shared key helper accepting `Identifier`, `StringLiteral` and `NumericLiteral`; each keeps its own binding-target policy; computed keys are omitted.
+- [x] `pnpm --filter @elmeragroup/api-extractor test -- test/component-source.test.ts` exits 0 and contains the quoted, escaped, numeric, shorthand, alias and computed-key cases plus the provenance assertion.
+- [x] `pnpm --filter @elmeragroup/api-artifacts test -- test/component-source.test.ts` exits 0 after an extractor rebuild and contains the `aria-label` `defaultValue` case.
+- [x] `pnpm --filter @elmeragroup/api-extractor check:all` exits 0.
+- [x] `pnpm ci:checks` exits 0.
+- [x] `pnpm packages:pack && pnpm test:packed-consumer` exits 0.
+- [x] `git diff --check` exits 0, and `git diff --name-only` lists only Scope paths; `git status --short` shows no other tracked or untracked source changes.
+- [x] `.changeset/quoted-prop-defaults.md` exists with the `"@elmeragroup/internal": patch` frontmatter and the consumer-facing description.
+- [x] `packages/api-extractor/README.md` documents literal-key support and the computed-key limitation; `pnpm exec oxfmt --check` passes on every edited markdown file.
+- [x] This plan and its index row reflect the actual completion state; no skipped gate is described as passing.
 
 ## STOP conditions
 
@@ -305,4 +305,38 @@ Never modify immutable evidence, suppress a diagnostic, or weaken a test just to
 
 ## Completion notes
 
-Not implemented. Record the implementing revision, regression results, full gate results and any reviewed scope changes here.
+Implemented uncommitted on `codex/deep-audit-plans` at HEAD `9ab963c` (operator override: stay on
+this branch; no commit, no staging). Runtime: Node v24.13.0, pnpm 11.20.0. Drift check vs `e9ad9b3`
+touched only this plan and `plans/README.md`; live `node-facts.ts` excerpts matched.
+
+`bindingPropertyKey` accepts `Identifier`, `StringLiteral`, and `NumericLiteral` via `.text`.
+`bindingDefaults` still requires an identifier target; `sourceBindingDefaults` still accepts nested
+targets when `propertyName` is defined. Computed keys remain omitted. Numeric key `0` reports `"0"`.
+
+Step 1: `pnpm --filter @elmeragroup/api-extractor test -- test/component-source.test.ts` ran the
+full extractor suite (vitest did not isolate the file through that `--` form). 628 passed, 1 failed:
+the new case omitted `aria-label`, `data-id`, and `0`; nested-binding control passed.
+
+Step 2: helper and both call sites. Isolated
+`pnpm --filter @elmeragroup/api-extractor exec vitest run test/component-source.test.ts` — 16
+passed, including the literal-key case and nested-binding control.
+
+Step 3: `pnpm --filter @elmeragroup/api-extractor build` exit 0.
+`pnpm --filter @elmeragroup/api-artifacts exec vitest run test/component-source.test.ts` — 11
+passed (`aria-label` `defaultValue: '"hello"'`).
+`pnpm exec oxfmt --check packages/api-extractor/README.md` exit 0.
+
+Gates:
+
+1. `pnpm --filter @elmeragroup/api-extractor check:all` — exit 0 (format, lint, build, type-check,
+   629 tests, catalog 141/116, boundary clear, fixtures pass, conformance pass, timing go).
+2. `pnpm ci:checks` — first run failed on pre-existing `test/release-version.test.mjs` 5s timeout
+   (`does not release private changes to @elmeragroup/api-extractor`). Second `pnpm ci:checks`
+   exit 0 (15 turbo tasks; oxfmt 261 files; repo-policy 31 tests).
+3. `pnpm packages:pack && pnpm test:packed-consumer` — exit 0. Packed
+   `@elmeragroup/internal@0.1.0`; consumer declarations and tree-shaking passed.
+4. `git diff --check` — exit 0. Tracked `git diff --name-only` paths are in Scope. Untracked
+   `.changeset/quoted-prop-defaults.md` is also in Scope. Ignored build products under `dist/`,
+   `.turbo/`, `.cache/`, `.artifacts/` were produced by verification.
+5. `pnpm exec oxfmt --check` on `packages/api-extractor/README.md`,
+   `.changeset/quoted-prop-defaults.md`, `plans/README.md`, and this plan — exit 0.

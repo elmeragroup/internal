@@ -55,6 +55,51 @@ export const NestedWrapped = memo(
     expect(part?.sourcePath).not.toMatch(/node_modules/u);
   });
 
+  it("preserves authored defaults for string-literal destructuring keys", async () => {
+    const root = await fixture({
+      "labelled.tsx": `export type LabelledProps = {
+  /** Accessible name. */
+  "aria-label"?: string;
+  /** Visible label. */
+  label?: string;
+};
+export function Labelled({ "aria-label": ariaLabel = "hello", label = "ok" }: LabelledProps) {
+  return [ariaLabel, label];
+}
+`,
+    });
+    const result = await generateApiArtifacts(
+      options(root, [
+        {
+          slug: "labelled",
+          entryFile: "labelled.tsx",
+          exportNames: ["Labelled"],
+          outputFile: "docs/labelled/api.json",
+        },
+      ])
+    );
+    expect(result.components[0]?.parts[0]?.props).toEqual([
+      {
+        name: "aria-label",
+        origin: "declared",
+        type: "string | undefined",
+        shortType: null,
+        defaultValue: '"hello"',
+        description: "Accessible name.",
+        required: false,
+      },
+      {
+        name: "label",
+        origin: "declared",
+        type: "string | undefined",
+        shortType: null,
+        defaultValue: '"ok"',
+        description: "Visible label.",
+        required: false,
+      },
+    ]);
+  });
+
   it.each([
     { name: "named import", expression: "memo(Render)" },
     { name: "namespace import", expression: "memo(impl.Render)" },

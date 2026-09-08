@@ -22,6 +22,7 @@ import {
   primaryNode,
   withSession,
 } from "./support/component-source.ts";
+import { extractFixture } from "./support/extract.ts";
 
 const inputPath = componentSourceFixture("input.tsx");
 const renderPath = componentSourceFixture("render.tsx");
@@ -706,6 +707,101 @@ export function CommentAfterBody() { return "value"; } // implementation
       { status: "unresolved", reason: "export-not-found" },
       { status: "unresolved", reason: "member-not-found" },
     ]);
+  });
+
+  it("preserves authored defaults for identifier, string-literal, and numeric-literal destructuring keys", async () => {
+    const root = await mkdtemp(resolve(tmpdir(), "component-source-literal-keys-"));
+    try {
+      const config = resolve(root, "tsconfig.json");
+      const file = resolve(root, "literal-keys.ts");
+      await writeFile(
+        config,
+        JSON.stringify({ compilerOptions: { types: [], strict: true }, include: ["*.ts"] })
+      );
+      await writeFile(
+        file,
+        `export type Props = {
+  "aria-label"?: string;
+  "data-id"?: string;
+  0?: string;
+  plain?: string;
+  alias?: string;
+};
+export function LiteralKeys({
+  "aria-label": label = "hello",
+  'data-id': id = "escaped",
+  0: zero = "z",
+  plain = "ok",
+  alias: renamed = "aliased",
+}: Props) {
+  return [label, id, zero, plain, renamed];
+}
+export function ComputedKey({ ["dyn" as string]: value = "never" }: Record<string, string>) {
+  return value;
+}
+`
+      );
+      expect(
+        await inspectNative(file, [{ exportName: "LiteralKeys" }, { exportName: "ComputedKey" }], config)
+      ).toEqual([
+        {
+          status: "resolved",
+          filePath: file,
+          defaults: [
+            { name: "aria-label", initializerText: '"hello"' },
+            { name: "data-id", initializerText: '"escaped"' },
+            { name: "0", initializerText: '"z"' },
+            { name: "plain", initializerText: '"ok"' },
+            { name: "alias", initializerText: '"aliased"' },
+          ],
+        },
+        { status: "resolved", filePath: file, defaults: [] },
+      ]);
+
+      const result = await extractFixture({ tsconfigPath: config }, file);
+      const literalKeys = result.module.exports.find((entry) => entry.name === "LiteralKeys");
+      expect(literalKeys?.type.kind).toBe("function");
+      if (literalKeys?.type.kind !== "function") return;
+
+      const parameter = literalKeys.type.callSignatures[0]?.parameters[0];
+      expect(parameter).toBeDefined();
+      if (parameter === undefined) return;
+      expect(result.provenance).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            path: [
+              "LiteralKeys",
+              "callSignatures",
+              "0",
+              "parameters",
+              parameter.name,
+              "properties",
+              "aria-label",
+            ],
+            defaultInitializer: '"hello"',
+          }),
+          expect.objectContaining({
+            path: [
+              "LiteralKeys",
+              "callSignatures",
+              "0",
+              "parameters",
+              parameter.name,
+              "properties",
+              "data-id",
+            ],
+            defaultInitializer: '"escaped"',
+          }),
+          expect.objectContaining({
+            path: ["LiteralKeys", "callSignatures", "0", "parameters", parameter.name, "properties", "plain"],
+            defaultInitializer: '"ok"',
+          }),
+        ])
+      );
+      expect(result.provenance.some((entry) => entry.defaultInitializer === '"never"')).toBe(false);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 });
 
