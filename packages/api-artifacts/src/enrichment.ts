@@ -55,6 +55,7 @@ function enrichPart(
   const root = roots.find((name) => current.name === name || current.name.startsWith(`${name}.`));
   const facts = component.partApis.find((part) => part.name === current.name);
   if (root === undefined || facts === undefined) return current;
+  if (facts.source?.origin === "forwarded") return current;
   const selected = selectedProps(result, root, current.name);
   if (selected === undefined) return current;
   const names = new Set(current.props.map((prop) => prop.name));

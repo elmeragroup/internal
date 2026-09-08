@@ -103,6 +103,8 @@ export type PartSource = {
   /** Repo-relative path of the file that declares the part. */
   sourcePath: string;
   rsc: RscStatus;
+  /** Forwarded values accept only dependency-declared props and are never enriched. */
+  readonly origin: "resolved" | "forwarded";
   /** Destructuring defaults, keyed by prop name. */
   defaults: ReadonlyMap<string, string>;
 };
@@ -147,6 +149,7 @@ function partSourceFromInspection(
   return {
     sourcePath: path.relative(context.projectRoot, sourceFile.fileName).replaceAll("\\", "/"),
     rsc: readRscStatus(sourceFile),
+    origin: result.status,
     defaults: new Map(
       result.status === "resolved" ? result.defaults.map((entry) => [entry.name, entry.initializerText]) : []
     ),

@@ -40,7 +40,8 @@ A facade that only forwards a dependency's value, through named or `export *` re
 exported import binding, or an authored `export const X = DepX` alias, publishes a part with no
 props. Its `sourcePath` and `rsc` come from the innermost authored module that forwards the value,
 and `forwardedFrom` names the declaring dependency together with the packages that declare the
-forwarded props.
+forwarded props. Selecting that dependency through `includeExternalTypes` does not add its
+documented props to the facade; enrichment applies only to parts with a resolved implementation.
 
 Each part's `rsc` value is classified from the recovered implementation module's directive prologue
 in the parsed syntax. Only an exact authored `"use client"` or `'use client'` expression statement in
