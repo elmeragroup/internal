@@ -1,4 +1,4 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -194,6 +194,196 @@ export function Overloaded({ label = "actual" }: Props) {
       forwardedCount: 0,
       forwardedFrom: [],
     });
+  });
+
+  it("rejects a part with more than one public call signature", async () => {
+    const root = await fixture({
+      "render.ts": `"use client";
+export type LabelProps = {
+  /** Visible label. */
+  label: string;
+};
+export type IconProps = {
+  /** Icon name. */
+  icon: string;
+};
+export function Overloaded(props: LabelProps): { type: "span"; props: { children: string }; key: null };
+export function Overloaded(props: IconProps): { type: "span"; props: { children: string }; key: null };
+export function Overloaded(props: LabelProps | IconProps) {
+  return { type: "span", props: { children: "label" in props ? props.label : props.icon }, key: null };
+}
+`,
+      "entry.ts": `export { Overloaded } from "./render.ts";`,
+    });
+    await expect(
+      generateApiArtifacts(
+        options(root, [
+          {
+            slug: "overloaded",
+            entryFile: "entry.ts",
+            exportNames: ["Overloaded"],
+            outputFile: "docs/overloaded/api.json",
+          },
+        ])
+      )
+    ).rejects.toThrow(/Overloaded: 2 call signatures — API artifacts describe one public props contract/u);
+  });
+
+  it("rejects an overloaded namespace member", async () => {
+    const root = await fixture({
+      "menu.ts": `"use client";
+export type LabelProps = {
+  /** Visible label. */
+  label: string;
+};
+export type IconProps = {
+  /** Icon name. */
+  icon: string;
+};
+export function Item(props: LabelProps): { type: "span"; props: { children: string }; key: null };
+export function Item(props: IconProps): { type: "span"; props: { children: string }; key: null };
+export function Item(props: LabelProps | IconProps) {
+  return { type: "span", props: { children: "label" in props ? props.label : props.icon }, key: null };
+}
+export const Menu = { Item };
+`,
+    });
+    await expect(
+      generateApiArtifacts(
+        options(root, [
+          {
+            slug: "menu",
+            entryFile: "menu.ts",
+            exportNames: ["Menu"],
+            outputFile: "docs/menu/api.json",
+          },
+        ])
+      )
+    ).rejects.toThrow(/Menu\.Item: 2 call signatures — /u);
+  });
+
+  it("rejects an overload without a props parameter", async () => {
+    const root = await fixture({
+      "toggle.ts": `"use client";
+export type ToggleProps = {
+  /** Whether the control is pressed. */
+  pressed: boolean;
+};
+export function Toggle(): { type: "span"; props: { children: string }; key: null };
+export function Toggle(props: ToggleProps): { type: "span"; props: { children: string }; key: null };
+export function Toggle(props?: ToggleProps) {
+  return { type: "span", props: { children: props?.pressed === true ? "on" : "off" }, key: null };
+}
+`,
+    });
+    await expect(
+      generateApiArtifacts(
+        options(root, [
+          {
+            slug: "toggle",
+            entryFile: "toggle.ts",
+            exportNames: ["Toggle"],
+            outputFile: "docs/toggle/api.json",
+          },
+        ])
+      )
+    ).rejects.toThrow(/Toggle: 2 call signatures — /u);
+  });
+
+  it("does not write artifacts when another part has multiple call signatures", async () => {
+    const root = await fixture({
+      "button.ts": `export type Props = {
+  /** Visible label. */
+  label: string;
+};
+export function Button({ label }: Props) {
+  return label;
+}
+`,
+      "render.ts": `"use client";
+export type LabelProps = {
+  /** Visible label. */
+  label: string;
+};
+export type IconProps = {
+  /** Icon name. */
+  icon: string;
+};
+export function Overloaded(props: LabelProps): { type: "span"; props: { children: string }; key: null };
+export function Overloaded(props: IconProps): { type: "span"; props: { children: string }; key: null };
+export function Overloaded(props: LabelProps | IconProps) {
+  return { type: "span", props: { children: "label" in props ? props.label : props.icon }, key: null };
+}
+`,
+      "entry.ts": `export { Overloaded } from "./render.ts";`,
+    });
+    const output = path.join(root, "docs/button/api.json");
+    await generateApiArtifacts(
+      options(root, [
+        {
+          slug: "button",
+          entryFile: "button.ts",
+          exportNames: ["Button"],
+          outputFile: "docs/button/api.json",
+        },
+      ])
+    );
+    await writeFile(output, "keep me\n");
+    await expect(
+      generateApiArtifacts(
+        options(root, [
+          {
+            slug: "button",
+            entryFile: "button.ts",
+            exportNames: ["Button"],
+            outputFile: "docs/button/api.json",
+          },
+          {
+            slug: "overloaded",
+            entryFile: "entry.ts",
+            exportNames: ["Overloaded"],
+            outputFile: "docs/overloaded/api.json",
+          },
+        ])
+      )
+    ).rejects.toThrow(/Overloaded: 2 call signatures — API artifacts describe one public props contract/u);
+    expect(await readFile(output, "utf8")).toBe("keep me\n");
+    await expect(stat(path.join(root, "docs/overloaded"))).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  it("rejects multiple call signatures in check mode without creating directories", async () => {
+    const root = await fixture({
+      "render.ts": `"use client";
+export type LabelProps = {
+  /** Visible label. */
+  label: string;
+};
+export type IconProps = {
+  /** Icon name. */
+  icon: string;
+};
+export function Overloaded(props: LabelProps): { type: "span"; props: { children: string }; key: null };
+export function Overloaded(props: IconProps): { type: "span"; props: { children: string }; key: null };
+export function Overloaded(props: LabelProps | IconProps) {
+  return { type: "span", props: { children: "label" in props ? props.label : props.icon }, key: null };
+}
+`,
+      "entry.ts": `export { Overloaded } from "./render.ts";`,
+    });
+    await expect(
+      generateApiArtifacts({
+        ...options(root, [
+          {
+            slug: "overloaded",
+            entryFile: "entry.ts",
+            exportNames: ["Overloaded"],
+            outputFile: "docs/overloaded/api.json",
+          },
+        ]),
+        mode: "check",
+      })
+    ).rejects.toThrow(/Overloaded: 2 call signatures — API artifacts describe one public props contract/u);
+    await expect(stat(path.join(root, "docs"))).rejects.toMatchObject({ code: "ENOENT" });
   });
 
   it("preserves outer-property defaults on nested bindings for a direct component", async () => {

@@ -36,6 +36,11 @@ flags, printed types, and forwarded counts stay authoritative. Unknown wrappers,
 declaration-only components the project itself declares fail generation with an explicit diagnostic
 naming the component and reason; they do not publish React's type-declaration path or empty defaults.
 
+A part must expose exactly one public call signature. One overload declaration plus its
+implementation is one signature and is supported. Two or more overload declarations fail generation
+with `<part>: <N> call signatures — API artifacts describe one public props contract; keep one public overload`,
+because the flat props list cannot represent alternative required sets.
+
 A facade that only forwards a dependency's value, through named or `export *` re-export chains, an
 exported import binding, or an authored `export const X = DepX` alias, publishes a part with no
 props. Its `sourcePath` and `rsc` come from the innermost authored module that forwards the value,

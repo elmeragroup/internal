@@ -474,7 +474,21 @@ export function extractPart(
 ): LibraryPartApi {
   const source = partSourceFromInspection(context, request.name, sourceResult, problems);
   const { checker } = context;
-  const signature = callSignature(checker, request.type);
+  const signatures = checker.getSignaturesOfType(request.type, SignatureKind.Call);
+  if (signatures.length > 1) {
+    problems.add(
+      `${request.name}: ${signatures.length} call signatures — API artifacts describe one public props contract; keep one public overload`
+    );
+    return {
+      name: request.name,
+      declarationPaths: [],
+      source,
+      forwarded: withForwardedValue(emptyForwarded, sourceResult),
+      props: new Map<string, TsSymbol>(),
+      part: null,
+    };
+  }
+  const signature = signatures[0] ?? null;
   const declarationPaths = signature?.declaration === undefined ? [] : [signature.declaration.path];
   const parameter = signature?.getParameters()[0];
   const declared = parameter === undefined ? undefined : checker.getTypeOfSymbol(parameter);

@@ -7,7 +7,7 @@
 
 ## Status
 
-- Status: TODO
+- Status: DONE
 - Finding: 4 from the deep audit
 - Priority: P1
 - Effort: M, including regression coverage
@@ -295,15 +295,15 @@ Do not replace assertions with snapshots that merely accept current output.
 
 ## Done criteria
 
-- [ ] `grep -n "signatures\[0\] ?? null" packages/api-artifacts/src/checker.ts` matches only inside `callSignature` (discovery) or the post-cardinality line in `extractPart`; `extractPart` no longer calls `callSignature` before checking `signatures.length > 1`.
-- [ ] `pnpm --filter @elmeragroup/api-artifacts exec vitest run test/component-source.test.ts` exits 0 with five new tests present.
-- [ ] `pnpm --filter @elmeragroup/api-artifacts type-check` and `pnpm lint` exit 0.
-- [ ] `pnpm ci:checks` exits 0.
-- [ ] `pnpm packages:pack && pnpm test:packed-consumer` exits 0.
-- [ ] `git diff --check` exits 0 and `git diff --name-only` lists only in-scope paths.
-- [ ] `.changeset/reject-unsupported-overloads.md` exists with `"@elmeragroup/internal": patch` frontmatter.
-- [ ] `packages/api-artifacts/README.md` documents the one-call-signature rule and the exact diagnostic.
-- [ ] This plan's completion notes and the `plans/README.md` status row reflect the actual completion state; no skipped gate is described as passing.
+- [x] `grep -n "signatures\[0\] ?? null" packages/api-artifacts/src/checker.ts` matches only inside `callSignature` (discovery) or the post-cardinality line in `extractPart`; `extractPart` no longer calls `callSignature` before checking `signatures.length > 1`.
+- [x] `pnpm --filter @elmeragroup/api-artifacts exec vitest run test/component-source.test.ts` exits 0 with five new tests present.
+- [x] `pnpm --filter @elmeragroup/api-artifacts type-check` and `pnpm lint` exit 0.
+- [x] `pnpm ci:checks` exits 0.
+- [x] `pnpm packages:pack && pnpm test:packed-consumer` exits 0.
+- [x] `git diff --check` exits 0 and `git diff --name-only` lists only in-scope paths.
+- [x] `.changeset/reject-unsupported-overloads.md` exists with `"@elmeragroup/internal": patch` frontmatter.
+- [x] `packages/api-artifacts/README.md` documents the one-call-signature rule and the exact diagnostic.
+- [x] This plan's completion notes and the `plans/README.md` status row reflect the actual completion state; no skipped gate is described as passing.
 
 ## STOP conditions
 
@@ -326,4 +326,45 @@ Report pre-existing or environment failures separately (for example the pnpm boo
 
 ## Completion notes
 
-Not implemented. Record the implementing revision, regression results, full gate results and any reviewed scope changes here.
+Implemented uncommitted on `codex/deep-audit-plans` at HEAD `3c5ae7a` (operator override: stay on
+this branch; no commit, no staging). Runtime: Node v24.13.0, pnpm 11.20.0. Drift vs `e9ad9b3`
+touched `packages/api-artifacts/src/checker.ts`, `packages/api-artifacts/test/component-source.test.ts`,
+and `packages/api-artifacts/README.md` from plans 001 and 003. Live `extractPart` still began with
+`partSourceFromInspection` then `callSignature`; `callSignature` and `LibraryPartApi` bodies were
+unchanged. Line numbers shifted; operator noted that is not a STOP.
+
+`extractPart` now queries `getSignaturesOfType` once and, when `signatures.length > 1`, records
+`<part>: <N> call signatures — API artifacts describe one public props contract; keep one public overload`
+and returns early with empty `declarationPaths`, empty `props`, `part: null`, and
+`withForwardedValue(emptyForwarded, sourceResult)`. `describePart` is not reached. Zero and one
+signature keep the previous path via `signatures[0] ?? null`. `callSignature` and discovery are
+unchanged.
+
+Step 1: `pnpm --filter @elmeragroup/api-artifacts exec vitest run test/component-source.test.ts` —
+12 tests, 1 failed: `rejects a part with more than one public call signature` (promise resolved
+using the first overload's `label` prop).
+
+Step 2: cardinality check in `extractPart`. Same command — 12 passed, including the new test, the
+single-overload control, and `memo`/`forwardRef` cases. `pnpm --filter @elmeragroup/api-artifacts
+type-check` exit 0.
+
+Step 3: four additional tests. Focused command — 16 passed (five new).
+`pnpm --filter @elmeragroup/api-artifacts test` — 4 files, 43 tests.
+
+Step 4: README paragraph after the implementation-source paragraph.
+`pnpm exec oxfmt --check packages/api-artifacts/README.md` — "All matched files use the correct format."
+
+Step 5: `.changeset/reject-unsupported-overloads.md` with `"@elmeragroup/internal": patch`.
+
+Gates:
+
+1. `grep -n "signatures\\[0\\] ?? null" packages/api-artifacts/src/checker.ts` — line 219
+   (`callSignature`) and line 491 (post-cardinality in `extractPart`). `extractPart` does not call
+   `callSignature`.
+2. `pnpm lint` — 0 warnings, 0 errors.
+3. `pnpm ci:checks` — first run failed on pre-existing `test/release-version.test.mjs` 5s timeout
+   (`plans only the umbrella release`). Second `pnpm ci:checks` exit 0 (15 turbo tasks).
+4. `pnpm packages:pack && pnpm test:packed-consumer` — exit 0.
+5. `git diff --check` exit 0. Changed paths are the six in-scope files.
+
+No skipped gate is described as passing. No out-of-scope files.
