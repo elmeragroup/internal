@@ -72,6 +72,9 @@ pnpm test:packed-consumer
 `packages:pack` builds the package archive without publishing. `canary:pack` is a compatibility alias
 for the same command. The consumer test installs the packed package in a temporary project and
 checks extraction, defaults, drift detection, all public declarations, both lint plugins, and consumer tree-shaking without workspace links.
+It installs a private copy of the archive it verified and writes a receipt bound to that archive's
+report. Repacking after verification invalidates the receipt, so re-run `pnpm test:packed-consumer`
+before `pnpm canary:publish`.
 
 ## Canary release
 

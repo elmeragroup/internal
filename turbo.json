@@ -19,6 +19,7 @@
         "scripts/canary-publish.ts",
         "scripts/canary-version.ts",
         "scripts/packed-consumer.ts",
+        "scripts/packed-verification.ts",
         ".changeset/config.json",
         "packages/api-artifacts/package.json",
         "packages/internal/package.json",

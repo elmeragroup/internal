@@ -19,7 +19,7 @@ Each plan stands alone and includes current excerpts, an allowed file list, regr
 | [006](006-scope-aware-lint-types.md)               | Resolve lint type references in their lexical scope                     | P2       | M      | None       | DONE   |
 | [007](007-tailwind-dark-variants.md)               | Detect dark variants before arbitrary and modified utilities            | P2       | S      | None       | DONE   |
 | [008](008-structural-variant-props.md)             | Require a structural recipe-to-props connection                         | P2       | M      | None       | DONE   |
-| [009](009-bind-packed-verification.md)             | Bind packed-consumer verification to the archive actually tested        | P3       | M      | None       | TODO   |
+| [009](009-bind-packed-verification.md)             | Bind packed-consumer verification to the archive actually tested        | P3       | M      | None       | DONE   |
 
 Status values: TODO, IN PROGRESS, DONE, BLOCKED with a reason, or REJECTED with a rationale. Update the relevant plan's completion notes with commands and results before marking it DONE.
 

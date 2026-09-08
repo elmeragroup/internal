@@ -7,7 +7,7 @@
 
 ## Status
 
-- Status: TODO
+- Status: DONE
 - Finding: 9 from the deep audit
 - Priority: P3
 - Effort: M, including regression coverage
@@ -254,15 +254,15 @@ Run `pnpm exec vitest run --config test/vitest.config.mjs test/packed-verificati
 
 ## Done criteria
 
-- [ ] `scripts/packed-verification.ts` exists, has no module-load side effects, and is imported by both `scripts/packed-consumer.ts` and `scripts/canary-publish.ts`; `grep -n "archiveReportSha256" scripts/packed-consumer.ts scripts/canary-publish.ts` returns no matches (the seam owns the receipt).
-- [ ] The consumer installs from a private snapshot path and the receipt is derived only from bytes captured before `runChecks`.
-- [ ] `pnpm exec vitest run --config test/vitest.config.mjs test/packed-verification.test.mjs` exits 0 and the seven cases above exist.
-- [ ] `pnpm type-check:scripts`, `pnpm lint` and `pnpm test:repo-policy` exit 0.
-- [ ] `pnpm ci:checks` exits 0.
-- [ ] `pnpm packages:pack && pnpm test:packed-consumer` exits 0 and writes `.artifacts/canary/verified.json`.
-- [ ] `git diff --check` exits 0 and `git diff --name-only` lists only Scope paths.
-- [ ] No Changeset added; the completion notes say why.
-- [ ] This plan and its `plans/README.md` row reflect the actual completion state; no skipped gate is described as passing.
+- [x] `scripts/packed-verification.ts` exists, has no module-load side effects, and is imported by both `scripts/packed-consumer.ts` and `scripts/canary-publish.ts`; `grep -n "archiveReportSha256" scripts/packed-consumer.ts scripts/canary-publish.ts` returns no matches (the seam owns the receipt).
+- [x] The consumer installs from a private snapshot path and the receipt is derived only from bytes captured before `runChecks`.
+- [x] `pnpm exec vitest run --config test/vitest.config.mjs test/packed-verification.test.mjs` exits 0 and the seven cases above exist.
+- [x] `pnpm type-check:scripts`, `pnpm lint` and `pnpm test:repo-policy` exit 0.
+- [x] `pnpm ci:checks` exits 0.
+- [x] `pnpm packages:pack && pnpm test:packed-consumer` exits 0 and writes `.artifacts/canary/verified.json`.
+- [x] `git diff --check` exits 0 and `git diff --name-only` lists only Scope paths.
+- [x] No Changeset added; the completion notes say why.
+- [x] This plan and its `plans/README.md` row reflect the actual completion state; no skipped gate is described as passing.
 
 ## STOP conditions
 
@@ -283,4 +283,39 @@ Stop and report (do not improvise) if:
 
 ## Completion notes
 
-Not implemented. Record the implementing revision, regression results, full gate results and any reviewed scope changes here.
+Implemented uncommitted on `codex/deep-audit-plans` at HEAD `f5708cb` (operator override: stay on
+this branch; no commit, no staging). Runtime: Node v24.13.0, pnpm 11.20.0. Drift vs `e9ad9b3`
+touched only this plan and `plans/README.md`. Live `canary-pack.ts`, `packed-consumer.ts`, and
+`canary-publish.ts` excerpts matched. No Changeset: this changes private verification tooling, not
+the published package, and does not version private workspaces.
+
+`scripts/packed-verification.ts` captures report and tarball bytes before checks, installs from a
+private snapshot of those bytes, writes `verified.json` from the captured report digest, and rejects
+a replaced shared report or archive before writing. `packed-consumer.ts` and `canary-publish.ts`
+delegate through that seam. `canary-publish.ts` still publishes the path returned by
+`validateReceipt` with `--access public --tag canary --ignore-scripts`.
+
+Step 1: created the seam with hash-after-checks timing. `pnpm exec vitest run --config
+test/vitest.config.mjs test/packed-verification.test.mjs` — 13 tests, 1 failed:
+`does not let a replaced archive B validate after checks for A` (`validateReceipt` accepted B).
+No import, type, or fixture-setup error. Other cases passed. Snapshot path was already passed to
+`runChecks` so cases 2 and 6 could pass; identity still came from the post-check shared report.
+
+Step 2: receipt from captured digest plus pre-write replacement check. Same command — 13 passed.
+
+Step 3: wired `packed-consumer.ts` and `canary-publish.ts`; added `scripts/packed-verification.ts`
+to `//#test:repo-policy` inputs. `pnpm type-check:scripts && pnpm lint && pnpm test:repo-policy` —
+exit 0, 0 lint warnings, 44 repo-policy tests. `grep -n "archiveReportSha256" scripts/packed-consumer.ts
+scripts/canary-publish.ts` — no matches. Preserved the live consumer `devDependencies` catalog
+entries for oxlint and esbuild (needed by the four checks; omitted from the plan excerpt).
+
+Step 4: README binding paragraph. `pnpm packages:pack && pnpm test:packed-consumer` — exit 0.
+`.artifacts/canary/verified.json` written; `archiveReportSha256` matched `shasum -a 256
+.artifacts/canary/archive.json`. The consumer installed a `file:` snapshot outside the repository.
+
+Step 5: `pnpm ci:checks` — exit 0 (15 turbo tasks; repo-policy 44; extractor 52 files / 634 tests;
+catalog 141/116; boundary clear; conformance pass). Re-ran `pnpm packages:pack && pnpm
+test:packed-consumer` — exit 0; receipt digest matched the report. `git diff --check` — exit 0.
+`git diff --name-only` listed `README.md`, `scripts/canary-publish.ts`, `scripts/packed-consumer.ts`,
+`turbo.json`. Untracked in-scope files: `scripts/packed-verification.ts`,
+`test/packed-verification.test.mjs`, plus this plan and `plans/README.md`. No new Changeset file.
