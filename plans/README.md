@@ -15,7 +15,7 @@ Each plan stands alone and includes current excerpts, an allowed file list, regr
 | [002](002-safe-comment-removal.md)                 | Preserve executable syntax in comment-removal suggestions               | P1       | S      | None       | DONE   |
 | [003](003-quoted-prop-defaults.md)                 | Preserve authored defaults for literal destructuring keys               | P1       | S      | None       | DONE   |
 | [004](004-reject-unsupported-overloads.md)         | Reject unsupported multiple call signatures before generating artifacts | P1       | M      | None       | DONE   |
-| [005](005-discard-component-candidate-warnings.md) | Discard diagnostics from rejected authored component candidates         | P2       | M      | None       | TODO   |
+| [005](005-discard-component-candidate-warnings.md) | Discard diagnostics from rejected authored component candidates         | P2       | M      | None       | DONE   |
 | [006](006-scope-aware-lint-types.md)               | Resolve lint type references in their lexical scope                     | P2       | M      | None       | TODO   |
 | [007](007-tailwind-dark-variants.md)               | Detect dark variants before arbitrary and modified utilities            | P2       | S      | None       | TODO   |
 | [008](008-structural-variant-props.md)             | Require a structural recipe-to-props connection                         | P2       | M      | None       | TODO   |

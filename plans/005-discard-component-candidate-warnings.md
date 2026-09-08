@@ -8,7 +8,7 @@
 
 ## Status
 
-- Status: TODO
+- Status: DONE
 - Finding: 5 from the deep audit
 - Priority: P2
 - Effort: M, including regression coverage
@@ -274,15 +274,15 @@ Run `pnpm --filter @elmeragroup/api-extractor exec vitest run test/component-can
 
 ## Done criteria
 
-- [ ] Capitalized and lowercase ordinary functions each emit one legitimate parameter warning. Rejected/uncertain authored guesses add none. Selected-component diagnostics, module-walk order and isolated-session behavior remain covered.
-- [ ] `pnpm --filter @elmeragroup/api-extractor exec vitest run test/component-candidate-warnings.test.ts` exits 0 and the five cases from Step 1 exist.
-- [ ] `git status --short packages/api-extractor/test/fixtures` prints nothing (no oracle or fixture changed).
-- [ ] `pnpm --filter @elmeragroup/api-extractor check:all` exits 0.
-- [ ] `pnpm ci:checks` exits 0.
-- [ ] `pnpm packages:pack && pnpm test:packed-consumer` exits 0.
-- [ ] `git diff --check` exits 0, and changed paths match Scope.
-- [ ] The umbrella patch changeset exists with the consumer-facing fix description.
-- [ ] This plan and its index row reflect the actual completion state; no skipped gate is described as passing.
+- [x] Capitalized and lowercase ordinary functions each emit one legitimate parameter warning. Rejected/uncertain authored guesses add none. Selected-component diagnostics, module-walk order and isolated-session behavior remain covered.
+- [x] `pnpm --filter @elmeragroup/api-extractor exec vitest run test/component-candidate-warnings.test.ts` exits 0 and the five cases from Step 1 exist.
+- [x] `git status --short packages/api-extractor/test/fixtures` prints nothing (no oracle or fixture changed).
+- [x] `pnpm --filter @elmeragroup/api-extractor check:all` exits 0.
+- [x] `pnpm ci:checks` exits 0.
+- [x] `pnpm packages:pack && pnpm test:packed-consumer` exits 0.
+- [x] `git diff --check` exits 0, and changed paths match Scope.
+- [x] The umbrella patch changeset exists with the consumer-facing fix description.
+- [x] This plan and its index row reflect the actual completion state; no skipped gate is described as passing.
 
 ## STOP conditions
 
@@ -300,4 +300,41 @@ Reviewers should check that only the `authoredPropsTypes` contexts receive the b
 
 ## Completion notes
 
-Not implemented. Record the implementing revision, regression results, full gate results and any reviewed scope changes here.
+Implemented uncommitted on `codex/deep-audit-plans` at HEAD `210c6f4` (operator override: stay on
+this branch; no commit, no staging). Runtime: Node v24.13.0, pnpm 11.20.0. Drift vs `e9ad9b3`
+touched `packages/api-extractor/README.md` (plan 003 inspectComponentSources paragraph only). The
+warnings bullet and `resolver.ts` excerpts matched live code.
+
+`resolveExport` buffers `authoredPropsTypes` diagnostics in `authoredWarnings` and appends them to
+`base.warnings` only when `componentNode` recognition is `transformed`. Rejected and uncertain
+candidates drop those diagnostics. `resolvedType` warnings, `componentContext`, and
+`recordUncertainComponentRecognition` are unchanged.
+
+Step 1: `pnpm --filter @elmeragroup/api-extractor exec vitest run test/component-candidate-warnings.test.ts`
+— 5 tests, 2 failed on assertion: Factory had two `omitted-callable-members` warnings (count 8);
+Card, Mixed, and repeated-extraction cases passed. No import, compile, or setup error.
+
+Step 2: authored warning buffer. Same command — 5 passed.
+
+Step 3: README warnings bullet. `pnpm --filter @elmeragroup/api-extractor test` — 52 files, 634
+tests. First `check:all` failed format then lint on the new test (`JSON.parse` assertion /
+combined filter predicate). Inlined the basic tsconfig compilerOptions (include `input.ts` only)
+and narrowed omitted-callable-members by code then path. Second `check:all` exit 0. Catalog
+141/116, boundary clear, conformance pass (97 unchanged / 19 reviewed), timing go.
+`git status --short packages/api-extractor/test/fixtures` empty.
+
+Step 4: `.changeset/discard-component-candidate-warnings.md` with `"@elmeragroup/internal": patch`.
+
+Gates:
+
+1. `pnpm ci:checks` — first run failed on pre-existing `test/release-version.test.mjs` 5s timeouts
+   (`plans only the umbrella release`, `does not release private changes to
+@elmeragroup/api-extractor`). Second `pnpm ci:checks` exit 0 (15 turbo tasks).
+2. `pnpm packages:pack && pnpm test:packed-consumer` — exit 0. Packed
+   `@elmeragroup/internal@0.1.0`; consumer declarations and tree-shaking passed.
+3. `git diff --check` — exit 0. Tracked `git diff --name-only` paths are in Scope. Untracked
+   `.changeset/discard-component-candidate-warnings.md` and
+   `packages/api-extractor/test/component-candidate-warnings.test.ts` are also in Scope. Ignored
+   build products under `dist/`, `.turbo/`, `.cache/`, `.artifacts/` were produced by verification.
+4. `pnpm exec oxfmt --check plans/005-discard-component-candidate-warnings.md plans/README.md` —
+   exit 0 after formatting this plan's completion notes.

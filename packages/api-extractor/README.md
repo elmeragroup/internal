@@ -56,7 +56,8 @@ guessing. Compiler objects never cross this boundary.
   environments, including repeated instantiations of the same donor alias and nested spreads.
 - `warnings`: recoverable losses in the returned model. A warning has a stable `code`, location, and
   code-specific fields; `message` explains what failed, what the extractor did, and what a maintainer
-  can do next. Diagnostics from a discarded speculative candidate are not published.
+  can do next. Diagnostics from a speculative component-props candidate are published only when the
+  export is recognized as a component; a rejected or uncertain candidate contributes none.
 - `provenance`: repository-relative declaration and re-export paths for model nodes.
 
 Fatal setup, compiler, missing-file, and resolver failures remain typed Effect errors. Recoverable
