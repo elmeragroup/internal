@@ -149,7 +149,7 @@ function partSourceFromInspection(
   return {
     sourcePath: path.relative(context.projectRoot, sourceFile.fileName).replaceAll("\\", "/"),
     rsc: readRscStatus(sourceFile),
-    origin: result.status,
+    origin: result.status === "forwarded" ? "forwarded" : "resolved",
     defaults: new Map(
       result.status === "resolved" ? result.defaults.map((entry) => [entry.name, entry.initializerText]) : []
     ),
@@ -390,6 +390,7 @@ function describePart(
   context: LibraryProject,
   request: PartRequest,
   signature: Signature | null,
+  signatureCount: number,
   source: PartSource | null,
   hasPropsParameter: boolean,
   propsResolved: boolean,
@@ -399,7 +400,11 @@ function describePart(
 ): ApiPart | null {
   const { checker } = context;
   if (signature === null) {
-    problems.add(`${request.name}: no call signature — it does not look like a component`);
+    problems.add(
+      signatureCount === 0
+        ? `${request.name}: no call signature — it does not look like a component`
+        : `${request.name}: ${signatureCount} call signatures — API artifacts describe one public props contract; keep one public overload`
+    );
     return null;
   }
   if (source === null) {
@@ -475,20 +480,7 @@ export function extractPart(
   const source = partSourceFromInspection(context, request.name, sourceResult, problems);
   const { checker } = context;
   const signatures = checker.getSignaturesOfType(request.type, SignatureKind.Call);
-  if (signatures.length > 1) {
-    problems.add(
-      `${request.name}: ${signatures.length} call signatures — API artifacts describe one public props contract; keep one public overload`
-    );
-    return {
-      name: request.name,
-      declarationPaths: [],
-      source,
-      forwarded: withForwardedValue(emptyForwarded, sourceResult),
-      props: new Map<string, TsSymbol>(),
-      part: null,
-    };
-  }
-  const signature = signatures[0] ?? null;
+  const signature = signatures.length === 1 ? (signatures[0] ?? null) : null;
   const declarationPaths = signature?.declaration === undefined ? [] : [signature.declaration.path];
   const parameter = signature?.getParameters()[0];
   const declared = parameter === undefined ? undefined : checker.getTypeOfSymbol(parameter);
@@ -513,6 +505,7 @@ export function extractPart(
       context,
       request,
       signature,
+      signatures.length,
       source,
       parameter !== undefined,
       propsType !== null,

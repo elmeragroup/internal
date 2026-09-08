@@ -12,7 +12,7 @@ export type PackedInputs = {
   version: string;
 };
 
-export type CapturedArchive = {
+type CapturedArchive = {
   version: string;
   reportSha256: string;
   archiveSha256: string;
@@ -38,7 +38,7 @@ function writePassReceipt(receiptPath: string, version: string, archiveReportSha
   );
 }
 
-export function captureArchive(inputs: PackedInputs, packageName: string): CapturedArchive {
+function captureArchive(inputs: PackedInputs, packageName: string): CapturedArchive {
   const reportBytes = readFileSync(inputs.reportPath);
   const reportSha256 = sha256Hex(reportBytes);
   // SAFETY: JSON.parse is untyped; asRecord below is the contract.
@@ -49,12 +49,12 @@ export function captureArchive(inputs: PackedInputs, packageName: string): Captu
   }
   const expected = asRecord(report.archive, "archive");
   if (expected.name !== packageName) {
-    throw new Error(`${packageName}: archive changed since verification`);
+    throw new Error("Packed consumer verification does not match this archive");
   }
   const archiveBytes = readFileSync(inputs.archivePath);
   const archiveSha256 = sha256Hex(archiveBytes);
   if (asString(expected.sha256, "sha256") !== archiveSha256 || expected.bytes !== archiveBytes.length) {
-    throw new Error(`${packageName}: archive changed since verification`);
+    throw new Error("Packed consumer verification does not match this archive");
   }
   return {
     version: inputs.version,
@@ -76,6 +76,8 @@ export function verifyPackedArchive(
   try {
     writeFileSync(snapshotArchivePath, captured.archiveBytes);
     runChecks(snapshotArchivePath);
+    // Fail if the live archive or report changed during runChecks. This message is
+    // reserved for post-verification drift; captureArchive uses a different error.
     if (
       sha256Hex(readFileSync(inputs.reportPath)) !== captured.reportSha256 ||
       sha256Hex(readFileSync(inputs.archivePath)) !== captured.archiveSha256
@@ -89,22 +91,14 @@ export function verifyPackedArchive(
 }
 
 export function validateReceipt(inputs: PackedInputs, packageName: string): string {
-  const report = readJsonObject(inputs.reportPath);
+  const captured = captureArchive(inputs, packageName);
   const verification = readJsonObject(inputs.receiptPath);
-  const expected = asRecord(report.archive, "archive");
   if (
     verification.status !== "pass" ||
-    report.version !== inputs.version ||
     verification.version !== inputs.version ||
-    verification.archiveReportSha256 !== sha256Hex(readFileSync(inputs.reportPath))
+    verification.archiveReportSha256 !== captured.reportSha256
   ) {
     throw new Error("Packed consumer verification does not match this archive");
-  }
-  if (
-    expected.name !== packageName ||
-    asString(expected.sha256, "sha256") !== sha256Hex(readFileSync(inputs.archivePath))
-  ) {
-    throw new Error(`${packageName}: archive changed since verification`);
   }
   return inputs.archivePath;
 }

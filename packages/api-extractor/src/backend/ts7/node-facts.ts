@@ -358,21 +358,21 @@ function bindingPropertyKey(propertyName: Node): string | undefined {
   return undefined;
 }
 
-function bindingDefaults(
-  name: Node | undefined
+function collectBindingDefaults(
+  name: Node | undefined,
+  isIdentifierTarget: (elementName: Node | undefined) => boolean
 ): readonly { readonly name: string; readonly initializerText: string }[] {
   if (name === undefined || !isObjectBindingPattern(name)) return [];
   return name.elements.flatMap((element) => {
-    if (
-      !isBindingElement(element) ||
-      element.initializer === undefined ||
-      element.name === undefined ||
-      !isIdentifier(element.name)
-    ) {
-      return [];
-    }
+    if (!isBindingElement(element) || element.initializer === undefined) return [];
+    if (!isIdentifierTarget(element.name)) return [];
     const propertyName = element.propertyName;
-    const key = propertyName === undefined ? element.name.text : bindingPropertyKey(propertyName);
+    const key =
+      propertyName === undefined
+        ? element.name !== undefined && isIdentifier(element.name)
+          ? element.name.text
+          : undefined
+        : bindingPropertyKey(propertyName);
     if (key === undefined) return [];
     return [
       {
@@ -383,23 +383,19 @@ function bindingDefaults(
   });
 }
 
+function bindingDefaults(
+  name: Node | undefined
+): readonly { readonly name: string; readonly initializerText: string }[] {
+  return collectBindingDefaults(
+    name,
+    (elementName) => elementName !== undefined && isIdentifier(elementName)
+  );
+}
+
 function sourceBindingDefaults(
   name: Node | undefined
 ): readonly { readonly name: string; readonly initializerText: string }[] {
-  if (name === undefined || !isObjectBindingPattern(name)) return [];
-  return name.elements.flatMap((element) => {
-    if (!isBindingElement(element) || element.initializer === undefined) return [];
-    const propertyName = element.propertyName;
-    if (propertyName !== undefined) {
-      const key = bindingPropertyKey(propertyName);
-      if (key === undefined) return [];
-      return [{ name: key, initializerText: element.initializer.getText().trim() }];
-    }
-    if (element.name !== undefined && isIdentifier(element.name)) {
-      return [{ name: element.name.text, initializerText: element.initializer.getText().trim() }];
-    }
-    return [];
-  });
+  return collectBindingDefaults(name, () => true);
 }
 
 /**

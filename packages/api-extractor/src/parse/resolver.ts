@@ -166,8 +166,9 @@ function resolveExport(entry: BackendExportDraft, base: Context): ExportNode {
   const resolvedOutputType = transformedComponent.type;
   // Rejected and uncertain candidates never publish their speculative props, so
   // diagnostics collected while resolving those props are dropped with them.
-  if (transformedComponent.recognition.outcome === "transformed")
-    for (const warning of authoredWarnings) base.warnings.push(warning);
+  if (transformedComponent.recognition.outcome === "transformed") {
+    base.warnings.push(...authoredWarnings);
+  }
   if (transformedComponent.recognition.outcome === "uncertain")
     recordUncertainComponentRecognition(base, entry, symbolFacts, transformedComponent.recognition);
   // A dependency-owned bare interface/value at the export root is deliberately

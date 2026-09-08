@@ -144,18 +144,23 @@ describe("packed verification", () => {
         writeFileSync(inputs.reportPath, `${JSON.stringify(report, null, 2)}\n`);
       },
     ],
-    [
-      "missing report",
-      /**
-       * @param {ReturnType<typeof writeArchive>} inputs
-       */
-      (inputs) => {
-        rmSync(inputs.reportPath);
-      },
-    ],
   ])("rejects %s before checks and writes no receipt", (_label, mutate) => {
     withFixture(({ inputs }) => {
       mutate(inputs);
+      let called = false;
+      expect(() =>
+        verifyPackedArchive(inputs, packageName, () => {
+          called = true;
+        })
+      ).toThrow(/Packed consumer verification does not match this archive/);
+      expect(called).toBe(false);
+      expect(existsSync(inputs.receiptPath)).toBe(false);
+    });
+  });
+
+  it("rejects a missing report before checks and writes no receipt", () => {
+    withFixture(({ inputs }) => {
+      rmSync(inputs.reportPath);
       let called = false;
       expect(() =>
         verifyPackedArchive(inputs, packageName, () => {

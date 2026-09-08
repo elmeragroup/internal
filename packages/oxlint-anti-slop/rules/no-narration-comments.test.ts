@@ -18,21 +18,56 @@ tester.run("anti-slop/no-narration-comments", noNarrationCommentsRule, {
   invalid: [
     {
       code: "// fetch the user\nconst user = fetchUser();",
-      errors: [{ messageId: "narrationComment" }],
+      errors: [
+        {
+          messageId: "narrationComment",
+          suggestions: [{ messageId: "removeComment", output: "const user = fetchUser();" }],
+        },
+      ],
     },
     {
       name: "camelCase narration is normalized like the code identifier",
       code: "// fetchUser\nfetchUser();",
-      errors: [{ messageId: "narrationComment" }],
+      errors: [
+        {
+          messageId: "narrationComment",
+          suggestions: [{ messageId: "removeComment", output: "fetchUser();" }],
+        },
+      ],
     },
     {
       name: "narration is found through a following comment line",
       code: "// fetch the user\n// (keeps the stale one on failure)\nconst user = fetchUser();",
-      errors: [{ messageId: "narrationComment" }],
+      errors: [
+        {
+          messageId: "narrationComment",
+          suggestions: [
+            {
+              messageId: "removeComment",
+              output: "// (keeps the stale one on failure)\nconst user = fetchUser();",
+            },
+          ],
+        },
+      ],
     },
     {
       code: "// set loading to false\nsetLoading(false);",
-      errors: [{ messageId: "narrationComment" }],
+      errors: [
+        {
+          messageId: "narrationComment",
+          suggestions: [{ messageId: "removeComment", output: "setLoading(false);" }],
+        },
+      ],
+    },
+    {
+      name: "standalone line narration keeps its removal",
+      code: "const a = 1;\n  // set loading to false\n  setLoading(false);",
+      errors: [
+        {
+          messageId: "narrationComment",
+          suggestions: [{ messageId: "removeComment", output: "const a = 1;\n  setLoading(false);" }],
+        },
+      ],
     },
   ],
 });
