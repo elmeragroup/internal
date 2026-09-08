@@ -17,6 +17,12 @@ part of upstream. Keep them, their `index.ts` registrations, and
 `[A-Z][A-Z0-9]*-\d+`), for the bare ticket ids that count as a tracker reference.
 The root `.oxlintrc.json` sets it to `ELM-\d+`.
 
+`no-slop-comments` and `no-narration-comments` offer a `removeComment` suggestion
+only when the deletion cannot join tokens or drop a line terminator: `//` comments,
+and block comments that start or end their line. Inline block comments with code on
+both sides are still reported without a suggestion. The predicate is
+`isSafeCommentRemoval` in `shared/slop-comments.ts`.
+
 ## Tests
 
 Run the rule tests with Node 24:

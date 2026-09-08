@@ -7,7 +7,7 @@
 
 ## Status
 
-- Status: TODO
+- Status: DONE
 - Finding: 2 from the deep audit
 - Priority: P1
 - Effort: S, including regression coverage
@@ -280,16 +280,16 @@ Run the focused regression command after each step: Step 1 must fail only with `
 
 ## Done criteria
 
-- [ ] `isSafeCommentRemoval` exists in `packages/oxlint-anti-slop/shared/slop-comments.ts` and `report` in `no-slop-comments.ts` uses it; `commentRemovalRange` is unchanged (`git diff e9ad9b3 -- packages/oxlint-anti-slop/shared/slop-comments.ts` shows only additions).
-- [ ] `grep -n "fixable" packages/oxlint-anti-slop/rules/no-slop-comments.ts` returns nothing; `hasSuggestions: true` remains.
-- [ ] The focused regression command reports `pass 1`, `fail 0`, and the test file contains all nine new named cases from Step 1 plus explicit `suggestions` on the three existing standalone-block cases.
-- [ ] `pnpm --filter @elmeragroup/oxlint-plugin-anti-slop test` exits 0; `rules/no-narration-comments.ts` is unmodified.
-- [ ] `pnpm lint` and `pnpm ci:checks` exit 0.
-- [ ] `pnpm packages:pack && pnpm test:packed-consumer` exits 0.
-- [ ] `git diff --check` exits 0, and `git diff --name-only` lists only Scope paths.
-- [ ] `.changeset/safe-comment-removal.md` exists with the `"@elmeragroup/internal": patch` frontmatter.
-- [ ] `packages/oxlint-anti-slop/README.md` "Local divergence" describes the suggestion policy.
-- [ ] This plan's Status and Completion notes, the `plans/README.md` status row, and its 002 decision line reflect the implemented behavior; no skipped gate is described as passing.
+- [x] `isSafeCommentRemoval` exists in `packages/oxlint-anti-slop/shared/slop-comments.ts` and `report` in `no-slop-comments.ts` uses it; `commentRemovalRange` is unchanged (`git diff e9ad9b3 -- packages/oxlint-anti-slop/shared/slop-comments.ts` shows only additions).
+- [x] `grep -n "fixable" packages/oxlint-anti-slop/rules/no-slop-comments.ts` returns nothing; `hasSuggestions: true` remains.
+- [x] The focused regression command reports `pass 1`, `fail 0`, and the test file contains all nine new named cases from Step 1 plus explicit `suggestions` on the three existing standalone-block cases.
+- [x] `pnpm --filter @elmeragroup/oxlint-plugin-anti-slop test` exits 0; `rules/no-narration-comments.ts` is unmodified.
+- [x] `pnpm lint` and `pnpm ci:checks` exit 0.
+- [x] `pnpm packages:pack && pnpm test:packed-consumer` exits 0.
+- [x] `git diff --check` exits 0, and `git diff --name-only` lists only Scope paths.
+- [x] `.changeset/safe-comment-removal.md` exists with the `"@elmeragroup/internal": patch` frontmatter.
+- [x] `packages/oxlint-anti-slop/README.md` "Local divergence" describes the suggestion policy.
+- [x] This plan's Status and Completion notes, the `plans/README.md` status row, and its 002 decision line reflect the implemented behavior; no skipped gate is described as passing.
 
 ## STOP conditions
 
@@ -313,4 +313,36 @@ Never modify immutable evidence, suppress a diagnostic, weaken or delete a test,
 
 ## Completion notes
 
-Not implemented. Record the implementing revision, regression results, full gate results and any reviewed scope changes here.
+Implemented uncommitted on `codex/deep-audit-plans` at base `d3bddc6` (operator override: stay on
+this branch; no commit, no staging). Runtime: Node v24.13.0, pnpm 11.20.0.
+
+`isSafeCommentRemoval` was added after `commentRemovalRange`; the range helper is unchanged
+(diff vs `e9ad9b3` is additions only). `no-slop-comments` `report` attaches `suggest` only when
+every comment in the group is safe (`suggest: []` otherwise). `no-narration-comments.ts` is
+unmodified. `hasSuggestions: true` remains; there is no `fixable`.
+
+Step 1: focused `node --experimental-strip-types --test rules/no-slop-comments.test.ts` — `tests 1`,
+`fail 1`, assertion `Rule produced suggestions` (unsafe inline-block cases).
+
+Step 2: predicate added. `pnpm exec oxfmt --check packages/oxlint-anti-slop/shared/slop-comments.ts`
+exits 2 because `.oxfmtrc.json` ignores `packages/oxlint-anti-slop/**` (pre-existing; not changed).
+Focused command still `fail 1` / `Rule produced suggestions`.
+
+Step 3: `report` consults the predicate. Focused command — `pass 1`, `fail 0`.
+`pnpm --filter @elmeragroup/oxlint-plugin-anti-slop test` — 14 files, pass 14.
+`pnpm lint` first failed `typescript(prefer-regexp-exec)` on `String#match` in the new predicate;
+switched to `RegExp#exec` (same rest-of-line check). Second `pnpm lint` — 0 warnings, 0 errors.
+
+Gates:
+
+1. `pnpm ci:checks` — first run failed on pre-existing `test/release-version.test.mjs` 5s timeout
+   (`does not release private changes to @elmeragroup/oxlint-plugin`). Second `pnpm ci:checks`
+   exit 0 (15 turbo tasks; oxfmt 260 files; repo-policy 31 tests).
+2. `pnpm packages:pack && pnpm test:packed-consumer` — exit 0. Packed
+   `@elmeragroup/internal@0.1.0`; consumer declarations and tree-shaking passed.
+3. `git diff --check` — exit 0.
+4. Tracked `git diff --name-only` paths are in Scope. Untracked
+   `.changeset/safe-comment-removal.md` is also in Scope. Ignored build products under `dist/`,
+   `.turbo/`, `.cache/`, `.artifacts/` were produced by verification.
+5. `pnpm exec oxfmt --check` on `.changeset/safe-comment-removal.md`, `plans/README.md`, and this
+   plan — exit 0. Anti-slop `.ts`/README remain formatter-ignored as above.

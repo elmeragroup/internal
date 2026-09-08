@@ -7,6 +7,7 @@ import {
   createSlopCommentSkipper,
   dividerPattern,
   hasTrackerOrRfcReference,
+  isSafeCommentRemoval,
   isStandaloneLineComment,
 } from "../shared/slop-comments.ts";
 
@@ -188,10 +189,13 @@ export const noSlopCommentsRule = defineRule({
       if (first === undefined || last === undefined) return;
       const [start] = commentRemovalRange(context.sourceCode, first);
       const [, end] = commentRemovalRange(context.sourceCode, last);
+      const safe = comments.every((comment) => isSafeCommentRemoval(context.sourceCode, comment));
       context.report({
         loc: { start: first.loc.start, end: last.loc.end },
         messageId,
-        suggest: [{ messageId: "removeComment", fix: (fixer) => fixer.removeRange([start, end]) }],
+        suggest: safe
+          ? [{ messageId: "removeComment", fix: (fixer) => fixer.removeRange([start, end]) }]
+          : [],
       });
     };
 

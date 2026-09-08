@@ -12,7 +12,7 @@ Each plan stands alone and includes current excerpts, an allowed file list, regr
 | Plan                                               | Finding                                                                 | Priority | Effort | Depends on | Status |
 | -------------------------------------------------- | ----------------------------------------------------------------------- | -------- | ------ | ---------- | ------ |
 | [001](001-preserve-forwarded-facades.md)           | Keep forwarded facades prop-free during enrichment                      | P1       | S      | None       | DONE   |
-| [002](002-safe-comment-removal.md)                 | Preserve executable syntax in comment-removal suggestions               | P1       | S      | None       | TODO   |
+| [002](002-safe-comment-removal.md)                 | Preserve executable syntax in comment-removal suggestions               | P1       | S      | None       | DONE   |
 | [003](003-quoted-prop-defaults.md)                 | Preserve authored defaults for literal destructuring keys               | P1       | S      | None       | TODO   |
 | [004](004-reject-unsupported-overloads.md)         | Reject unsupported multiple call signatures before generating artifacts | P1       | M      | None       | TODO   |
 | [005](005-discard-component-candidate-warnings.md) | Discard diagnostics from rejected authored component candidates         | P2       | M      | None       | TODO   |
@@ -39,7 +39,7 @@ All plans update this index; coordinate those status edits if executors run conc
 
 ## Decisions made in these plans
 
-- 002 keeps diagnostics for block comments but removes their deletion suggestions. This conservative fix avoids token-joining and automatic-semicolon-insertion hazards without introducing a lexer.
+- 002 keeps diagnostics for all slop comments. Suggestions stay for line comments and for block comments that start or end their line; only inline block comments with code on both sides lose the deletion suggestion. This avoids token-joining and automatic-semicolon-insertion hazards without introducing a lexer.
 - 004 rejects more than one checker-visible public call signature with an actionable generation error. Merging overload contracts is deferred because a flat props list cannot faithfully express alternative required sets. One public overload plus its implementation remains supported.
 - 005 isolates diagnostics from rejected authored candidates. It deliberately preserves selected-component diagnostic behavior and does not redesign the warning model.
 - 006 uses local syntax and lexical scope only. It does not add TypeScript or Effect loads to lint entries.

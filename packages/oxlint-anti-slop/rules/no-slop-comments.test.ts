@@ -78,7 +78,12 @@ tester.run("anti-slop/no-slop-comments", noSlopCommentsRule, {
     },
     {
       code: "/* ********** */\nconst a = 1;",
-      errors: [{ messageId: "bannerComment" }],
+      errors: [
+        {
+          messageId: "bannerComment",
+          suggestions: [{ messageId: "removeComment", output: "const a = 1;" }],
+        },
+      ],
     },
     {
       code: "// const total = price * quantity;\nconst a = 1;",
@@ -96,7 +101,12 @@ tester.run("anti-slop/no-slop-comments", noSlopCommentsRule, {
     },
     {
       code: "/*\nif (user) {\n  return user.name;\n}\n*/\nconst a = 1;",
-      errors: [{ messageId: "commentedOutCode" }],
+      errors: [
+        {
+          messageId: "commentedOutCode",
+          suggestions: [{ messageId: "removeComment", output: "const a = 1;" }],
+        },
+      ],
     },
     {
       code: "// return <UserCard id={id} />\nconst a = 1;",
@@ -120,7 +130,12 @@ tester.run("anti-slop/no-slop-comments", noSlopCommentsRule, {
     {
       name: "function call inside a block comment is a corpse",
       code: "/*\nsendRequest(url, options);\n*/\nconst a = 1;",
-      errors: [{ messageId: "commentedOutCode" }],
+      errors: [
+        {
+          messageId: "commentedOutCode",
+          suggestions: [{ messageId: "removeComment", output: "const a = 1;" }],
+        },
+      ],
     },
     {
       name: "balanced multiline function call is a corpse",
@@ -276,6 +291,76 @@ tester.run("anti-slop/no-slop-comments", noSlopCommentsRule, {
       name: "multiline object with comma-terminated properties is a corpse",
       code: "/*\nconst config = {\n  timeout: 30,\n  retries: 2,\n};\n*/\nconst a = 1;",
       errors: [{ messageId: "commentedOutCode" }],
+    },
+    {
+      name: "inline block between keyword and identifier has no removal",
+      code: "function f(){ return/* TODO */x; }",
+      errors: [{ messageId: "todoWithoutLink", suggestions: null }],
+    },
+    {
+      name: "inline block between operands has no removal",
+      code: "const c = a/* TODO */+b;",
+      errors: [{ messageId: "todoWithoutLink", suggestions: null }],
+    },
+    {
+      name: "multi-line block after return has no removal",
+      code: "function f(){ return /*\n TODO\n*/ x; }",
+      errors: [{ messageId: "todoWithoutLink", suggestions: null }],
+    },
+    {
+      name: "CRLF multi-line block after return has no removal",
+      code: "function f(){ return /*\r\n TODO\r\n*/ x; }",
+      errors: [{ messageId: "todoWithoutLink", suggestions: null }],
+    },
+    {
+      name: "block that starts its line keeps its removal",
+      code: "/* TODO */ const a = 1;",
+      errors: [
+        {
+          messageId: "todoWithoutLink",
+          suggestions: [{ messageId: "removeComment", output: " const a = 1;" }],
+        },
+      ],
+    },
+    {
+      name: "block that ends its line keeps its removal",
+      code: "const a = 1; /* TODO */\nconst b = 2;",
+      errors: [
+        {
+          messageId: "todoWithoutLink",
+          suggestions: [{ messageId: "removeComment", output: "const a = 1;\nconst b = 2;" }],
+        },
+      ],
+    },
+    {
+      name: "indented standalone line comment keeps its line terminator",
+      code: "const a = 1;\n  // TODO later\n  const b = 2;",
+      errors: [
+        {
+          messageId: "todoWithoutLink",
+          suggestions: [{ messageId: "removeComment", output: "const a = 1;\n  const b = 2;" }],
+        },
+      ],
+    },
+    {
+      name: "CRLF standalone line comment removes one line",
+      code: "const a = 1;\r\n// TODO later\r\nconst b = 2;",
+      errors: [
+        {
+          messageId: "todoWithoutLink",
+          suggestions: [{ messageId: "removeComment", output: "const a = 1;\r\nconst b = 2;" }],
+        },
+      ],
+    },
+    {
+      name: "trailing line comment keeps the newline",
+      code: "function f(){ return// TODO\n x; }",
+      errors: [
+        {
+          messageId: "todoWithoutLink",
+          suggestions: [{ messageId: "removeComment", output: "function f(){ return\n x; }" }],
+        },
+      ],
     },
   ],
 });
