@@ -23,6 +23,17 @@ and block comments that start or end their line. Inline block comments with code
 both sides are still reported without a suggestion. The predicate is
 `isSafeCommentRemoval` in `shared/slop-comments.ts`.
 
+`shared/type-name-scope.ts` and the scope-aware resolution in
+`shared/dictionary-types.ts`, `rules/no-object-parameters.ts` and
+`rules/no-unknown-returns.ts` are local changes: type names resolve in their
+lexical scope instead of a module-level alias table. Scope containers include
+`StaticBlock`, whose `body` is a statement list, so inner type aliases in
+`class C { static { ... } }` are found. `TSImportEqualsDeclaration` locals,
+including `import Promise = require("./p")`, are recorded as `shadowed`, and
+any other identifier-bearing declaration kind fail-closes as `shadowed` so
+lookup never walks to an outer name. Keep them when refreshing the vendored
+upstream files.
+
 ## Tests
 
 Run the rule tests with Node 24:

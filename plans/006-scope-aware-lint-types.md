@@ -7,7 +7,7 @@
 
 ## Status
 
-- Status: TODO
+- Status: DONE
 - Finding: 6 from the deep audit
 - Priority: P2
 - Effort: M, including regression coverage
@@ -373,17 +373,17 @@ Run `pnpm --filter @elmeragroup/oxlint-plugin-anti-slop test` after the implemen
 
 ## Done criteria
 
-- [ ] The four Step 1 regressions pass as valid without renaming `Value` or `Promise` in their source.
-- [ ] The four "new true positive" invalid cases report exactly one diagnostic each.
-- [ ] Pre-existing invalid controls still report: `grep -c 'type Escape = unknown; type A = Record<string, Escape>;' packages/oxlint-anti-slop/rules/no-unsafe-dictionary-type.test.ts` → `1`, and the file passes.
-- [ ] `grep -n 'aliases\|shadowedBuiltIns' packages/oxlint-anti-slop/shared/dictionary-types.ts packages/oxlint-anti-slop/rules/no-object-parameters.ts packages/oxlint-anti-slop/rules/no-unknown-returns.ts` returns no module-level table (only `resolvingAliases`/local identifiers may remain).
-- [ ] `grep -En 'from "(typescript|effect)' packages/oxlint-anti-slop/shared/type-name-scope.ts` returns nothing.
-- [ ] `pnpm --filter @elmeragroup/oxlint-plugin-anti-slop test` exits 0.
-- [ ] `pnpm lint` exits 0 and `pnpm ci:checks` exits 0.
-- [ ] `pnpm packages:pack && pnpm test:packed-consumer` exits 0.
-- [ ] `git diff --check` exits 0, and `git status --short` lists only Scope paths.
-- [ ] `.changeset/scope-aware-lint-types.md` exists with the `"@elmeragroup/internal": patch` frontmatter.
-- [ ] This plan and its index row reflect the actual completion state; no skipped gate is described as passing.
+- [x] The four Step 1 regressions pass as valid without renaming `Value` or `Promise` in their source.
+- [x] The four "new true positive" invalid cases report exactly one diagnostic each.
+- [x] Pre-existing invalid controls still report: `grep -c 'type Escape = unknown; type A = Record<string, Escape>;' packages/oxlint-anti-slop/rules/no-unsafe-dictionary-type.test.ts` → `1`, and the file passes.
+- [x] `grep -n 'aliases\|shadowedBuiltIns' packages/oxlint-anti-slop/shared/dictionary-types.ts packages/oxlint-anti-slop/rules/no-object-parameters.ts packages/oxlint-anti-slop/rules/no-unknown-returns.ts` returns no module-level table (only `resolvingAliases`/local identifiers may remain).
+- [x] `grep -En 'from "(typescript|effect)' packages/oxlint-anti-slop/shared/type-name-scope.ts` returns nothing.
+- [x] `pnpm --filter @elmeragroup/oxlint-plugin-anti-slop test` exits 0.
+- [x] `pnpm lint` exits 0 and `pnpm ci:checks` exits 0.
+- [x] `pnpm packages:pack && pnpm test:packed-consumer` exits 0.
+- [x] `git diff --check` exits 0, and `git status --short` lists only Scope paths.
+- [x] `.changeset/scope-aware-lint-types.md` exists with the `"@elmeragroup/internal": patch` frontmatter.
+- [x] This plan and its index row reflect the actual completion state; no skipped gate is described as passing.
 
 ## STOP conditions
 
@@ -408,4 +408,54 @@ Never modify immutable evidence, suppress a diagnostic, or weaken a test just to
 
 ## Completion notes
 
-Not implemented. Record the implementing revision, regression results, full gate results and any reviewed scope changes here.
+Implemented uncommitted on `codex/deep-audit-plans` at HEAD `70e6019` (operator override: stay on
+this branch; no commit, no staging). Runtime: Node v24.13.0, pnpm 11.20.0. Drift vs `e9ad9b3` touched
+`packages/oxlint-anti-slop/README.md` from plan 002 (`removeComment` / `isSafeCommentRemoval`). That
+paragraph was kept. Implementation excerpts in `dictionary-types.ts`, `no-object-parameters.ts`, and
+`no-unknown-returns.ts` still matched.
+
+`shared/type-name-scope.ts` indexes `Program`, `BlockStatement`, `TSModuleBlock`, and `SwitchCase`
+statement lists lazily. `resolve` treats lexical type parameters, mapped keys, and `infer` binders as
+`shadowed`, then walks parents. Duplicate aliases, mixed kinds, imports, classes, enums, functions,
+and modules bind as `shadowed`. `TypeEnvironment` now carries only `{ scope }`. Alias cycles are
+tracked by declaration identity. `substitutions.get` still runs before lexical lookup.
+`no-object-parameters` and `no-unknown-returns` dropped their module-level alias maps.
+`Promise`/`PromiseLike` are builtins only when `scope.resolve` returns null.
+
+Step 1: `pnpm --filter @elmeragroup/oxlint-plugin-anti-slop test` — 14 files, 4 failed
+(`no-unsafe-dictionary-type`, `no-object-parameters`, `no-unknown-returns`,
+`no-known-value-widening`), each `Should have no errors but had 1` with `unsafeDictionary`,
+`objectParameter`, `unknownReturn`, `widening`. Other files `ok`.
+
+Step 2: helper added. Same four failures. `pnpm lint` — 0 warnings, 0 errors.
+
+Step 3: four rules routed through the lookup. Package tests — 14 passed. `pnpm lint` — 0 warnings,
+0 errors. `lexicalTypeParameterNames` was removed from the two rules because `resolve` already
+applies it; existing type-parameter cases still passed.
+
+Step 4: remaining valid/invalid cases, including nested true positives and a
+`function f(value: Value) {}` stale-index sentinel after a module-level `type Value = object` case.
+Package tests — 14 passed.
+
+Step 5: README local-divergence paragraph added after the comment-removal note.
+`pnpm packages:pack && pnpm test:packed-consumer` — exit 0. Packed `@elmeragroup/internal@0.1.0`;
+consumer declarations and tree-shaking passed (lint and api checks also ran in that loop).
+
+Gates:
+
+1. `pnpm --filter @elmeragroup/oxlint-plugin-anti-slop test` — 14 passed.
+2. `pnpm lint` — 0 warnings, 0 errors.
+3. `pnpm ci:checks` — exit 0 on the first run (15 turbo tasks; oxfmt 265 files; anti-slop 14;
+   oxlint-plugin 190; api-artifacts 43; api-extractor 634; repo-policy included).
+4. `pnpm packages:pack && pnpm test:packed-consumer` — exit 0 (Step 5 and again in Step 6).
+5. `grep -c 'type Escape = unknown; type A = Record<string, Escape>;' ...no-unsafe-dictionary-type.test.ts`
+   → `1`.
+6. `grep -n 'aliases\|shadowedBuiltIns'` on dictionary-types / no-object-parameters /
+   no-unknown-returns — no module-level table. One remaining hit is the existing rule description
+   comment "including local aliases to object."
+7. `grep -En 'from "(typescript|effect)' ...type-name-scope.ts` — no matches.
+8. `git diff --check` — exit 0. Tracked and untracked source/document paths are in Scope.
+9. `pnpm exec oxfmt --check .changeset/scope-aware-lint-types.md plans/006-scope-aware-lint-types.md plans/README.md`
+   — exit 0. Anti-slop sources remain formatter-ignored; tabs vs two-space indent was matched by
+   hand (`no-unknown-returns.ts` kept two spaces).
+10. `.changeset/scope-aware-lint-types.md` has `"@elmeragroup/internal": patch` only.

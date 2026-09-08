@@ -29,6 +29,7 @@ tester.run("anti-slop/no-known-value-widening", noKnownValueWideningRule, {
 		`${prelude} interface Commands { readonly start: Command } function create(): Commands { return { start: startCommand }; }`,
 		`${prelude} declare function make(): Record<string, Command>; const commands: Record<string, Command> = make();`,
 		`${prelude} import { Commands } from './types'; const commands: Commands = { start: startCommand };`,
+		"type Value = unknown; function outer() { type Value = { id: string }; const v: Value = { id: \"a\" }; }",
 	],
 	invalid: [
 		{ code: "const value: unknown = {};", errors: [error] },
@@ -109,5 +110,9 @@ tester.run("anti-slop/no-known-value-widening", noKnownValueWideningRule, {
 		},
 		{ code: "const value: unknown = 1;", errors: [error] },
 		{ code: "const value: object = [];", errors: [error] },
+		{
+			code: "type Value = { id: string }; function outer() { type Value = unknown; const v: Value = { id: \"a\" }; }",
+			errors: [error],
+		},
 	],
 });

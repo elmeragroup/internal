@@ -1,6 +1,6 @@
 import type { ESTree } from "@oxlint/plugins";
 
-type VisitorKeys = Readonly<Record<string, readonly string[]>>;
+export type VisitorKeys = Readonly<Record<string, readonly string[]>>;
 
 function isNode(value: unknown): value is ESTree.Node {
 	return (
