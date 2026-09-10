@@ -36,5 +36,6 @@ tester.run("anti-slop/no-unknown-returns", noUnknownReturnsRule, {
       code: "type Value = string; function outer() { type Value = unknown; function inner(): Value { return x; } }",
       errors: [error],
     },
+    { code: "function Promise() {} function load(): Promise<unknown> { return p; }", errors: [error] },
   ],
 });

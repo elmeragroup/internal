@@ -43,6 +43,29 @@ describe("verified publication", () => {
     expect(services.publish).toHaveBeenCalledWith(release.archive);
     expect(services.promote).toHaveBeenCalledWith(release.version, "canary");
   });
+  it("waits until the dist-tag is visible after a successful promote", async () => {
+    const { services, registry } = publication();
+    let pendingTag: { version: string; tag: string } | undefined;
+    let tagVisible = false;
+    services.promote.mockImplementation((version: string, tag: string) => {
+      pendingTag = { version, tag };
+    });
+    services.registry.mockImplementation(() => {
+      const tags = new Map(registry.tags);
+      if (tagVisible && pendingTag !== undefined) {
+        tags.set(pendingTag.tag, pendingTag.version);
+      }
+      return Promise.resolve({ versions: new Map(registry.versions), tags });
+    });
+    services.wait.mockImplementation(() => {
+      if (pendingTag !== undefined) tagVisible = true;
+      return Promise.resolve();
+    });
+    await publish(release, services);
+    expect(services.promote).toHaveBeenCalledTimes(1);
+    expect(services.promote).toHaveBeenCalledWith(release.version, "canary");
+    expect(services.wait).toHaveBeenCalled();
+  });
   it("recovers when npm accepted the upload but the client reported failure", async () => {
     const { services, registry } = publication();
     services.publish.mockImplementation(() => {

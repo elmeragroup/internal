@@ -194,6 +194,7 @@ writeFileSync(file, JSON.stringify({ releases: [] }));
   let packed;
   /** @type {Uint8Array | undefined} */
   let uploadedBundle;
+  let patchedRelease = false;
   /** @type {{ ref: string; sha: string } | undefined} */
   let createdTag;
   /** @type {{ tag_name: string; id: number; draft: boolean; body: string; assets: readonly never[] } | undefined} */
@@ -269,6 +270,7 @@ writeFileSync(file, JSON.stringify({ releases: [] }));
     }
     if (method === "PATCH" && href === `${githubApi}/releases/1`) {
       assert.ok(draft);
+      patchedRelease = true;
       return jsonResponse({ ...draft, draft: false });
     }
     throw new Error(`unexpected fetch: ${method} ${href}`);
@@ -356,6 +358,7 @@ writeFileSync(file, JSON.stringify({ releases: [] }));
     const pkg = release.resolveReleasePackage(root, path.join(root, "packages/ui"), packageName);
     await Effect.runPromise(release.releaseCheckedCommit(pkg, { pack }, commit));
     assert.deepEqual(uploadedBundle, packed.bundle);
+    assert.equal(patchedRelease, true);
   } finally {
     globalThis.fetch = originalFetch;
     if (previousToken === undefined) delete process.env.GH_TOKEN;

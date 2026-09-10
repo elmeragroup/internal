@@ -38,5 +38,6 @@ tester.run("anti-slop/no-object-parameters", noObjectParametersRule, {
 			code: "type Value = { id: string }; function outer() { type Value = object; function inner(value: Value) {} }",
 			errors: [error],
 		},
+		{ code: "function Alias() {} type Alias = object; function f(value: Alias) {}", errors: [error] },
 	],
 });

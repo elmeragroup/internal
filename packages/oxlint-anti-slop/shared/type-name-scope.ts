@@ -82,11 +82,14 @@ function recordDeclaration(entries: Map<string, BindingCollector>, declaration: 
 			markShadowed(entries, declaration.id.name);
 			return;
 		}
-		case "ClassDeclaration":
-		case "FunctionDeclaration": {
+		case "ClassDeclaration": {
 			if (declaration.id !== null) markShadowed(entries, declaration.id.name);
 			return;
 		}
+		case "FunctionDeclaration":
+		case "TSDeclareFunction":
+			// Value-namespace only; a same-named type alias or built-in stays visible.
+			return;
 		case "TSModuleDeclaration": {
 			if (declaration.id.type === "Identifier") markShadowed(entries, declaration.id.name);
 			return;

@@ -114,5 +114,6 @@ tester.run("anti-slop/no-unsafe-dictionary-type", noUnsafeDictionaryTypeRule, {
 			code: "type Item = unknown; type Fallback<Input> = Input extends infer Item ? string : Record<string, Item>;",
 			errors: [error],
 		},
+		{ code: "function Record() {} type A = Record<string, unknown>;", errors: [error] },
 	],
 });

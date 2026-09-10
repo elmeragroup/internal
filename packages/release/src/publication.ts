@@ -25,6 +25,20 @@ const propagationAttempts = 6;
 
 const unverifiedPublication = "Publication could not be verified; retry the recorded release";
 
+/** Polls `registry()` until `isVisible` holds or `propagationAttempts` is exhausted. */
+function confirmRegistry(
+  services: PublicationServices,
+  isVisible: (registry: Registry) => boolean
+): Effect.Effect<Registry | undefined, ReleaseError> {
+  return Effect.gen(function* () {
+    for (let attemptNumber = 1; attemptNumber <= propagationAttempts; attemptNumber += 1) {
+      const registry = yield* attemptPromise(() => services.registry());
+      if (yield* attempt(() => isVisible(registry))) return registry;
+      if (attemptNumber < propagationAttempts) yield* attemptPromise(() => services.wait());
+    }
+  });
+}
+
 /** Uploads the archive and returns the first registry read that shows those exact bytes. */
 function uploadAndConfirm(
   release: VerifiedRelease,
@@ -40,11 +54,11 @@ function uploadAndConfirm(
       }
       publishFailure = error.message;
     }
-    for (let attemptNumber = 1; attemptNumber <= propagationAttempts; attemptNumber += 1) {
-      const registry = yield* attemptPromise(() => services.registry());
-      if ((yield* attempt(() => npmIdentity(release, registry))) === "match") return registry;
-      if (attemptNumber < propagationAttempts) yield* attemptPromise(() => services.wait());
-    }
+    const confirmed = yield* confirmRegistry(
+      services,
+      (registry) => npmIdentity(release, registry) === "match"
+    );
+    if (confirmed !== undefined) return confirmed;
     if (publishFailure === undefined) {
       return yield* new ReleaseError({ message: unverifiedPublication });
     }
@@ -59,8 +73,11 @@ function promoteAndConfirm(
   return Effect.gen(function* () {
     const tag = distTagFor(release.channel);
     yield* attempt(() => services.promote(release.version, tag));
-    const promoted = yield* attemptPromise(() => services.registry());
-    if (promoted.tags.get(tag) !== release.version) {
+    const confirmed = yield* confirmRegistry(
+      services,
+      (registry) => registry.tags.get(tag) === release.version
+    );
+    if (confirmed === undefined) {
       return yield* new ReleaseError({
         message: `npm ${tag} update is not visible; retry the recorded release`,
       });
