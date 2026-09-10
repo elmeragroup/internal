@@ -19,6 +19,7 @@ assert.deepEqual(emitted, ["tree-shake.mjs"], "Unused generator chunks must be r
 const bundled = await readFile("consumer-dist/tree-shake.mjs", "utf8");
 assert.doesNotMatch(bundled, /(?:from\s*|import\s*\(?)["'](?:effect|typescript|node:|@elmeragroup\/)/);
 assert.doesNotMatch(bundled, /generateApiArtifacts|ProjectExtractor|eslintCompatPlugin/);
+assert.doesNotMatch(bundled, /releaseCheckedCommit|retryRelease|verified-release\.tgz|elmera\/release\//);
 assert.ok(bundled.length < 4000, `Error-only consumer retained ${bundled.length} bytes`);
 // SAFETY: this bundle re-exports only the installed public error class.
 const { ApiArtifactsError } =

@@ -1,8 +1,8 @@
 # Release
 
 Private workspace for publication identity, configuration, versioning, policy, and Effect
-operations. It is not published; `@elmeragroup/internal` remains the only npm package. Requires
-Node >=24.13.0 <25.
+operations. It is not published; `@elmeragroup/internal` remains the only npm package. Consumers
+import the operations from `@elmeragroup/internal/release`. Requires Node >=24.13.0 <25.
 
 Callers pass checkout root, package directory, and package name. The module does not derive the
 repository from its own path. `resolveReleasePackage` resolves both directories, requires the package

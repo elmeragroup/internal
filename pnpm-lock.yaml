@@ -203,6 +203,9 @@ importers:
       '@elmeragroup/oxlint-plugin-anti-slop':
         specifier: workspace:*
         version: link:../oxlint-anti-slop
+      '@elmeragroup/release':
+        specifier: workspace:*
+        version: link:../release
       '@elmeragroup/typescript-config':
         specifier: workspace:*
         version: link:../../tooling/typescript

@@ -45,19 +45,23 @@ Packaging and publishing support stable `x.y.z` and canary `x.y.z-canary.N` vers
 
 The package has explicit ESM entries:
 
-| Import                                      | Purpose                                                     |
-| ------------------------------------------- | ----------------------------------------------------------- |
-| `@elmeragroup/internal`                     | Artifact generation with Elmera defaults, errors, and types |
-| `@elmeragroup/internal/api-artifacts`       | The same generator, errors, and types as the root           |
-| `@elmeragroup/internal/api-artifacts/model` | Artifact types with an empty runtime module                 |
-| `@elmeragroup/internal/api-extractor`       | Low-level Effect extraction, models, schemas, and errors    |
-| `@elmeragroup/internal/oxlint`              | Elmera Oxlint plugin default export                         |
-| `@elmeragroup/internal/oxlint/anti-slop`    | Anti-slop Oxlint plugin default export                      |
+| Import                                      | Purpose                                                                   |
+| ------------------------------------------- | ------------------------------------------------------------------------- |
+| `@elmeragroup/internal`                     | Artifact generation with Elmera defaults, errors, and types               |
+| `@elmeragroup/internal/api-artifacts`       | The same generator, errors, and types as the root                         |
+| `@elmeragroup/internal/api-artifacts/model` | Artifact types with an empty runtime module                               |
+| `@elmeragroup/internal/api-extractor`       | Low-level Effect extraction, models, schemas, and errors                  |
+| `@elmeragroup/internal/oxlint`              | Elmera Oxlint plugin default export                                       |
+| `@elmeragroup/internal/oxlint/anti-slop`    | Anti-slop Oxlint plugin default export                                    |
+| `@elmeragroup/internal/release`             | Checked-commit publication, recorded-archive retry, and release-PR checks |
 
 TypeScript, Effect, and `@oxlint/plugins` are pinned runtime dependencies. Installing the package
 includes the compiler. Importing lint entries does not load TypeScript or Effect. Consumer bundlers
 can remove unused exports. Future browser-safe helpers belong in separate entries; the root remains
 the convenient artifact generator.
+
+npm OIDC covers publish commands, not `dist-tag` updates ([ADR 0004](docs/adr/0004-pack-and-verify-is-the-consumer-seam.md)).
+Resolving promotion authentication is an open prerequisite for UI adoption.
 
 ## Development
 
@@ -72,7 +76,7 @@ pnpm test:packed-consumer
 
 `packages:pack` builds the package archive without publishing. `canary:pack` is a compatibility alias
 for the same command. The consumer test installs the packed package in a temporary project and
-checks extraction, defaults, drift detection, all public declarations, both lint plugins, and consumer tree-shaking without workspace links.
+checks extraction, defaults, drift detection, all public declarations, both lint plugins, consumer tree-shaking, and packed UI-shaped release consumption without workspace links.
 It installs a private copy of the archive it verified and writes a receipt bound to that archive's
 report. Repacking after verification invalidates the receipt, so re-run `pnpm test:packed-consumer`
 before preparing a release record.

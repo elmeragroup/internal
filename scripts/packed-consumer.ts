@@ -45,7 +45,7 @@ try {
       cpSync(resolve(repoRoot, "test/packed-consumer"), resolve(consumer, "checks"), { recursive: true });
       run("pnpm", ["install", "--ignore-scripts"], consumer);
       // Node's type stripping is disabled to prove only compiled JavaScript is loaded.
-      for (const check of ["api", "types", "lint", "tree-shaking"]) {
+      for (const check of ["api", "types", "lint", "tree-shaking", "release"]) {
         run(process.execPath, ["--no-experimental-strip-types", `checks/${check}.mjs`], consumer);
       }
     }

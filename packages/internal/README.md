@@ -59,6 +59,45 @@ Configure the plugins explicitly in Oxlint:
 `enforce-variant-standard` requires a structural connection between a `tv()` recipe with axes and the component's props: `VariantProps` must be imported from `tailwind-variants` and applied to `typeof <recipe>` in an exported props type or a function parameter annotation.
 
 Both entries export a default plugin. They do not load TypeScript or Effect.
+
+## Release
+
+`@elmeragroup/internal/release` exports checked-commit publication, recorded-archive retry, and
+release-PR checks. Importing the entry does not publish, write the filesystem, or read credentials.
+GitHub token and repository (`GH_TOKEN`, `GITHUB_REPOSITORY`) and the checkout layout are validated
+when an operation that needs them runs. `resolveReleasePackage` may read `package.json` when called.
+
+```ts
+import {
+  checkReleasePr,
+  releaseCheckedCommit,
+  retryRelease,
+  resolveReleasePackage,
+  type PackAndVerify,
+} from "@elmeragroup/internal/release";
+```
+
+The operations return Effect:
+
+```ts
+checkReleasePr(pkg: ReleasePackage): Effect<void, ReleaseError>
+releaseCheckedCommit(pkg: ReleasePackage, adapter: PackAndVerify, commit: string): Effect<void, ReleaseError>
+retryRelease(pkg: ReleasePackage, recordTag: string): Effect<void, ReleaseError>
+```
+
+`checkReleasePr` does not need GitHub credentials. `releaseCheckedCommit` takes a pack-and-verify
+adapter; Git, GitHub, and npm use production defaults inside the engine.
+
+```ts
+type PackAndVerify = {
+  pack: (intent: ReleaseIntent) => Uint8Array;
+};
+```
+
+The adapter stamps packed identity, builds, packs, verifies, and returns the durable
+`verified-release.tgz` bytes. Callers pass checkout root, package directory, and package name;
+the module does not derive the repository from its own path.
+
 The package is ESM-only. Installation includes the pinned compiler and Effect runtime, while
 consumer bundlers can remove unused exports. Browser-safe helpers must have separate entries;
 the root is reserved for artifact generation.

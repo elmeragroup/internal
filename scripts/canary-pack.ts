@@ -57,6 +57,7 @@ const expectedExports = [
   "./api-extractor",
   "./oxlint",
   "./oxlint/anti-slop",
+  "./release",
 ];
 const exports = asRecord(manifest.exports, "exports");
 if (JSON.stringify(Object.keys(exports)) !== JSON.stringify(expectedExports))
