@@ -1,6 +1,6 @@
 import { Schema } from "effect";
 
-import { decodeJson, decodeUnknown } from "./json.ts";
+import { decodeJson } from "./json.ts";
 import type { PublishedVersion, Registry } from "./registry.ts";
 
 export type { PublishedVersion, Registry };
@@ -18,7 +18,7 @@ const NpmVersion = Schema.Struct({
 });
 
 const NpmPackument = Schema.Struct({
-  versions: Schema.Record(Schema.String, Schema.Json),
+  versions: Schema.Record(Schema.String, NpmVersion),
   "dist-tags": Schema.Record(Schema.String, Schema.String),
 });
 
@@ -41,16 +41,11 @@ export async function readRegistry(packageName: string, request: typeof fetch = 
   if (!response.ok) throw new Error(`npm registry lookup failed: ${String(response.status)}`);
   const data = decodeJson(await response.text(), NpmPackument, "npm registry");
   const versions = new Map<string, PublishedVersion>();
-  for (const [version, value] of Object.entries(data.versions)) {
-    const manifest = decodeUnknown(value, NpmVersion, version);
+  for (const [version, manifest] of Object.entries(data.versions)) {
     versions.set(version, {
       integrity: manifest.dist.integrity,
       commit: publishedCommit(manifest),
     });
   }
-  const tags = new Map<string, string>();
-  for (const [tag, version] of Object.entries(data["dist-tags"])) {
-    tags.set(tag, version);
-  }
-  return { versions, tags };
+  return { versions, tags: new Map(Object.entries(data["dist-tags"])) };
 }

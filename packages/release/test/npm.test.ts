@@ -44,4 +44,18 @@ describe("registry failures", () => {
       readRegistry(packageName, () => Promise.resolve(Response.json({ error: "invalid" })))
     ).rejects.toThrow();
   });
+  it("names the malformed version in the decode cause", async () => {
+    const failure = await readRegistry(packageName, () =>
+      Promise.resolve(
+        Response.json({
+          versions: { "0.1.0": { dist: "not-an-object" } },
+          "dist-tags": {},
+        })
+      )
+    ).catch((error: Error) => error);
+    if (!(failure instanceof Error)) throw new Error("expected the registry read to fail");
+    expect(failure.message).toBe("npm registry is invalid");
+    if (!(failure.cause instanceof Error)) throw new Error("expected a decode cause");
+    expect(failure.cause.message).toContain('["versions"]["0.1.0"]["dist"]');
+  });
 });
