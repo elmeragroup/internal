@@ -192,7 +192,7 @@ describe("git port manifest version at a revision", () => {
         const baseline = commitBaseline(workspace);
         expect(() =>
           createGitPort(workspace.path, packageManifest, remoteTrackingRef).stableVersionAt(baseline)
-        ).toThrow("recorded manifest version is not a string");
+        ).toThrow("recorded manifest is invalid");
       });
     },
     workspaceTimeout
@@ -206,7 +206,7 @@ describe("git port manifest version at a revision", () => {
         const baseline = commitBaseline(workspace);
         expect(() =>
           createGitPort(workspace.path, packageManifest, remoteTrackingRef).stableVersionAt(baseline)
-        ).toThrow("recorded manifest is not a JSON object");
+        ).toThrow("recorded manifest is invalid");
       });
     },
     workspaceTimeout

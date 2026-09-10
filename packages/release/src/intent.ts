@@ -1,6 +1,6 @@
 import { Schema } from "effect";
 
-import { decodeJson, isJsonString } from "./json.ts";
+import { decodeJson } from "./json.ts";
 import { assertCanaryReleaseVersion, assertStableReleaseVersion, isStableReleaseVersion } from "./version.ts";
 
 export type ReleaseIntent = {
@@ -18,11 +18,11 @@ export const releaseRecordOwner = "elmera-release";
 export const verifiedBundleName = "verified-release.tgz";
 
 const IntentDocument = Schema.Struct({
-  schema: Schema.optionalKey(Schema.Json),
-  owner: Schema.optionalKey(Schema.Json),
-  channel: Schema.optionalKey(Schema.Json),
-  version: Schema.optionalKey(Schema.Json),
-  commit: Schema.optionalKey(Schema.Json),
+  schema: Schema.Literal(1),
+  owner: Schema.optionalKey(Schema.Literal(releaseRecordOwner)),
+  channel: Schema.Literals(["stable", "canary"]),
+  version: Schema.String,
+  commit: Schema.String,
 });
 
 function isCommit(value: string): boolean {
@@ -50,14 +50,6 @@ export function assertReleaseTag(tag: string): string {
 
 export function parseIntent(text: string): ReleaseIntent {
   const value = decodeJson(text, IntentDocument, "release intent");
-  if (value.owner !== undefined && value.owner !== releaseRecordOwner) {
-    throw new Error("Unsupported release intent");
-  }
-  if (value.schema !== 1 || (value.channel !== "stable" && value.channel !== "canary")) {
-    throw new Error("Unsupported release intent");
-  }
-  if (!isJsonString(value.version)) throw new Error("version is not a string");
-  if (!isJsonString(value.commit)) throw new Error("commit is not a string");
   if (value.channel === "stable") assertStableReleaseVersion(value.version);
   else assertCanaryReleaseVersion(value.version);
   return { channel: value.channel, version: value.version, commit: assertCommit(value.commit) };

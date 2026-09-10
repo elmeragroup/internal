@@ -25,11 +25,7 @@ const ChangesetPlan = Schema.Struct({
 });
 
 /** One entry of the Changesets release plan; `type` is `none` for a package that stays put. */
-export type PlannedRelease = {
-  name: string;
-  type: string;
-  newVersion: string;
-};
+export type PlannedRelease = typeof PlannedReleaseEntry.Type;
 
 function changesetBin(checkoutRoot: string): string {
   return createRequire(resolve(checkoutRoot, "package.json")).resolve("@changesets/cli/bin.js");
@@ -61,7 +57,7 @@ export function changesetTrackedBranch(checkoutRoot: string): string {
  *
  * The CLI binary is resolved from the consuming checkout, never from this package's location.
  */
-export function readReleasePlan(checkoutRoot: string): PlannedRelease[] {
+export function readReleasePlan(checkoutRoot: string): readonly PlannedRelease[] {
   const planPath = resolve(checkoutRoot, planFileName);
   mkdirSync(resolve(checkoutRoot, ".artifacts"), { recursive: true });
   try {
@@ -69,15 +65,11 @@ export function readReleasePlan(checkoutRoot: string): PlannedRelease[] {
       cwd: checkoutRoot,
       stdio: "pipe",
     });
-    return readJson(planPath, ChangesetPlan).releases.map((release) => ({
-      name: release.name,
-      type: release.type,
-      newVersion: release.newVersion,
-    }));
+    return readJson(planPath, ChangesetPlan).releases;
   } catch (error) {
     const message = error instanceof Error ? error.message : "changeset status failed";
     const stderr = error instanceof Error && "stderr" in error ? error.stderr : undefined;
-    const details = Object.prototype.toString.call(stderr) === "[object String]" ? String(stderr) : "";
+    const details = Schema.is(Schema.String)(stderr) ? stderr : "";
     throw new Error(details === "" ? message : `${message}\n${details}`, { cause: error });
   } finally {
     rmSync(planPath, { force: true });

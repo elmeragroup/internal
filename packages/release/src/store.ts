@@ -1,13 +1,9 @@
-import { createGitHubClient } from "./github.ts";
-import type { GitHubClient, GitHubRelease, GitHubReleaseAsset } from "./github.ts";
-import {
-  decodeGitHubRelease,
-  decodeGitHubTagRef,
-  GitHubReleaseAsset as GitHubReleaseAssetSchema,
-} from "./github.ts";
+import { Schema } from "effect";
+
+import { createGitHubClient, GitHubRelease, GitHubReleaseAsset, GitHubTagRef } from "./github.ts";
+import type { GitHubClient } from "./github.ts";
 import { releaseTag, serializeIntent, verifiedBundleName } from "./intent.ts";
 import type { ReleaseIntent } from "./intent.ts";
-import { decodeUnknown, isJsonString } from "./json.ts";
 import { classifyReleaseRecord } from "./ownership.ts";
 
 export type ReleaseAsset = { state: "missing" } | { state: "starter" | "uploaded"; id: number };
@@ -27,12 +23,6 @@ export type ReleaseStore = {
   reservedCanaryVersions: () => Promise<string[]>;
 };
 
-export type ReleaseAssetFields = {
-  id: number;
-  state: string;
-  size: number;
-};
-
 type CatalogEntry = { kind: "saved"; release: SavedRelease } | { kind: "foreign" };
 type ReleaseCatalog = Map<string, CatalogEntry>;
 
@@ -46,9 +36,7 @@ function assertSameIntent(saved: ReleaseIntent, intended: ReleaseIntent): void {
 }
 
 function releaseBodyText(value: GitHubRelease): string {
-  if (value.body === null || value.body === undefined) return "";
-  if (!isJsonString(value.body)) throw new Error("release body is not a string");
-  return value.body;
+  return value.body ?? "";
 }
 
 function assetNames(value: GitHubRelease): string[] {
@@ -70,7 +58,7 @@ function recordIntent(value: GitHubRelease): ReleaseIntent {
 /** `starterAllowed` records that an empty placeholder is only legal on a draft release. */
 export function classifyReleaseAsset(
   starterAllowed: boolean,
-  asset: ReleaseAssetFields | undefined
+  asset: GitHubReleaseAsset | undefined
 ): ReleaseAsset {
   if (asset === undefined) return { state: "missing" };
   if (asset.state === "starter") {
@@ -82,29 +70,24 @@ export function classifyReleaseAsset(
   return { state: "uploaded", id: asset.id };
 }
 
-function assetFields(asset: GitHubReleaseAsset): ReleaseAssetFields {
-  return { id: asset.id, state: asset.state, size: asset.size };
-}
-
 function savedReleaseFrom(value: GitHubRelease, intent: ReleaseIntent): SavedRelease {
   const assets = value.assets.filter((asset) => asset.name === verifiedBundleName);
   if (assets.length > 1) throw new Error("Duplicate release archives");
-  const raw = assets[0];
   return {
     id: value.id,
     intent,
-    asset: classifyReleaseAsset(value.draft === true, raw === undefined ? undefined : assetFields(raw)),
+    asset: classifyReleaseAsset(value.draft === true, assets[0]),
   };
 }
 
 export function createReleaseStore(client: GitHubClient, packageName: string): ReleaseStore {
-  const { root, request, data } = client;
+  const { root, request } = client;
   let catalog: ReleaseCatalog | undefined;
 
   async function readTagSha(tag: string): Promise<string | undefined> {
     const response = await request(`${root}/git/ref/tags/${encodeURIComponent(tag)}`, { allow404: true });
     if (response === undefined) return undefined;
-    const object = decodeGitHubTagRef(await data(response), "tag target").object;
+    const { object } = await client.json(response, GitHubTagRef, "tag target");
     if (object.type !== "commit") {
       throw new Error("Release tag was moved or is not a direct commit reference");
     }
@@ -120,12 +103,12 @@ export function createReleaseStore(client: GitHubClient, packageName: string): R
   async function listReleases(): Promise<ReleaseCatalog> {
     const listed: ReleaseCatalog = new Map();
     for (let page = 1; ; page += 1) {
-      const pageItems = await client.items(
+      const pageItems = await client.json(
         await request(`${root}/releases?per_page=100&page=${String(page)}`),
+        Schema.Array(GitHubRelease),
         "GitHub releases"
       );
-      for (const item of pageItems) {
-        const value = decodeGitHubRelease(item, "GitHub release");
+      for (const value of pageItems) {
         const classification = classifyReleaseRecord(
           value.tag_name,
           releaseBodyText(value),
@@ -175,8 +158,9 @@ export function createReleaseStore(client: GitHubClient, packageName: string): R
   }
 
   async function readSaved(id: number): Promise<SavedRelease> {
-    const value = decodeGitHubRelease(
-      await data(await request(`${root}/releases/${String(id)}`)),
+    const value = await client.json(
+      await request(`${root}/releases/${String(id)}`),
+      GitHubRelease,
       "GitHub release"
     );
     const saved = savedReleaseFrom(value, recordIntent(value));
@@ -194,29 +178,30 @@ export function createReleaseStore(client: GitHubClient, packageName: string): R
     }
     const sha = await readTagSha(tag);
     if (sha === undefined) {
-      await data(
+      await client.json(
         await request(`${root}/git/refs`, {
           method: "POST",
           body: JSON.stringify({ ref: `refs/tags/${tag}`, sha: intent.commit }),
-        })
+        }),
+        GitHubTagRef,
+        "created tag"
       );
     } else if (sha !== intent.commit) {
       throw new Error("Existing release tag points to a different commit");
     }
-    const value = decodeGitHubRelease(
-      await data(
-        await request(`${root}/releases`, {
-          method: "POST",
-          body: JSON.stringify({
-            tag_name: tag,
-            target_commitish: intent.commit,
-            name: `${packageName} ${intent.version}`,
-            body: serializeIntent(intent),
-            draft: true,
-            prerelease: intent.channel === "canary",
-          }),
-        })
-      ),
+    const value = await client.json(
+      await request(`${root}/releases`, {
+        method: "POST",
+        body: JSON.stringify({
+          tag_name: tag,
+          target_commitish: intent.commit,
+          name: `${packageName} ${intent.version}`,
+          body: serializeIntent(intent),
+          draft: true,
+          prerelease: intent.channel === "canary",
+        }),
+      }),
+      GitHubRelease,
       "GitHub release"
     );
     const created = savedReleaseFrom(value, recordIntent(value));
@@ -234,23 +219,18 @@ export function createReleaseStore(client: GitHubClient, packageName: string): R
     if (current.asset.state === "starter") {
       await request(`${root}/releases/assets/${String(current.asset.id)}`, { method: "DELETE" });
     }
-    const uploadedAsset = decodeUnknown(
-      await data(
-        await request(
-          `${client.uploadRoot}/releases/${String(release.id)}/assets?name=${verifiedBundleName}`,
-          {
-            method: "POST",
-            body: new Blob([new Uint8Array(bytes)]),
-          }
-        )
-      ),
-      GitHubReleaseAssetSchema,
+    const uploadedAsset = await client.json(
+      await request(`${client.uploadRoot}/releases/${String(release.id)}/assets?name=${verifiedBundleName}`, {
+        method: "POST",
+        body: new Blob([new Uint8Array(bytes)]),
+      }),
+      GitHubReleaseAsset,
       "uploaded asset"
     );
     const uploaded: SavedRelease = {
       id: release.id,
       intent: current.intent,
-      asset: classifyReleaseAsset(false, assetFields(uploadedAsset)),
+      asset: classifyReleaseAsset(false, uploadedAsset),
     };
     await remember(uploaded);
     return uploaded;
@@ -270,11 +250,13 @@ export function createReleaseStore(client: GitHubClient, packageName: string): R
   async function complete(release: SavedRelease): Promise<void> {
     if (release.asset.state !== "uploaded")
       throw new Error("A release record cannot be published without its verified archive");
-    await data(
+    await client.json(
       await request(`${root}/releases/${String(release.id)}`, {
         method: "PATCH",
         body: JSON.stringify({ draft: false, make_latest: "false" }),
-      })
+      }),
+      GitHubRelease,
+      "GitHub release"
     );
   }
 

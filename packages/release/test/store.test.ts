@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { createGitHubClient } from "../src/github.ts";
 import { releaseRecordOwner, serializeIntent, verifiedBundleName } from "../src/intent.ts";
 import type { ReleaseIntent } from "../src/intent.ts";
-import { decodeJson, decodeJsonArray } from "../src/json.ts";
+import { decodeJson } from "../src/json.ts";
 import { classifyReleaseAsset, createReleaseStore } from "../src/store.ts";
 import type { ReleaseStore, SavedRelease } from "../src/store.ts";
 
@@ -214,36 +214,24 @@ describe("durable GitHub release records", () => {
 
 describe("release asset classification", () => {
   it("classifies a draft starter and a non-zero uploaded asset", () => {
-    expect(classifyReleaseAsset(true, { id: 2, state: "starter", size: 0 })).toEqual({
-      state: "starter",
-      id: 2,
-    });
-    expect(classifyReleaseAsset(true, { id: 2, state: "uploaded", size: 12 })).toEqual({
-      state: "uploaded",
-      id: 2,
-    });
+    expect(classifyReleaseAsset(true, starterAsset)).toEqual({ state: "starter", id: 2 });
+    expect(classifyReleaseAsset(true, uploadedAsset)).toEqual({ state: "uploaded", id: 2 });
     expect(classifyReleaseAsset(true, undefined)).toEqual({ state: "missing" });
   });
   it("rejects a non-draft starter asset", async () => {
-    expect(() => classifyReleaseAsset(false, { id: 2, state: "starter", size: 0 })).toThrow(
-      "Unsupported starter release asset"
-    );
+    expect(() => classifyReleaseAsset(false, starterAsset)).toThrow("Unsupported starter release asset");
     const { store } = githubStore([releaseRecord({ draft: false })]);
     await expect(store.find("v0.2.0")).rejects.toThrow("Unsupported starter release asset");
   });
   it("rejects an unknown asset state", async () => {
     const unknown = { id: 2, name: verifiedBundleName, state: "open", size: 0 };
-    expect(() => classifyReleaseAsset(true, { id: 2, state: "open", size: 0 })).toThrow(
-      "Unsupported release asset state open"
-    );
+    expect(() => classifyReleaseAsset(true, unknown)).toThrow("Unsupported release asset state open");
     const { store } = githubStore([releaseRecord({ assets: [unknown] })]);
     await expect(store.find("v0.2.0")).rejects.toThrow("Unsupported release asset state open");
   });
   it("rejects a size-zero uploaded asset", async () => {
     const empty = { id: 2, name: verifiedBundleName, state: "uploaded", size: 0 };
-    expect(() => classifyReleaseAsset(true, { id: 2, state: "uploaded", size: 0 })).toThrow(
-      "Uploaded release asset has no bytes"
-    );
+    expect(() => classifyReleaseAsset(true, empty)).toThrow("Uploaded release asset has no bytes");
     const { store } = githubStore([releaseRecord({ assets: [empty] })]);
     await expect(store.find("v0.2.0")).rejects.toThrow("Uploaded release asset has no bytes");
   });
@@ -298,8 +286,8 @@ describe("release record ownership in the GitHub store", () => {
         assets: [],
       },
     ]);
-    await expect(store.find("v0.2.0")).rejects.toThrow("commit is not a string");
-    await expect(store.create(intent)).rejects.toThrow("commit is not a string");
+    await expect(store.find("v0.2.0")).rejects.toThrow("release intent is invalid");
+    await expect(store.create(intent)).rejects.toThrow("release intent is invalid");
   });
 
   it("fails a marked owned record whose tag does not match its intent", async () => {
@@ -332,8 +320,8 @@ describe("release record ownership in the GitHub store", () => {
         assets: [],
       },
     ]);
-    await expect(store.reservedCanaryVersions()).rejects.toThrow("Unsupported release intent");
-    await expect(store.find(`canary-${commit}`)).rejects.toThrow("Unsupported release intent");
+    await expect(store.reservedCanaryVersions()).rejects.toThrow("release intent is invalid");
+    await expect(store.find(`canary-${commit}`)).rejects.toThrow("release intent is invalid");
   });
 
   it("reads unmarked schema-1 records without rewriting them", async () => {
@@ -380,12 +368,11 @@ describe("release record ownership in the GitHub store", () => {
 });
 
 describe("GitHub JSON arrays", () => {
-  it("parses arrays directly and rejects a wrapped object", () => {
-    expect(decodeJsonArray('[{"id":1}]', Schema.Struct({ id: Schema.Number }), "releases")).toEqual([
-      { id: 1 },
-    ]);
-    expect(() =>
-      decodeJsonArray('{"releases":[]}', Schema.Struct({ id: Schema.Number }), "releases")
-    ).toThrow("not a JSON array");
+  it("rejects a wrapped object where a release array is required", async () => {
+    const store = createReleaseStore(
+      createGitHubClient("example/package", "test", () => Promise.resolve(Response.json({ releases: [] }))),
+      packageName
+    );
+    await expect(store.reservedCanaryVersions()).rejects.toThrow("GitHub releases is invalid");
   });
 });

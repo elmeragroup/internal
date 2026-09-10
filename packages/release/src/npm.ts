@@ -1,25 +1,25 @@
 import { Schema } from "effect";
 
-import { decodeJson, decodeUnknown, isJsonString } from "./json.ts";
+import { decodeJson, decodeUnknown } from "./json.ts";
 import type { PublishedVersion, Registry } from "./registry.ts";
 
 export type { PublishedVersion, Registry };
 
+const ReleaseSource = Schema.Struct({
+  commit: Schema.String,
+});
+
 const NpmVersion = Schema.Struct({
   dist: Schema.Struct({
-    integrity: Schema.optionalKey(Schema.Json),
+    integrity: Schema.optionalKey(Schema.String),
   }),
-  elmeraRelease: Schema.optionalKey(Schema.Json),
-  gitHead: Schema.optionalKey(Schema.Json),
+  elmeraRelease: Schema.optionalKey(ReleaseSource),
+  gitHead: Schema.optionalKey(Schema.String),
 });
 
 const NpmPackument = Schema.Struct({
   versions: Schema.Record(Schema.String, Schema.Json),
-  "dist-tags": Schema.Record(Schema.String, Schema.Json),
-});
-
-const ReleaseSource = Schema.Struct({
-  commit: Schema.String,
+  "dist-tags": Schema.Record(Schema.String, Schema.String),
 });
 
 function registryUrl(packageName: string): string {
@@ -28,11 +28,11 @@ function registryUrl(packageName: string): string {
 
 function publishedCommit(manifest: typeof NpmVersion.Type): string | undefined {
   if (manifest.elmeraRelease === undefined) {
-    return isJsonString(manifest.gitHead) && /^[a-f0-9]{40}$/.test(manifest.gitHead)
+    return manifest.gitHead !== undefined && /^[a-f0-9]{40}$/.test(manifest.gitHead)
       ? manifest.gitHead
       : undefined;
   }
-  return decodeUnknown(manifest.elmeraRelease, ReleaseSource, "release source").commit;
+  return manifest.elmeraRelease.commit;
 }
 
 export async function readRegistry(packageName: string, request: typeof fetch = fetch): Promise<Registry> {
@@ -44,13 +44,12 @@ export async function readRegistry(packageName: string, request: typeof fetch = 
   for (const [version, value] of Object.entries(data.versions)) {
     const manifest = decodeUnknown(value, NpmVersion, version);
     versions.set(version, {
-      integrity: isJsonString(manifest.dist.integrity) ? manifest.dist.integrity : undefined,
+      integrity: manifest.dist.integrity,
       commit: publishedCommit(manifest),
     });
   }
   const tags = new Map<string, string>();
   for (const [tag, version] of Object.entries(data["dist-tags"])) {
-    if (!isJsonString(version)) throw new Error(`${tag} is not a string`);
     tags.set(tag, version);
   }
   return { versions, tags };

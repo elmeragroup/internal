@@ -32,7 +32,7 @@ function withCheckout(
   const version = options.version ?? "0.2.0";
   mkdirSync(packageDirectory, { recursive: true });
   mkdirSync(resolve(root, ".changeset"), { recursive: true });
-  writeFileSync(resolve(packageDirectory, "package.json"), JSON.stringify({ version }));
+  writeFileSync(resolve(packageDirectory, "package.json"), JSON.stringify({ name: "@acme/app", version }));
   writeFileSync(
     resolve(packageDirectory, "CHANGELOG.md"),
     `# changelog\n\n## ${options.changelog ?? version}\n`

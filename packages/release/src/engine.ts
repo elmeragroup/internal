@@ -160,6 +160,10 @@ export function executeCheckReleasePr(pkg: ReleasePackage, git: GitPort): Effect
   });
 }
 
+function liveGit(pkg: ReleasePackage): GitPort {
+  return createGitPort(pkg.checkoutRoot, packageManifestGitPath(pkg), changesetBaseBranch(pkg.checkoutRoot));
+}
+
 function livePublicationServices(pkg: ReleasePackage): PublicationServices {
   return {
     registry: () => readRegistry(pkg.packageName),
@@ -179,7 +183,7 @@ function livePublicationServices(pkg: ReleasePackage): PublicationServices {
 export function liveDeps(pkg: ReleasePackage): EngineDeps {
   const client = githubClientFromEnv();
   return {
-    git: createGitPort(pkg.checkoutRoot, packageManifestGitPath(pkg), changesetBaseBranch(pkg.checkoutRoot)),
+    git: liveGit(pkg),
     store: createReleaseStore(client, pkg.packageName),
     registry: () => readRegistry(pkg.packageName),
     stableGate: createStableReleaseGate(client, pkg.checkoutRoot, pkg.packageDirectory),
@@ -194,11 +198,9 @@ export function liveDeps(pkg: ReleasePackage): EngineDeps {
 
 export function checkReleasePr(pkg: ReleasePackage): Effect.Effect<void, ReleaseError> {
   return Effect.gen(function* () {
-    const git = yield* attempt(() =>
-      createGitPort(pkg.checkoutRoot, packageManifestGitPath(pkg), changesetBaseBranch(pkg.checkoutRoot))
-    );
+    const git = yield* attempt(() => liveGit(pkg));
     yield* executeCheckReleasePr(pkg, git);
-  }).pipe(Effect.scoped);
+  });
 }
 
 export function releaseCheckedCommit(

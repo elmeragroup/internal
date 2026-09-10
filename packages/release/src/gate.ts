@@ -1,8 +1,9 @@
+import { Schema } from "effect";
+
 import { readManifestVersion } from "./config.ts";
 import { assertStableReleaseFiles } from "./files.ts";
-import { decodeGitHubPullRequest } from "./github.ts";
+import { GitHubPullRequest } from "./github.ts";
 import type { GitHubClient } from "./github.ts";
-import { isJsonString } from "./json.ts";
 import { changesetTrackedBranch } from "./plan.ts";
 import { assertStableReleaseVersion } from "./version.ts";
 
@@ -21,21 +22,20 @@ async function assertMergedReleasePullRequest(
   commit: string,
   trackedBranch: string
 ): Promise<void> {
-  const pulls = await client.items(
+  const pulls = await client.json(
     await client.request(`${client.root}/commits/${commit}/pulls?per_page=100`),
+    Schema.Array(GitHubPullRequest),
     "commit pull requests"
   );
   const releaseHead = `changeset-release/${trackedBranch}`;
-  const merged = pulls.some((pull) => {
-    const parsed = decodeGitHubPullRequest(pull, "PR");
-    return (
-      isJsonString(parsed.merged_at) &&
-      parsed.merge_commit_sha === commit &&
-      parsed.head.ref === releaseHead &&
-      parsed.base.ref === trackedBranch &&
-      parsed.head.repo.full_name === client.repository
-    );
-  });
+  const merged = pulls.some(
+    (pull) =>
+      pull.merged_at !== null &&
+      pull.merge_commit_sha === commit &&
+      pull.head.ref === releaseHead &&
+      pull.base.ref === trackedBranch &&
+      pull.head.repo.full_name === client.repository
+  );
   if (!merged) {
     throw new Error(`A stable version change must come from a merged ${releaseHead} PR`);
   }

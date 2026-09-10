@@ -1,8 +1,8 @@
-import { Schema } from "effect";
 import { execFileSync, spawnSync } from "node:child_process";
 
+import { PackageManifest } from "./config.ts";
 import { assertCommit } from "./intent.ts";
-import { decodeJson, isJsonString } from "./json.ts";
+import { decodeJson } from "./json.ts";
 import type { CommitAncestry } from "./policy.ts";
 import { assertStableReleaseVersion } from "./version.ts";
 
@@ -49,12 +49,9 @@ export function createGitPort(cwd: string, packageManifest: string, remoteTracki
     stableVersionAt: (revision) => {
       const recorded = decodeJson(
         git(cwd, ["show", `${revision}:${manifest}`]),
-        Schema.Struct({ version: Schema.optionalKey(Schema.Json) }),
+        PackageManifest,
         "recorded manifest"
       );
-      if (!isJsonString(recorded.version)) {
-        throw new Error("recorded manifest version is not a string");
-      }
       return assertStableReleaseVersion(recorded.version);
     },
     isAncestor: createCommitAncestry(cwd),

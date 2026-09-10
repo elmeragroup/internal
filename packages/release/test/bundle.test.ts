@@ -24,6 +24,16 @@ function sha256Hex(bytes: Buffer): string {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
+type WrittenReceipt = {
+  status: string;
+  version: string;
+  archiveReportSha256: string;
+};
+
+function writeReceiptJson(directory: string, receipt: WrittenReceipt): void {
+  writeFileSync(join(directory, "verified.json"), JSON.stringify(receipt));
+}
+
 function writeReceipt(directory: string, recordedPackageName: string): void {
   const archive = join(directory, "package.tgz");
   const bytes = readFileSync(archive);
@@ -40,14 +50,11 @@ function writeReceipt(directory: string, recordedPackageName: string): void {
       },
     })
   );
-  writeFileSync(
-    join(directory, "verified.json"),
-    JSON.stringify({
-      version: intent.version,
-      archiveReportSha256: sha256Hex(readFileSync(reportPath)),
-      status: "pass",
-    })
-  );
+  writeReceiptJson(directory, {
+    version: intent.version,
+    archiveReportSha256: sha256Hex(readFileSync(reportPath)),
+    status: "pass",
+  });
 }
 
 function withRecordedArchive(check: (directory: string) => void, recordedPackageName = packageName): void {
@@ -113,17 +120,23 @@ describe("recorded archive recovery", () => {
       expect(verifyRelease(directory, intent, "@acme/app").integrity).toMatch(/^sha512-/);
     }, "@acme/app");
   });
-  it("rejects a receipt that no longer matches the archive", () => {
+  it("accepts the receipt it earned", () => {
     withRecordedArchive((directory) => {
       expect(assertReceipt(directory, intent, packageName)).toMatch(/package\.tgz$/);
-      writeFileSync(
-        join(directory, "verified.json"),
-        JSON.stringify({
-          version: intent.version,
-          archiveReportSha256: "0".repeat(64),
-          status: "fail",
-        })
-      );
+    });
+  });
+  it.each<[string, (receipt: WrittenReceipt) => WrittenReceipt]>([
+    ["failed status", (receipt) => ({ ...receipt, status: "fail" })],
+    ["wrong version", (receipt) => ({ ...receipt, version: "0.2.0-canary.1" })],
+    ["stale digest", (receipt) => ({ ...receipt, archiveReportSha256: "0".repeat(64) })],
+  ])("rejects a receipt with an invalid %s", (_part, tamper) => {
+    withRecordedArchive((directory) => {
+      const earned: WrittenReceipt = {
+        status: "pass",
+        version: intent.version,
+        archiveReportSha256: sha256Hex(readFileSync(join(directory, "archive.json"))),
+      };
+      writeReceiptJson(directory, tamper(earned));
       expect(() => assertReceipt(directory, intent, packageName)).toThrow("does not match");
     });
   });

@@ -38,11 +38,17 @@ describe("release record identity", () => {
   it("rejects a foreign owner, unsupported channel, canary-as-stable, and short SHA", () => {
     const recorded = { schema: 1, channel: "stable", version: "0.2.0", commit };
     expect(() => parseIntent(JSON.stringify({ ...recorded, owner: "other-release" }))).toThrow(
-      "Unsupported release intent"
+      "release intent is invalid"
     );
-    expect(() => parseIntent(JSON.stringify({ ...recorded, channel: "beta" }))).toThrow();
-    expect(() => parseIntent(JSON.stringify({ ...recorded, version: "0.2.0-canary.0" }))).toThrow();
-    expect(() => parseIntent(JSON.stringify({ ...recorded, commit: "main" }))).toThrow();
+    expect(() => parseIntent(JSON.stringify({ ...recorded, channel: "beta" }))).toThrow(
+      "release intent is invalid"
+    );
+    expect(() => parseIntent(JSON.stringify({ ...recorded, version: "0.2.0-canary.0" }))).toThrow(
+      "Expected a stable version"
+    );
+    expect(() => parseIntent(JSON.stringify({ ...recorded, commit: "main" }))).toThrow(
+      "Expected a full commit SHA"
+    );
   });
 
   it("accepts only v<stable> and canary-<sha> record tags", () => {

@@ -11,6 +11,16 @@ describe("ReleaseError", () => {
     expect(toReleaseError(new Error("original Merge job")).message).toBe("original Merge job");
   });
 
+  it("keeps the deepest diagnostic cause for wrapped decode failures", () => {
+    const wrapped = new Error("release intent is invalid", {
+      cause: new Error('Missing key\n  at ["commit"]'),
+    });
+    expect(toReleaseError(wrapped)).toMatchObject({
+      message: "release intent is invalid",
+      cause: 'Missing key\n  at ["commit"]',
+    });
+  });
+
   it("can carry an original diagnostic cause", () => {
     const error = new ReleaseError({
       message: "Publication could not be verified; retry the recorded release",

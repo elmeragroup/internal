@@ -36,10 +36,10 @@ describe("release record ownership", () => {
         JSON.stringify({ schema: 1, owner: releaseRecordOwner, channel: "stable", version: "0.2.0" }),
         []
       )
-    ).toThrow("commit is not a string");
+    ).toThrow("release intent is invalid");
     expect(() =>
       classifyReleaseRecord("v0.2.0", JSON.stringify({ schema: 2, owner: releaseRecordOwner, ...stable }), [])
-    ).toThrow("Unsupported release intent");
+    ).toThrow("release intent is invalid");
     expect(() => classifyReleaseRecord(`canary-${commit}`, serializeIntent(stable), [])).toThrow(
       "Release tag does not match its intent"
     );
@@ -48,11 +48,11 @@ describe("release record ownership", () => {
   it("fails malformed unmarked schema-1 candidates and incomplete bundle records", () => {
     expect(() =>
       classifyReleaseRecord("v0.2.0", JSON.stringify({ schema: 1, channel: "stable", version: "0.2.0" }), [])
-    ).toThrow("commit is not a string");
+    ).toThrow("release intent is invalid");
     expect(() => classifyReleaseRecord("v0.2.0", "not json", [verifiedBundleName])).toThrow(/JSON/);
     expect(() =>
       classifyReleaseRecord("v0.2.0", JSON.stringify({ notes: "human" }), [verifiedBundleName])
-    ).toThrow("Unsupported release intent");
+    ).toThrow("release intent is invalid");
   });
 
   it("skips a clearly foreign occupant of a record tag", () => {

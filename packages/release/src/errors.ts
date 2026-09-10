@@ -6,10 +6,26 @@ export class ReleaseError extends Schema.TaggedError<ReleaseError>()("ReleaseErr
   cause: Schema.optionalKey(Schema.String),
 }) {}
 
+/** The deepest recorded diagnostic, so wrapped decode failures keep their detail. */
+function diagnosticCause(error: Error): string | undefined {
+  let current: unknown = error.cause;
+  let message: string | undefined;
+  while (current instanceof Error) {
+    message = current.message;
+    current = current.cause;
+  }
+  return message;
+}
+
 // oxlint-disable-next-line anti-slop/no-unknown-parameters -- thrown values are narrowed at this seam.
 export function toReleaseError(cause: unknown): ReleaseError {
   if (cause instanceof ReleaseError) return cause;
-  if (cause instanceof Error) return new ReleaseError({ message: cause.message });
+  if (cause instanceof Error) {
+    const diagnostic = diagnosticCause(cause);
+    return diagnostic === undefined
+      ? new ReleaseError({ message: cause.message })
+      : new ReleaseError({ message: cause.message, cause: diagnostic });
+  }
   return new ReleaseError({ message: "Release operation failed" });
 }
 

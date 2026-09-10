@@ -10,6 +10,12 @@ export type ReleasePackage = {
   packageName: string;
 };
 
+/** The fields the release pipeline reads from any package manifest it touches. */
+export const PackageManifest = Schema.Struct({
+  name: Schema.String,
+  version: Schema.String,
+});
+
 function isDirectory(path: string): boolean {
   try {
     return statSync(path).isDirectory();
@@ -40,20 +46,16 @@ export function resolveReleasePackage(
   }
   const manifestPath = resolve(directory, "package.json");
   if (!existsSync(manifestPath)) throw new Error("Package directory does not contain package.json");
-  const name = readJson(manifestPath, Schema.Struct({ name: Schema.String })).name;
+  const { name } = readJson(manifestPath, PackageManifest);
   if (name !== packageName) {
     throw new Error(`Package name ${packageName} does not match ${name}`);
   }
   return { checkoutRoot: root, packageDirectory: directory, packageName };
 }
 
-const PackageVersionManifest = Schema.Struct({
-  version: Schema.String,
-});
-
 /** The `version` field of `package.json` in `packageDirectory`. */
 export function readManifestVersion(packageDirectory: string): string {
-  return readJson(resolve(packageDirectory, "package.json"), PackageVersionManifest).version;
+  return readJson(resolve(packageDirectory, "package.json"), PackageManifest).version;
 }
 
 /** Git path to the package manifest, always with forward slashes. */
