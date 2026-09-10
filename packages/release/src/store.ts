@@ -1,8 +1,11 @@
-import { releaseTag, serializeIntent, verifiedBundleName } from "../packages/release/src/intent.ts";
-import type { ReleaseIntent } from "../packages/release/src/intent.ts";
-import { classifyReleaseRecord } from "../packages/release/src/ownership.ts";
-import { asInteger, asRecord, asRecordArray, asString, isString } from "./lib/json-object.mjs";
-import type { GitHubClient, GitHubObject } from "./release-github-client.ts";
+import { Context } from "effect";
+
+import { createGitHubClient } from "./github.ts";
+import type { GitHubClient, GitHubObject } from "./github.ts";
+import { releaseTag, serializeIntent, verifiedBundleName } from "./intent.ts";
+import type { ReleaseIntent } from "./intent.ts";
+import { asInteger, asRecord, asRecordArray, asString, isString } from "./json.ts";
+import { classifyReleaseRecord } from "./ownership.ts";
 
 export type ReleaseAsset = { state: "missing" } | { state: "starter" | "uploaded"; id: number };
 
@@ -20,6 +23,8 @@ export type ReleaseStore = {
   complete: (release: SavedRelease) => Promise<void>;
   reservedCanaryVersions: () => Promise<string[]>;
 };
+
+export class Store extends Context.Service<Store, ReleaseStore>()("elmera/release/Store") {}
 
 export type ReleaseAssetFields = {
   id: number;
@@ -271,4 +276,11 @@ export function createReleaseStore(client: GitHubClient, packageName: string): R
   }
 
   return { find, create, upload, download, complete, reservedCanaryVersions };
+}
+
+export function githubClientFromEnv(
+  repository = process.env.GITHUB_REPOSITORY ?? "",
+  token = process.env.GH_TOKEN ?? ""
+): GitHubClient {
+  return createGitHubClient(repository, token);
 }

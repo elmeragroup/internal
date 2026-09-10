@@ -1,14 +1,18 @@
+import { Context } from "effect";
 import { execFileSync } from "node:child_process";
 import { mkdirSync, rmSync } from "node:fs";
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
 
-import { assertStableReleaseVersion, nextPatchVersion } from "../packages/release/src/version.ts";
-import { asRecordArray, asString, isString, readJsonObject } from "./lib/json-object.mjs";
+import { asRecordArray, asString, isString, readJsonObject } from "./json.ts";
+import { assertStableReleaseVersion, nextPatchVersion } from "./version.ts";
 
-const changesetBin = createRequire(import.meta.url).resolve("@changesets/cli/bin.js");
 // Relative to the directory the CLI runs in, and inside the ignored scratch directory.
 const planFileName = ".artifacts/changeset-release-plan.json";
+
+export class Planner extends Context.Service<Planner, { plannedCanaryBase: (current: string) => string }>()(
+  "elmera/release/Planner"
+) {}
 
 /** One entry of the Changesets release plan; `type` is `none` for a package that stays put. */
 export type PlannedRelease = {
@@ -17,23 +21,40 @@ export type PlannedRelease = {
   newVersion: string;
 };
 
+function changesetBin(checkoutRoot: string): string {
+  return createRequire(resolve(checkoutRoot, "package.json")).resolve("@changesets/cli/bin.js");
+}
+
+export function changesetBaseBranch(checkoutRoot: string): string {
+  const base = asString(
+    readJsonObject(resolve(checkoutRoot, ".changeset/config.json")).baseBranch,
+    "changeset baseBranch"
+  );
+  if (!base.startsWith("origin/")) {
+    throw new Error("Changesets baseBranch must be a remote-tracking ref (origin/<branch>)");
+  }
+  return base;
+}
+
 /**
- * Asks Changesets which releases the pending changesets in `cwd` would produce.
+ * Asks Changesets which releases the pending changesets in `checkoutRoot` would produce.
  *
  * Two properties of the pinned CLI are load-bearing here. It writes `--output` with
  * `path.join(cwd, output)`, so the path must stay relative to the directory the CLI runs in; an
  * absolute path is concatenated onto that directory instead. It also resolves the configured
  * `baseBranch` through `git merge-base`, which is why `.changeset/config.json` names
- * `origin/main` — the publisher runs in a detached checkout of one commit, where a bare `main`
- * does not resolve. Passing `--since` is not a substitute: it also filters out every changeset
+ * `origin/<branch>` — the publisher runs in a detached checkout of one commit, where a bare branch
+ * name does not resolve. Passing `--since` is not a substitute: it also filters out every changeset
  * added before that ref, which would silently plan the wrong version.
+ *
+ * The CLI binary is resolved from the consuming checkout, never from this package's location.
  */
-export function readReleasePlan(cwd: string): PlannedRelease[] {
-  const planPath = resolve(cwd, planFileName);
-  mkdirSync(resolve(cwd, ".artifacts"), { recursive: true });
+export function readReleasePlan(checkoutRoot: string): PlannedRelease[] {
+  const planPath = resolve(checkoutRoot, planFileName);
+  mkdirSync(resolve(checkoutRoot, ".artifacts"), { recursive: true });
   try {
-    execFileSync(process.execPath, [changesetBin, "status", "--output", planFileName], {
-      cwd,
+    execFileSync(process.execPath, [changesetBin(checkoutRoot), "status", "--output", planFileName], {
+      cwd: checkoutRoot,
       stdio: "pipe",
     });
     return asRecordArray(readJsonObject(planPath).releases, "release plan").map((release) => ({
@@ -51,8 +72,8 @@ export function readReleasePlan(cwd: string): PlannedRelease[] {
 }
 
 /** The stable version a fresh canary counts up from: the planned release, else the next patch. */
-export function plannedCanaryBase(current: string, packageName: string, cwd: string): string {
-  const planned = readReleasePlan(cwd).filter(
+export function plannedCanaryBase(current: string, packageName: string, checkoutRoot: string): string {
+  const planned = readReleasePlan(checkoutRoot).filter(
     (release) => release.name === packageName && release.type !== "none"
   );
   if (planned.length > 1) throw new Error("Multiple release plans for the public package");

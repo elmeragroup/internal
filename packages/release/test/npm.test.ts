@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { asString } from "../scripts/lib/json-object.mjs";
-import { readRegistry } from "../scripts/release-registry.ts";
+import { asString } from "../src/json.ts";
+import { readRegistry } from "../src/npm.ts";
 
 const commit = "a".repeat(40);
 const packageName = "@elmeragroup/internal";

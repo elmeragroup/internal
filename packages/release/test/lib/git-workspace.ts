@@ -23,31 +23,56 @@ export type GitWorkspace = {
  * The committer identity, hooks path, and signing setting are fixed so a developer's own git
  * configuration cannot change what the case observes.
  */
-export function withGitWorkspace(prefix: string, run: (workspace: GitWorkspace) => void): void {
+type OpenedGitWorkspace = {
+  workspace: GitWorkspace;
+  close: () => void;
+};
+
+function openGitWorkspace(prefix: string): OpenedGitWorkspace {
   const path = mkdtempSync(join(tmpdir(), prefix));
   const hooksDir = join(path, ".empty-git-hooks");
+  mkdirSync(hooksDir);
+  const git = (args: readonly string[]): string =>
+    execFileSync(
+      "git",
+      [
+        "-c",
+        "user.name=ReleaseTest",
+        "-c",
+        "user.email=release-test@example.invalid",
+        "-c",
+        `core.hooksPath=${hooksDir}`,
+        "-c",
+        "commit.gpgsign=false",
+        ...args,
+      ],
+      { cwd: path, env: { ...process.env, HUSKY: "0" }, encoding: "utf8", stdio: "pipe" }
+    ).trim();
+  git(["init", "--initial-branch=main"]);
+  return {
+    workspace: { path, git },
+    close: () => rmSync(path, { recursive: true, force: true }),
+  };
+}
+
+export function withGitWorkspace(prefix: string, run: (workspace: GitWorkspace) => void): void {
+  const { workspace, close } = openGitWorkspace(prefix);
   try {
-    mkdirSync(hooksDir);
-    const git = (args: readonly string[]): string =>
-      execFileSync(
-        "git",
-        [
-          "-c",
-          "user.name=ReleaseTest",
-          "-c",
-          "user.email=release-test@example.invalid",
-          "-c",
-          `core.hooksPath=${hooksDir}`,
-          "-c",
-          "commit.gpgsign=false",
-          ...args,
-        ],
-        { cwd: path, env: { ...process.env, HUSKY: "0" }, encoding: "utf8", stdio: "pipe" }
-      ).trim();
-    git(["init", "--initial-branch=main"]);
-    run({ path, git });
+    run(workspace);
   } finally {
-    rmSync(path, { recursive: true, force: true });
+    close();
+  }
+}
+
+export async function withGitWorkspaceAsync(
+  prefix: string,
+  run: (workspace: GitWorkspace) => Promise<void>
+): Promise<void> {
+  const { workspace, close } = openGitWorkspace(prefix);
+  try {
+    await run(workspace);
+  } finally {
+    close();
   }
 }
 

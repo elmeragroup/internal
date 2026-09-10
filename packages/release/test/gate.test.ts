@@ -3,9 +3,9 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { asString } from "../scripts/lib/json-object.mjs";
-import { createStableReleaseGate } from "../scripts/release-gate.ts";
-import { createGitHubClient } from "../scripts/release-github-client.ts";
+import { createStableReleaseGate } from "../src/gate.ts";
+import { createGitHubClient } from "../src/github.ts";
+import { asString } from "../src/json.ts";
 
 const commit = "a".repeat(40);
 

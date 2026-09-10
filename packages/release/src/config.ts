@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
-import { isAbsolute, relative, resolve, sep } from "node:path";
+import { isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import { asString, parseJsonObject } from "./json.ts";
 
@@ -44,4 +44,9 @@ export function resolveReleasePackage(
     throw new Error(`Package name ${packageName} does not match ${name}`);
   }
   return { checkoutRoot: root, packageDirectory: directory, packageName };
+}
+
+/** Git path to the package manifest, always with forward slashes. */
+export function packageManifestGitPath(pkg: ReleasePackage): string {
+  return join(relative(pkg.checkoutRoot, pkg.packageDirectory), "package.json").replaceAll("\\", "/");
 }

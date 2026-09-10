@@ -1,9 +1,10 @@
+import { Effect } from "effect";
 import { describe, expect, it, vi } from "vitest";
 
-import type { VerifiedRelease } from "../packages/release/src/intent.ts";
-import type { Registry } from "../packages/release/src/registry.ts";
-import { publishVerifiedRelease } from "../scripts/release-publication.ts";
-import type { PublicationServices } from "../scripts/release-publication.ts";
+import type { VerifiedRelease } from "../src/intent.ts";
+import { publishVerifiedRelease } from "../src/publication.ts";
+import type { PublicationServices } from "../src/publication.ts";
+import type { Registry } from "../src/registry.ts";
 
 const commit = "a".repeat(40);
 const newerCommit = "b".repeat(40);
@@ -31,10 +32,14 @@ function publication() {
   return { registry, services };
 }
 
+function publish(target: VerifiedRelease, services: PublicationServices) {
+  return Effect.runPromise(publishVerifiedRelease(target, services));
+}
+
 describe("verified publication", () => {
   it("uploads the verified archive then promotes after checking npm identity", async () => {
     const { services } = publication();
-    await publishVerifiedRelease(release, services);
+    await publish(release, services);
     expect(services.publish).toHaveBeenCalledWith(release.archive);
     expect(services.promote).toHaveBeenCalledWith(release.version, "canary");
   });
@@ -44,14 +49,14 @@ describe("verified publication", () => {
       registry.versions.set(release.version, { commit, integrity: release.integrity });
       throw new Error("connection lost");
     });
-    await publishVerifiedRelease(release, services);
+    await publish(release, services);
     expect(services.publish).toHaveBeenCalledTimes(1);
     expect(services.promote).toHaveBeenCalled();
   });
   it("retries without uploading an already verified version", async () => {
     const { services, registry } = publication();
     registry.versions.set(release.version, { commit, integrity: release.integrity });
-    await publishVerifiedRelease(release, services);
+    await publish(release, services);
     expect(services.publish).not.toHaveBeenCalled();
     expect(services.promote).toHaveBeenCalled();
   });
@@ -61,23 +66,28 @@ describe("verified publication", () => {
   ])("rejects an existing version with different identity", async (existing) => {
     const { services, registry } = publication();
     registry.versions.set(release.version, existing);
-    await expect(publishVerifiedRelease(release, services)).rejects.toThrow("does not match");
+    await expect(publish(release, services)).rejects.toThrow("does not match");
     expect(services.promote).not.toHaveBeenCalled();
     expect(services.publish).not.toHaveBeenCalled();
   });
-  it("does not promote an unverified upload", async () => {
+  it("does not promote an unverified upload and retains the npm error", async () => {
     const { services } = publication();
     services.publish.mockImplementation(() => {
-      throw new Error("npm denied publication");
+      throw new Error("connection lost");
     });
-    await expect(publishVerifiedRelease(release, services)).rejects.toThrow("could not be verified");
+    await expect(publish(release, services)).rejects.toMatchObject({
+      _tag: "ReleaseError",
+      message: "Publication could not be verified; retry the recorded release",
+      cause: "connection lost",
+    });
+    expect(services.publish).toHaveBeenCalledTimes(1);
     expect(services.promote).not.toHaveBeenCalled();
   });
   it("does not replace a newer canary even when the delayed version has a larger suffix", async () => {
     const { services, registry } = publication();
     registry.versions.set("0.2.0-canary.10", { commit: newerCommit, integrity: "other" });
     registry.tags.set("canary", "0.2.0-canary.10");
-    await publishVerifiedRelease(release, services);
+    await publish(release, services);
     expect(services.promote).not.toHaveBeenCalled();
   });
   it.each(["missing", "older", "already-uploaded"])(
@@ -96,7 +106,7 @@ describe("verified publication", () => {
       }
       if (state === "already-uploaded")
         registry.versions.set(release.version, { commit, integrity: release.integrity });
-      await publishVerifiedRelease(release, services);
+      await publish(release, services);
       expect(services.publish).not.toHaveBeenCalled();
       expect(services.promote).not.toHaveBeenCalled();
     }
@@ -107,14 +117,14 @@ describe("verified publication", () => {
       registry.versions.set(release.version, { commit, integrity: release.integrity });
       registry.versions.set("0.2.0-canary.12", { commit: newerCommit, integrity: "newer" });
     });
-    await publishVerifiedRelease(release, services);
+    await publish(release, services);
     expect(services.publish).toHaveBeenCalledOnce();
     expect(services.promote).not.toHaveBeenCalled();
   });
   it("skips a prepared canary once its stable base has shipped", async () => {
     const { services, registry } = publication();
     registry.versions.set("0.2.0", { commit: newerCommit, integrity: "stable" });
-    await expect(publishVerifiedRelease(release, services)).resolves.toBe("superseded");
+    await expect(publish(release, services)).resolves.toBe("superseded");
     expect(services.publish).not.toHaveBeenCalled();
     expect(services.promote).not.toHaveBeenCalled();
   });
@@ -126,7 +136,7 @@ describe("verified publication", () => {
     services.publish.mockImplementation(() =>
       registry.versions.set(stable.version, { commit, integrity: stable.integrity })
     );
-    await expect(publishVerifiedRelease(stable, services)).resolves.toBe("published");
+    await expect(publish(stable, services)).resolves.toBe("published");
     expect(services.publish).toHaveBeenCalledOnce();
     expect(services.promote).not.toHaveBeenCalled();
   });
@@ -137,13 +147,13 @@ describe("registry integrity", () => {
     const { services, registry } = publication();
     registry.versions.set("0.1.0", { commit: newerCommit });
     registry.versions.set(release.version, { commit });
-    await expect(publishVerifiedRelease(release, services)).rejects.toThrow("missing dist integrity");
+    await expect(publish(release, services)).rejects.toThrow("missing dist integrity");
     expect(services.publish).not.toHaveBeenCalled();
   });
   it("still publishes when an unrelated historical version lacks integrity", async () => {
     const { services, registry } = publication();
     registry.versions.set("0.1.0", { commit: "c".repeat(40) });
-    await publishVerifiedRelease(release, services);
+    await publish(release, services);
     expect(services.publish).toHaveBeenCalledWith(release.archive);
   });
 });

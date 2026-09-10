@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { join, relative, resolve } from "node:path";
+import { resolve } from "node:path";
 
 import { resolveReleasePackage } from "../packages/release/src/config.ts";
 import { assertReleaseVersion } from "../packages/release/src/version.ts";
@@ -15,10 +15,6 @@ export const repoRoot = releasePackage.checkoutRoot;
 export const packageDirectory = releasePackage.packageDirectory;
 export const packageName = releasePackage.packageName;
 export const manifestPath = resolve(releasePackage.packageDirectory, "package.json");
-export const packageManifest = join(
-  relative(releasePackage.checkoutRoot, releasePackage.packageDirectory),
-  "package.json"
-).replaceAll("\\", "/");
 export const archiveDirectory = resolve(releasePackage.checkoutRoot, ".artifacts/release");
 
 export function run(command: string, args: readonly string[], cwd = repoRoot): void {

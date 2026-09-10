@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { assertStableReleaseVersion, compareStableVersions } from "../packages/release/src/version.ts";
+import { assertStableReleaseVersion, compareStableVersions } from "./version.ts";
 
 export function assertStableReleaseFiles(
   previous: string,

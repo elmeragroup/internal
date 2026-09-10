@@ -1,16 +1,6 @@
-import { execFileSync } from "node:child_process";
+import { Effect } from "effect";
 
-import { asString, parseJsonObject } from "./lib/json-object.mjs";
-import { assertStableReleaseFiles } from "./release-files.ts";
-import { packageDirectory, packageManifest, releaseVersion, repoRoot } from "./release.ts";
+import { checkReleasePr } from "../packages/release/src/index.ts";
+import { releasePackage } from "./release.ts";
 
-const base = execFileSync("git", ["show", `origin/main:${packageManifest}`], {
-  cwd: repoRoot,
-  encoding: "utf8",
-});
-assertStableReleaseFiles(
-  asString(parseJsonObject(base, "main manifest").version, "main version"),
-  releaseVersion(),
-  repoRoot,
-  packageDirectory
-);
+await Effect.runPromise(checkReleasePr(releasePackage));

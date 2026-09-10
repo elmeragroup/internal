@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { releaseRecordOwner, serializeIntent, verifiedBundleName } from "../packages/release/src/intent.ts";
-import type { ReleaseIntent } from "../packages/release/src/intent.ts";
-import { asString, isString, parseJsonArray, parseJsonObject } from "../scripts/lib/json-object.mjs";
-import { createGitHubClient } from "../scripts/release-github-client.ts";
-import { classifyReleaseAsset, createReleaseStore } from "../scripts/release-github.ts";
-import type { ReleaseStore, SavedRelease } from "../scripts/release-github.ts";
+import { createGitHubClient } from "../src/github.ts";
+import { releaseRecordOwner, serializeIntent, verifiedBundleName } from "../src/intent.ts";
+import type { ReleaseIntent } from "../src/intent.ts";
+import { asString, isString, parseJsonArray, parseJsonObject } from "../src/json.ts";
+import { classifyReleaseAsset, createReleaseStore } from "../src/store.ts";
+import type { ReleaseStore, SavedRelease } from "../src/store.ts";
 
 const commit = "a".repeat(40);
 const packageName = "@elmeragroup/internal";

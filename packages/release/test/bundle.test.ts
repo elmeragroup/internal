@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -5,14 +6,43 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import type { ReleaseIntent } from "../packages/release/src/intent.ts";
-import { verifyPackedArchive } from "../scripts/packed-verification.ts";
-import { assertStableReleaseFiles } from "../scripts/release-files.ts";
-import { packReleaseBundle, unpackRelease, verifyRelease } from "../scripts/release-record.ts";
-import { packageName } from "../scripts/release.ts";
+import { packReleaseBundle, restoreVerifiedRelease, unpackRelease, verifyRelease } from "../src/bundle.ts";
+import { assertStableReleaseFiles } from "../src/files.ts";
+import type { ReleaseIntent } from "../src/intent.ts";
 
 const commit = "a".repeat(40);
 const intent: ReleaseIntent = { channel: "stable", version: "0.2.0", commit };
+const packageName = "@elmeragroup/internal";
+
+function sha256Hex(bytes: Buffer): string {
+  return createHash("sha256").update(bytes).digest("hex");
+}
+
+function writeReceipt(directory: string, recordedPackageName: string): void {
+  const archive = join(directory, "package.tgz");
+  const bytes = readFileSync(archive);
+  const reportPath = join(directory, "archive.json");
+  writeFileSync(
+    reportPath,
+    JSON.stringify({
+      version: intent.version,
+      archive: {
+        name: recordedPackageName,
+        archive,
+        bytes: bytes.length,
+        sha256: sha256Hex(bytes),
+      },
+    })
+  );
+  writeFileSync(
+    join(directory, "verified.json"),
+    JSON.stringify({
+      version: intent.version,
+      archiveReportSha256: sha256Hex(readFileSync(reportPath)),
+      status: "pass",
+    })
+  );
+}
 
 function withRecordedArchive(check: (directory: string) => void, recordedPackageName = packageName): void {
   const directory = mkdtempSync(join(tmpdir(), "elmera-release-record-test-"));
@@ -26,32 +56,8 @@ function withRecordedArchive(check: (directory: string) => void, recordedPackage
         elmeraRelease: { channel: intent.channel, commit: intent.commit },
       })
     );
-    const archive = join(directory, "package.tgz");
-    execFileSync("tar", ["-czf", archive, "-C", directory, "package"]);
-    const bytes = readFileSync(archive);
-    const inputs = {
-      reportPath: join(directory, "archive.json"),
-      receiptPath: join(directory, "verified.json"),
-      archivePath: archive,
-      version: intent.version,
-    };
-    writeFileSync(
-      inputs.reportPath,
-      JSON.stringify({
-        version: intent.version,
-        archive: {
-          name: recordedPackageName,
-          archive,
-          bytes: bytes.length,
-          sha256: createHash("sha256").update(bytes).digest("hex"),
-        },
-      })
-    );
-    verifyPackedArchive(inputs, recordedPackageName, (snapshot) => {
-      expect(
-        execFileSync("tar", ["-xOzf", snapshot, "package/package.json"], { encoding: "utf8" })
-      ).toContain(intent.commit);
-    });
+    execFileSync("tar", ["-czf", join(directory, "package.tgz"), "-C", directory, "package"]);
+    writeReceipt(directory, recordedPackageName);
     check(directory);
   } finally {
     rmSync(directory, { recursive: true, force: true });
@@ -126,5 +132,31 @@ describe("recorded archive recovery", () => {
       ]);
       expect(() => unpackRelease(bundle, directory)).toThrow("inventory");
     });
+  });
+  it("restores saved bundle bytes through a scoped temp directory", async () => {
+    const directory = mkdtempSync(join(tmpdir(), "elmera-release-restore-test-"));
+    try {
+      mkdirSync(join(directory, "package"));
+      writeFileSync(
+        join(directory, "package/package.json"),
+        JSON.stringify({
+          name: packageName,
+          version: intent.version,
+          elmeraRelease: { channel: intent.channel, commit: intent.commit },
+        })
+      );
+      execFileSync("tar", ["-czf", join(directory, "package.tgz"), "-C", directory, "package"]);
+      writeReceipt(directory, packageName);
+      const bundle = join(directory, "verified-release.tgz");
+      packReleaseBundle(directory, bundle);
+      const bytes = new Uint8Array(readFileSync(bundle));
+      const recovered = await Effect.runPromise(
+        Effect.scoped(restoreVerifiedRelease(intent, bytes, packageName))
+      );
+      expect(recovered.integrity).toMatch(/^sha512-/);
+      expect(recovered.archive).toContain("elmera-release-");
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 });

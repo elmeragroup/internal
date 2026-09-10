@@ -1,6 +1,7 @@
-import { parseJsonArray, parseJsonObject } from "./lib/json-object.mjs";
+import { parseJsonArray, parseJsonObject } from "./json.ts";
+import type { JsonObject } from "./json.ts";
 
-export type GitHubObject = ReturnType<typeof parseJsonObject>;
+export type GitHubObject = JsonObject;
 
 export type GitHubRequest = {
   method?: string;

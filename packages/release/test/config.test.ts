@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { resolveReleasePackage } from "../src/config.ts";
+import { packageManifestGitPath, resolveReleasePackage } from "../src/config.ts";
 
 function withCheckout(run: (root: string) => void): void {
   const parent = mkdtempSync(join(tmpdir(), "elmera-release-config-"));
@@ -31,13 +31,18 @@ describe("release package config", () => {
         packageDirectory: resolve(directory),
         packageName: "@acme/app",
       });
+      expect(packageManifestGitPath(resolveReleasePackage(root, directory, "@acme/app"))).toBe(
+        "packages/app/package.json"
+      );
     });
   });
 
   it("accepts the checkout root as the package directory", () => {
     withCheckout((root) => {
       writePackage(root, "@acme/root-app");
-      expect(resolveReleasePackage(root, root, "@acme/root-app").packageDirectory).toBe(resolve(root));
+      const resolved = resolveReleasePackage(root, root, "@acme/root-app");
+      expect(resolved.packageDirectory).toBe(resolve(root));
+      expect(packageManifestGitPath(resolved)).toBe("package.json");
     });
   });
 

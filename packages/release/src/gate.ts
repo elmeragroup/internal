@@ -1,9 +1,10 @@
+import { Context } from "effect";
 import { resolve } from "node:path";
 
-import { assertStableReleaseVersion } from "../packages/release/src/version.ts";
-import { asRecord, asString, isString, readJsonObject } from "./lib/json-object.mjs";
-import { assertStableReleaseFiles } from "./release-files.ts";
-import type { GitHubClient } from "./release-github-client.ts";
+import { assertStableReleaseFiles } from "./files.ts";
+import type { GitHubClient } from "./github.ts";
+import { asRecord, asString, isString, readJsonObject } from "./json.ts";
+import { assertStableReleaseVersion } from "./version.ts";
 
 /** Which release line the checked-out manifest puts a main commit on. */
 export type ReleaseLine = { channel: "stable"; version: string } | { channel: "canary"; current: string };
@@ -13,6 +14,8 @@ export type ReleaseLine = { channel: "stable"; version: string } | { channel: "c
  * condition holds, so the checks cannot be reordered apart by a later edit.
  */
 export type StableReleaseGate = (commit: string, previous: string) => Promise<ReleaseLine>;
+
+export class Gate extends Context.Service<Gate, { decide: StableReleaseGate }>()("elmera/release/Gate") {}
 
 /** Only the merge of the generated release PR may raise the published stable version. */
 async function assertMergedReleasePullRequest(client: GitHubClient, commit: string): Promise<void> {

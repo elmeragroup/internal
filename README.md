@@ -34,7 +34,7 @@ Generate artifacts during the build, then import the JSON from your docs pages. 
 - [internal](packages/internal): shared consumer entry point and Elmera defaults.
 - [api-artifacts](packages/api-artifacts): component API generation and drift checking.
 - [api-extractor](packages/api-extractor): TypeScript API extraction and diagnostics.
-- [release](packages/release): private publication identity, configuration, versioning, and policy.
+- [release](packages/release): private publication identity, configuration, versioning, policy, and Effect operations.
 - `packages/oxlint-plugin`: private Elmera lint rules.
 - `packages/oxlint-anti-slop`: private code-quality rules.
 - `tooling/typescript`: private workspace TypeScript configuration.

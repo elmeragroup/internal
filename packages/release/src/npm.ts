@@ -1,7 +1,11 @@
-import type { PublishedVersion, Registry } from "../packages/release/src/registry.ts";
-import { asRecord, asString, isString, parseJsonObject } from "./lib/json-object.mjs";
+import { Context } from "effect";
+
+import { asRecord, asString, isString, parseJsonObject } from "./json.ts";
+import type { PublishedVersion, Registry } from "./registry.ts";
 
 export type { PublishedVersion, Registry };
+
+export class Npm extends Context.Service<Npm, { read: () => Promise<Registry> }>()("elmera/release/Npm") {}
 
 function registryUrl(packageName: string): string {
   return `https://registry.npmjs.org/${packageName.replace("/", "%2f")}`;

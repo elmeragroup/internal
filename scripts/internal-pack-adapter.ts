@@ -2,18 +2,14 @@ import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSy
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 
-import type { ReleaseIntent, VerifiedRelease } from "../packages/release/src/intent.ts";
+import type { PackAndVerify } from "../packages/release/src/adapter.ts";
+import { packReleaseBundle, verifyRelease } from "../packages/release/src/bundle.ts";
+import type { ReleaseIntent } from "../packages/release/src/intent.ts";
 import { verifiedBundleName } from "../packages/release/src/intent.ts";
 import { readJsonObject } from "./lib/json-object.mjs";
-import { packReleaseBundle, unpackRelease, verifyRelease } from "./release-record.ts";
 import { archiveDirectory, archivePath, manifestPath, packageName, repoRoot, run } from "./release.ts";
 
 const lockfilePath = resolve(repoRoot, "pnpm-lock.yaml");
-
-export type ArchiveWorkshop = {
-  pack: (intent: ReleaseIntent) => Uint8Array;
-  restore: (intent: ReleaseIntent, bundle: Uint8Array) => VerifiedRelease;
-};
 
 /**
  * Stamps the release version and source onto the published manifest, packs, and verifies the result.
@@ -41,28 +37,19 @@ function prepareArchive(intent: ReleaseIntent, bundleDirectory: string): void {
   }
 }
 
-function createArchiveWorkshop(bundleDirectory: string): ArchiveWorkshop {
-  const bundlePath = resolve(bundleDirectory, verifiedBundleName);
-  return {
-    pack: (intent) => {
-      prepareArchive(intent, bundleDirectory);
-      packReleaseBundle(bundleDirectory, bundlePath);
-      return new Uint8Array(readFileSync(bundlePath));
-    },
-    restore: (intent, bundle) => {
-      writeFileSync(bundlePath, bundle);
-      unpackRelease(bundlePath, bundleDirectory);
-      return verifyRelease(bundleDirectory, intent, packageName);
-    },
-  };
-}
-
-export async function withArchiveWorkshop(work: (workshop: ArchiveWorkshop) => Promise<void>): Promise<void> {
+function packInternal(intent: ReleaseIntent): Uint8Array {
   const bundleDirectory = mkdtempSync(resolve(tmpdir(), "elmera-release-"));
   try {
     mkdirSync(archiveDirectory, { recursive: true });
-    await work(createArchiveWorkshop(bundleDirectory));
+    prepareArchive(intent, bundleDirectory);
+    const bundlePath = resolve(bundleDirectory, verifiedBundleName);
+    packReleaseBundle(bundleDirectory, bundlePath);
+    return new Uint8Array(readFileSync(bundlePath));
   } finally {
     rmSync(bundleDirectory, { recursive: true, force: true });
   }
+}
+
+export function createInternalPackAndVerify(): PackAndVerify {
+  return { pack: packInternal };
 }

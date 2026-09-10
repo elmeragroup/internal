@@ -1,17 +1,17 @@
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-import { assertCanaryReleaseVersion, assertReleaseVersion } from "../packages/release/src/version.ts";
-import { asString, readJsonObject } from "../scripts/lib/json-object.mjs";
-import { plannedCanaryBase, readReleasePlan } from "../scripts/release-plan.ts";
-import type { PlannedRelease } from "../scripts/release-plan.ts";
-import { packageName } from "../scripts/release.ts";
+import { asString, readJsonObject } from "../src/json.ts";
+import { changesetBaseBranch, plannedCanaryBase, readReleasePlan } from "../src/plan.ts";
+import type { PlannedRelease } from "../src/plan.ts";
+import { assertCanaryReleaseVersion, assertReleaseVersion } from "../src/version.ts";
 import { commitBaseline, withGitWorkspace, workspaceTimeout } from "./lib/git-workspace.ts";
 import type { WorkspaceHead } from "./lib/git-workspace.ts";
 
-const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
+const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "../../..");
+const packageName = "@elmeragroup/internal";
 
 function writeChangeset(workspace: string, id: string, name: string, bump: string): void {
   writeFileSync(join(workspace, ".changeset", `${id}.md`), `---\n"${name}": ${bump}\n---\n\nplan-test\n`);
@@ -52,6 +52,7 @@ function writeWorkspaceFixture(workspace: string): void {
     join(workspace, ".changeset/config.json"),
     `${JSON.stringify({ ...changesetConfig, changelog: false }, null, 2)}\n`
   );
+  symlinkSync(join(repoRoot, "node_modules"), join(workspace, "node_modules"));
 }
 
 function withPlannerWorkspace(run: (workspace: string) => void, head: WorkspaceHead = "branch"): void {
@@ -113,6 +114,25 @@ describe("changesets umbrella release plan", () => {
         writeChangeset(workspace, "patch-internal", packageName, "patch");
         writeChangeset(workspace, "minor-internal", packageName, "minor");
         plannedVersion(plannedPublicReleases(workspace));
+      });
+    },
+    workspaceTimeout
+  );
+});
+
+describe("changeset base branch", () => {
+  it(
+    "rejects a local branch that is not a remote-tracking ref",
+    () => {
+      withGitWorkspace("elmera-release-plan-", (workspace) => {
+        mkdirSync(join(workspace.path, ".changeset"));
+        writeFileSync(
+          join(workspace.path, ".changeset/config.json"),
+          `${JSON.stringify({ baseBranch: "main" }, null, 2)}\n`
+        );
+        expect(() => changesetBaseBranch(workspace.path)).toThrow(
+          "Changesets baseBranch must be a remote-tracking ref (origin/<branch>)"
+        );
       });
     },
     workspaceTimeout

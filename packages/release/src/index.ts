@@ -1,4 +1,8 @@
-export { resolveReleasePackage, type ReleasePackage } from "./config.ts";
+export type { PackAndVerify } from "./adapter.ts";
+export { parseReleaseCommand, type ReleaseCommand } from "./command.ts";
+export { packageManifestGitPath, resolveReleasePackage, type ReleasePackage } from "./config.ts";
+export { checkReleasePr, releaseCheckedCommit, retryRelease } from "./engine.ts";
+export { ReleaseError } from "./errors.ts";
 export {
   assertCommit,
   assertReleaseTag,

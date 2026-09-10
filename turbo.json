@@ -18,6 +18,7 @@
         "scripts/release*.ts",
         "scripts/publish-release.ts",
         "scripts/check-release-pr.ts",
+        "scripts/internal-pack-adapter.ts",
         "scripts/canary-pack.ts",
         "scripts/canary-version.ts",
         "scripts/packed-consumer.ts",
