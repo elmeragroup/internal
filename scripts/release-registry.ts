@@ -1,19 +1,14 @@
+import type { PublishedVersion, Registry } from "../packages/release/src/registry.ts";
 import { asRecord, asString, isString, parseJsonObject } from "./lib/json-object.mjs";
 
-export type PublishedVersion = {
-  integrity?: string;
-  commit?: string;
-};
+export type { PublishedVersion, Registry };
 
-export type Registry = {
-  versions: Map<string, PublishedVersion>;
-  tags: Map<string, string>;
-};
+function registryUrl(packageName: string): string {
+  return `https://registry.npmjs.org/${packageName.replace("/", "%2f")}`;
+}
 
-const registryUrl = "https://registry.npmjs.org/@elmeragroup%2finternal";
-
-export async function readRegistry(request: typeof fetch = fetch): Promise<Registry> {
-  const response = await request(registryUrl, { signal: AbortSignal.timeout(30_000) });
+export async function readRegistry(packageName: string, request: typeof fetch = fetch): Promise<Registry> {
+  const response = await request(registryUrl(packageName), { signal: AbortSignal.timeout(30_000) });
   if (response.status === 404) return { versions: new Map(), tags: new Map() };
   if (!response.ok) throw new Error(`npm registry lookup failed: ${String(response.status)}`);
   const data = parseJsonObject(await response.text(), "npm registry");

@@ -1,7 +1,8 @@
+import { releaseTag, serializeIntent, verifiedBundleName } from "../packages/release/src/intent.ts";
+import type { ReleaseIntent } from "../packages/release/src/intent.ts";
+import { classifyReleaseRecord } from "../packages/release/src/ownership.ts";
 import { asInteger, asRecord, asRecordArray, asString, isString } from "./lib/json-object.mjs";
 import type { GitHubClient, GitHubObject } from "./release-github-client.ts";
-import { isReleaseTag, parseIntent, releaseTag, verifiedBundleName } from "./release-record.ts";
-import type { ReleaseIntent } from "./release-record.ts";
 
 export type ReleaseAsset = { state: "missing" } | { state: "starter" | "uploaded"; id: number };
 
@@ -26,6 +27,8 @@ export type ReleaseAssetFields = {
   size: number;
 };
 
+type ReleaseCatalog = Map<string, SavedRelease | "foreign">;
+
 function assertSameIntent(saved: ReleaseIntent, intended: ReleaseIntent): void {
   if (
     saved.commit !== intended.commit ||
@@ -35,11 +38,31 @@ function assertSameIntent(saved: ReleaseIntent, intended: ReleaseIntent): void {
     throw new Error("Release intent differs from the saved release");
 }
 
-function intentForRelease(value: GitHubObject): ReleaseIntent {
-  const tag = asString(value.tag_name, "release tag");
-  const intent = parseIntent(asString(value.body, "release body"));
-  if (releaseTag(intent) !== tag) throw new Error("Release tag does not match its intent");
-  return intent;
+function releaseBodyText(value: GitHubObject): string {
+  if (value.body === null || value.body === undefined) return "";
+  return asString(value.body, "release body");
+}
+
+function assetNames(value: GitHubObject): string[] {
+  return asRecordArray(value.assets, "release assets").map((asset, index) =>
+    asString(asset.name, `release assets[${String(index)}].name`)
+  );
+}
+
+function recordIntent(value: GitHubObject): ReleaseIntent {
+  const classification = classifyReleaseRecord(
+    asString(value.tag_name, "release tag"),
+    releaseBodyText(value),
+    assetNames(value)
+  );
+  switch (classification.kind) {
+    case "owned":
+    case "legacy":
+      return classification.intent;
+    case "foreign":
+    case "ignored":
+      throw new Error("A foreign GitHub release occupies the record tag");
+  }
 }
 
 /** `starterAllowed` records that an empty placeholder is only legal on a draft release. */
@@ -65,7 +88,7 @@ function assetFields(value: GitHubObject): ReleaseAssetFields {
   };
 }
 
-function savedReleaseFrom(value: GitHubObject): SavedRelease {
+function savedReleaseFrom(value: GitHubObject, intent: ReleaseIntent): SavedRelease {
   const assets = asRecordArray(value.assets, "release assets").filter(
     (asset) => asset.name === verifiedBundleName
   );
@@ -73,14 +96,14 @@ function savedReleaseFrom(value: GitHubObject): SavedRelease {
   const raw = assets[0];
   return {
     id: asInteger(value.id, "release id"),
-    intent: intentForRelease(value),
+    intent,
     asset: classifyReleaseAsset(value.draft === true, raw === undefined ? undefined : assetFields(raw)),
   };
 }
 
-export function createReleaseStore(client: GitHubClient): ReleaseStore {
+export function createReleaseStore(client: GitHubClient, packageName: string): ReleaseStore {
   const { root, request, data } = client;
-  let catalog: Map<string, SavedRelease> | undefined;
+  let catalog: ReleaseCatalog | undefined;
 
   async function readTagSha(tag: string): Promise<string | undefined> {
     const response = await request(`${root}/git/ref/tags/${encodeURIComponent(tag)}`, { allow404: true });
@@ -98,8 +121,8 @@ export function createReleaseStore(client: GitHubClient): ReleaseStore {
       throw new Error("Release tag was moved or is not a direct commit reference");
   }
 
-  async function listReleases(): Promise<Map<string, SavedRelease>> {
-    const items = new Map<string, SavedRelease>();
+  async function listReleases(): Promise<ReleaseCatalog> {
+    const listed: ReleaseCatalog = new Map();
     for (let page = 1; ; page += 1) {
       const pageItems = await client.items(
         await request(`${root}/releases?per_page=100&page=${String(page)}`),
@@ -107,16 +130,26 @@ export function createReleaseStore(client: GitHubClient): ReleaseStore {
       );
       for (const value of pageItems) {
         const tag = asString(value.tag_name, "release tag");
-        if (!isReleaseTag(tag)) continue;
-        items.set(tag, savedReleaseFrom(value));
+        const classification = classifyReleaseRecord(tag, releaseBodyText(value), assetNames(value));
+        switch (classification.kind) {
+          case "ignored":
+            break;
+          case "foreign":
+            listed.set(tag, "foreign");
+            break;
+          case "owned":
+          case "legacy":
+            listed.set(tag, savedReleaseFrom(value, classification.intent));
+            break;
+        }
       }
       if (pageItems.length < 100) break;
     }
-    return items;
+    return listed;
   }
 
   // One listing per store instance; every later read and write goes through this same catalog.
-  async function releaseCatalog(): Promise<Map<string, SavedRelease>> {
+  async function releaseCatalog(): Promise<ReleaseCatalog> {
     catalog ??= await listReleases();
     return catalog;
   }
@@ -128,13 +161,19 @@ export function createReleaseStore(client: GitHubClient): ReleaseStore {
   async function find(tag: string): Promise<SavedRelease | undefined> {
     // Listing with push access includes drafts, unlike the published-release-by-tag endpoint.
     const saved = (await releaseCatalog()).get(tag);
-    if (saved === undefined) return undefined;
-    await assertTagMatchesCommit(saved);
-    return saved;
+    if (saved === "foreign") {
+      throw new Error("A foreign GitHub release occupies the record tag");
+    }
+    if (saved !== undefined) {
+      await assertTagMatchesCommit(saved);
+      return saved;
+    }
+    return undefined;
   }
 
   async function readSaved(id: number): Promise<SavedRelease> {
-    const saved = savedReleaseFrom(await data(await request(`${root}/releases/${String(id)}`)));
+    const value = await data(await request(`${root}/releases/${String(id)}`));
+    const saved = savedReleaseFrom(value, recordIntent(value));
     await assertTagMatchesCommit(saved);
     await remember(saved);
     return saved;
@@ -158,21 +197,20 @@ export function createReleaseStore(client: GitHubClient): ReleaseStore {
     } else if (sha !== intent.commit) {
       throw new Error("Existing release tag points to a different commit");
     }
-    const created = savedReleaseFrom(
-      await data(
-        await request(`${root}/releases`, {
-          method: "POST",
-          body: JSON.stringify({
-            tag_name: tag,
-            target_commitish: intent.commit,
-            name: `@elmeragroup/internal ${intent.version}`,
-            body: JSON.stringify({ schema: 1, ...intent }),
-            draft: true,
-            prerelease: intent.channel === "canary",
-          }),
-        })
-      )
+    const value = await data(
+      await request(`${root}/releases`, {
+        method: "POST",
+        body: JSON.stringify({
+          tag_name: tag,
+          target_commitish: intent.commit,
+          name: `${packageName} ${intent.version}`,
+          body: serializeIntent(intent),
+          draft: true,
+          prerelease: intent.channel === "canary",
+        }),
+      })
     );
+    const created = savedReleaseFrom(value, recordIntent(value));
     assertSameIntent(created.intent, intent);
     await remember(created);
     return created;
@@ -227,7 +265,7 @@ export function createReleaseStore(client: GitHubClient): ReleaseStore {
   async function reservedCanaryVersions(): Promise<string[]> {
     const versions: string[] = [];
     for (const saved of (await releaseCatalog()).values()) {
-      if (saved.intent.channel === "canary") versions.push(saved.intent.version);
+      if (saved !== "foreign" && saved.intent.channel === "canary") versions.push(saved.intent.version);
     }
     return versions;
   }

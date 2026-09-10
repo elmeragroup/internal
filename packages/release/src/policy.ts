@@ -1,5 +1,5 @@
-import type { ReleaseIntent, VerifiedRelease } from "./release-record.ts";
-import type { Registry } from "./release-registry.ts";
+import type { ReleaseIntent, VerifiedRelease } from "./intent.ts";
+import type { Registry } from "./registry.ts";
 import {
   compareCanaryVersions,
   compareStableVersions,
@@ -8,7 +8,7 @@ import {
   nextCanaryVersion,
   parseCanaryVersion,
   parseStableVersion,
-} from "./release-version.ts";
+} from "./version.ts";
 
 export type CommitAncestry = (ancestor: string, descendant: string) => boolean;
 
@@ -121,12 +121,24 @@ export function npmIdentity(release: VerifiedRelease, registry: Registry): "abse
   return "match";
 }
 
+function descendantStableSupersedes(commit: string, registry: Registry, isAncestor: CommitAncestry): boolean {
+  for (const [version, published] of registry.versions) {
+    if (!isStableReleaseVersion(version) || published.commit === undefined) continue;
+    if (isAncestor(commit, published.commit)) return true;
+  }
+  return false;
+}
+
 function canaryOwnsChannel(release: ReleaseIntent, registry: Registry, isAncestor: CommitAncestry): boolean {
   const history = canaryHistory(release.commit, registry, isAncestor);
   if (history.publishedVersion !== undefined && history.publishedVersion !== release.version) {
     throw new Error(conflictingCanaryVersion);
   }
   if (history.superseded) return false;
+  // A descendant published stable supersedes this recorded canary even when that stable
+  // version is below the canary's planned base. Stables without commit metadata stay on
+  // the version comparison below.
+  if (descendantStableSupersedes(release.commit, registry, isAncestor)) return false;
   const { base } = parseCanaryVersion(release.version);
   const highestStable = highestStableVersion(registry);
   return highestStable === undefined || compareStableVersions(highestStable, base) < 0;

@@ -2,10 +2,11 @@ import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSy
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 
+import type { ReleaseIntent, VerifiedRelease } from "../packages/release/src/intent.ts";
+import { verifiedBundleName } from "../packages/release/src/intent.ts";
 import { readJsonObject } from "./lib/json-object.mjs";
-import { packReleaseBundle, unpackRelease, verifiedBundleName, verifyRelease } from "./release-record.ts";
-import type { ReleaseIntent, VerifiedRelease } from "./release-record.ts";
-import { archiveDirectory, archivePath, manifestPath, repoRoot, run } from "./release.ts";
+import { packReleaseBundle, unpackRelease, verifyRelease } from "./release-record.ts";
+import { archiveDirectory, archivePath, manifestPath, packageName, repoRoot, run } from "./release.ts";
 
 const lockfilePath = resolve(repoRoot, "pnpm-lock.yaml");
 
@@ -33,7 +34,7 @@ function prepareArchive(intent: ReleaseIntent, bundleDirectory: string): void {
     copyFileSync(archivePath(intent.version), resolve(bundleDirectory, "package.tgz"));
     copyFileSync(resolve(archiveDirectory, "archive.json"), resolve(bundleDirectory, "archive.json"));
     copyFileSync(resolve(archiveDirectory, "verified.json"), resolve(bundleDirectory, "verified.json"));
-    verifyRelease(bundleDirectory, intent);
+    verifyRelease(bundleDirectory, intent, packageName);
   } finally {
     writeFileSync(manifestPath, manifestBytes);
     writeFileSync(lockfilePath, lockfileBytes);
@@ -51,7 +52,7 @@ function createArchiveWorkshop(bundleDirectory: string): ArchiveWorkshop {
     restore: (intent, bundle) => {
       writeFileSync(bundlePath, bundle);
       unpackRelease(bundlePath, bundleDirectory);
-      return verifyRelease(bundleDirectory, intent);
+      return verifyRelease(bundleDirectory, intent, packageName);
     },
   };
 }

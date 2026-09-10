@@ -1,5 +1,11 @@
 import { setTimeout } from "node:timers/promises";
 
+import type { ReleasePackage } from "../packages/release/src/config.ts";
+import { assertCommit, assertReleaseTag, releaseTag } from "../packages/release/src/intent.ts";
+import type { ReleaseIntent, VerifiedRelease } from "../packages/release/src/intent.ts";
+import { allocateCanary, canaryEligibility } from "../packages/release/src/policy.ts";
+import type { CanaryEligibility } from "../packages/release/src/policy.ts";
+import type { Registry } from "../packages/release/src/registry.ts";
 import { withArchiveWorkshop } from "./release-archive.ts";
 import type { ArchiveWorkshop } from "./release-archive.ts";
 import { createStableReleaseGate } from "./release-gate.ts";
@@ -10,14 +16,9 @@ import { createGitHubClient } from "./release-github-client.ts";
 import { createReleaseStore } from "./release-github.ts";
 import type { ReleaseStore, SavedRelease } from "./release-github.ts";
 import { plannedCanaryBase } from "./release-plan.ts";
-import { allocateCanary, canaryEligibility } from "./release-policy.ts";
-import type { CanaryEligibility } from "./release-policy.ts";
 import { publishVerifiedRelease } from "./release-publication.ts";
-import { assertCommit, assertReleaseTag, releaseTag } from "./release-record.ts";
-import type { ReleaseIntent, VerifiedRelease } from "./release-record.ts";
 import { readRegistry } from "./release-registry.ts";
-import type { Registry } from "./release-registry.ts";
-import { packageName, run } from "./release.ts";
+import { packageManifest, releasePackage, run } from "./release.ts";
 
 export type ReleaseServices = {
   git: GitPort;
@@ -47,7 +48,7 @@ async function finishRelease(saved: SavedRelease, services: ReleaseServices): Pr
   }
   await services.store.complete(saved);
   services.log(
-    `Released ${packageName}@${saved.intent.version} from ${saved.intent.commit}. Record: ${releaseTag(saved.intent)}`
+    `Released ${releasePackage.packageName}@${saved.intent.version} from ${saved.intent.commit}. Record: ${releaseTag(saved.intent)}`
   );
 }
 
@@ -112,21 +113,22 @@ function productionServices(
   git: GitPort,
   store: ReleaseStore,
   stableGate: StableReleaseGate,
-  archive: ArchiveWorkshop
+  archive: ArchiveWorkshop,
+  pkg: ReleasePackage
 ): ReleaseServices {
   return {
     git,
     store,
-    registry: readRegistry,
+    registry: () => readRegistry(pkg.packageName),
     archive,
     stableGate,
-    plannedCanaryBase,
+    plannedCanaryBase: (current) => plannedCanaryBase(current, pkg.packageName, pkg.checkoutRoot),
     publishVerified: (release) =>
       publishVerifiedRelease(release, {
-        registry: readRegistry,
+        registry: () => readRegistry(pkg.packageName),
         publish: (tarball) =>
           run("npm", ["publish", tarball, "--access", "public", "--tag", "pending", "--ignore-scripts"]),
-        promote: (version, tag) => run("npm", ["dist-tag", "add", `${packageName}@${version}`, tag]),
+        promote: (version, tag) => run("npm", ["dist-tag", "add", `${pkg.packageName}@${version}`, tag]),
         isAncestor: git.isAncestor,
         wait: () => setTimeout(5_000),
       }),
@@ -137,11 +139,12 @@ function productionServices(
 }
 
 export async function runRelease(command: ReleaseCommand, repository: string, token: string): Promise<void> {
+  const pkg = releasePackage;
   const client = createGitHubClient(repository, token);
-  const git = createGitPort();
-  const store = createReleaseStore(client);
-  const stableGate = createStableReleaseGate(client);
+  const git = createGitPort(pkg.checkoutRoot, packageManifest);
+  const store = createReleaseStore(client, pkg.packageName);
+  const stableGate = createStableReleaseGate(client, pkg.checkoutRoot, pkg.packageDirectory);
   await withArchiveWorkshop(async (archive) => {
-    await executeRelease(command, productionServices(git, store, stableGate, archive));
+    await executeRelease(command, productionServices(git, store, stableGate, archive, pkg));
   });
 }

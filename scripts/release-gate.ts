@@ -1,10 +1,9 @@
 import { resolve } from "node:path";
 
+import { assertStableReleaseVersion } from "../packages/release/src/version.ts";
 import { asRecord, asString, isString, readJsonObject } from "./lib/json-object.mjs";
 import { assertStableReleaseFiles } from "./release-files.ts";
 import type { GitHubClient } from "./release-github-client.ts";
-import { assertStableReleaseVersion } from "./release-version.ts";
-import { repoRoot } from "./release.ts";
 
 /** Which release line the checked-out manifest puts a main commit on. */
 export type ReleaseLine = { channel: "stable"; version: string } | { channel: "canary"; current: string };
@@ -35,14 +34,18 @@ async function assertMergedReleasePullRequest(client: GitHubClient, commit: stri
   if (!merged) throw new Error("A stable version change must come from a merged changeset-release/main PR");
 }
 
-export function createStableReleaseGate(client: GitHubClient, root = repoRoot): StableReleaseGate {
-  const manifestPath = resolve(root, "packages/internal/package.json");
+export function createStableReleaseGate(
+  client: GitHubClient,
+  root: string,
+  packageDirectory: string
+): StableReleaseGate {
+  const manifestPath = resolve(packageDirectory, "package.json");
   return async (commit, previous) => {
     const current = assertStableReleaseVersion(
       asString(readJsonObject(manifestPath).version, "package version")
     );
     if (current === previous) return { channel: "canary", current };
-    assertStableReleaseFiles(previous, current, root);
+    assertStableReleaseFiles(previous, current, root, packageDirectory);
     await assertMergedReleasePullRequest(client, commit);
     return { channel: "stable", version: current };
   };

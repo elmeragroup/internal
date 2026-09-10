@@ -5,29 +5,23 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
+import type { ReleaseIntent } from "../packages/release/src/intent.ts";
 import { verifyPackedArchive } from "../scripts/packed-verification.ts";
 import { assertStableReleaseFiles } from "../scripts/release-files.ts";
-import {
-  packReleaseBundle,
-  parseIntent,
-  releaseTag,
-  unpackRelease,
-  verifyRelease,
-} from "../scripts/release-record.ts";
-import type { ReleaseIntent } from "../scripts/release-record.ts";
+import { packReleaseBundle, unpackRelease, verifyRelease } from "../scripts/release-record.ts";
 import { packageName } from "../scripts/release.ts";
 
 const commit = "a".repeat(40);
 const intent: ReleaseIntent = { channel: "stable", version: "0.2.0", commit };
 
-function withRecordedArchive(check: (directory: string) => void): void {
+function withRecordedArchive(check: (directory: string) => void, recordedPackageName = packageName): void {
   const directory = mkdtempSync(join(tmpdir(), "elmera-release-record-test-"));
   try {
     mkdirSync(join(directory, "package"));
     writeFileSync(
       join(directory, "package/package.json"),
       JSON.stringify({
-        name: packageName,
+        name: recordedPackageName,
         version: intent.version,
         elmeraRelease: { channel: intent.channel, commit: intent.commit },
       })
@@ -46,14 +40,14 @@ function withRecordedArchive(check: (directory: string) => void): void {
       JSON.stringify({
         version: intent.version,
         archive: {
-          name: packageName,
+          name: recordedPackageName,
           archive,
           bytes: bytes.length,
           sha256: createHash("sha256").update(bytes).digest("hex"),
         },
       })
     );
-    verifyPackedArchive(inputs, packageName, (snapshot) => {
+    verifyPackedArchive(inputs, recordedPackageName, (snapshot) => {
       expect(
         execFileSync("tar", ["-xOzf", snapshot, "package/package.json"], { encoding: "utf8" })
       ).toContain(intent.commit);
@@ -64,58 +58,56 @@ function withRecordedArchive(check: (directory: string) => void): void {
   }
 }
 
-describe("release identity", () => {
-  it("validates record schema, channel, version and full source SHA", () => {
-    const recorded = { schema: 1, channel: "stable", version: "0.2.0", commit };
-    expect(releaseTag(parseIntent(JSON.stringify(recorded)))).toBe("v0.2.0");
-    for (const invalid of [
-      { ...recorded, channel: "beta" },
-      { ...recorded, version: "0.2.0-canary.0" },
-      { ...recorded, commit: "main" },
-    ]) {
-      expect(() => parseIntent(JSON.stringify(invalid))).toThrow();
-    }
-  });
-});
-
 describe("recorded archive recovery", () => {
   it("checks release PR contents before merge and again before publication", () => {
     withRecordedArchive((directory) => {
       mkdirSync(join(directory, ".changeset"));
-      mkdirSync(join(directory, "packages/internal"), { recursive: true });
-      const changelog = join(directory, "packages/internal/CHANGELOG.md");
+      const packageDirectory = join(directory, "packages/app");
+      mkdirSync(packageDirectory, { recursive: true });
+      const changelog = join(packageDirectory, "CHANGELOG.md");
       writeFileSync(changelog, "# Package\n\n## 0.2.0\n\nRelease notes\n");
-      expect(() => assertStableReleaseFiles("0.1.1", "0.2.0", directory)).not.toThrow();
-      expect(() => assertStableReleaseFiles("0.2.0", "0.2.0", directory)).toThrow("increase");
+      expect(() => assertStableReleaseFiles("0.1.1", "0.2.0", directory, packageDirectory)).not.toThrow();
+      expect(() => assertStableReleaseFiles("0.2.0", "0.2.0", directory, packageDirectory)).toThrow(
+        "increase"
+      );
       writeFileSync(changelog, "# Package\n\n## 0.1.1\n");
-      expect(() => assertStableReleaseFiles("0.1.1", "0.2.0", directory)).toThrow("changelog");
+      expect(() => assertStableReleaseFiles("0.1.1", "0.2.0", directory, packageDirectory)).toThrow(
+        "changelog"
+      );
       writeFileSync(
         join(directory, ".changeset/new-fix.md"),
         '---\n"@elmeragroup/internal": patch\n---\nFix\n'
       );
-      expect(() => assertStableReleaseFiles("0.1.1", "0.2.0", directory)).toThrow("consume all changesets");
+      expect(() => assertStableReleaseFiles("0.1.1", "0.2.0", directory, packageDirectory)).toThrow(
+        "consume all changesets"
+      );
     });
   });
   it("validates the exact saved archive after restoring it into a different checkout directory", () => {
     withRecordedArchive((directory) => {
-      const original = verifyRelease(directory, intent);
+      const original = verifyRelease(directory, intent, packageName);
       const bundle = join(directory, "verified-release.tgz");
       packReleaseBundle(directory, bundle);
       const restored = join(directory, "restored");
       mkdirSync(restored);
       unpackRelease(bundle, restored);
-      const recovered = verifyRelease(restored, intent);
+      const recovered = verifyRelease(restored, intent, packageName);
       expect(recovered.integrity).toBe(original.integrity);
       expect(recovered.archive).not.toBe(original.archive);
     });
   });
+  it("verifies an archive for a package that is not Internal", () => {
+    withRecordedArchive((directory) => {
+      expect(verifyRelease(directory, intent, "@acme/app").integrity).toMatch(/^sha512-/);
+    }, "@acme/app");
+  });
   it("rejects tampered bytes and a different source commit", () => {
     withRecordedArchive((directory) => {
-      expect(() => verifyRelease(directory, { ...intent, commit: "b".repeat(40) })).toThrow(
+      expect(() => verifyRelease(directory, { ...intent, commit: "b".repeat(40) }, packageName)).toThrow(
         "recorded release source"
       );
       appendFileSync(join(directory, "package.tgz"), "different bytes");
-      expect(() => verifyRelease(directory, intent)).toThrow("does not match");
+      expect(() => verifyRelease(directory, intent, packageName)).toThrow("does not match");
     });
   });
   it("rejects unexpected bundle members before extraction", () => {

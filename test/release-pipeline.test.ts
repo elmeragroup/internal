@@ -1,14 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { releaseTag } from "../packages/release/src/intent.ts";
+import type { ReleaseIntent, VerifiedRelease } from "../packages/release/src/intent.ts";
+import type { CommitAncestry } from "../packages/release/src/policy.ts";
+import type { Registry } from "../packages/release/src/registry.ts";
 import type { ReleaseLine } from "../scripts/release-gate.ts";
 import type { GitPort } from "../scripts/release-git.ts";
 import type { SavedRelease } from "../scripts/release-github.ts";
 import { executeRelease, parseReleaseCommand } from "../scripts/release-pipeline.ts";
 import type { ReleaseServices } from "../scripts/release-pipeline.ts";
-import type { CommitAncestry } from "../scripts/release-policy.ts";
-import { releaseTag } from "../scripts/release-record.ts";
-import type { ReleaseIntent, VerifiedRelease } from "../scripts/release-record.ts";
-import type { Registry } from "../scripts/release-registry.ts";
 
 const commit = "a".repeat(40);
 const newerCommit = "b".repeat(40);

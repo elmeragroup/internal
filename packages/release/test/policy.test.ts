@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { allocateCanary, canaryEligibility, distTagFor, planPublication } from "../scripts/release-policy.ts";
-import type { CommitAncestry } from "../scripts/release-policy.ts";
-import type { ReleaseIntent, VerifiedRelease } from "../scripts/release-record.ts";
-import type { Registry } from "../scripts/release-registry.ts";
+import type { ReleaseIntent, VerifiedRelease } from "../src/intent.ts";
+import { allocateCanary, canaryEligibility, distTagFor, planPublication } from "../src/policy.ts";
+import type { CommitAncestry } from "../src/policy.ts";
+import type { Registry } from "../src/registry.ts";
 
 const commit = "a".repeat(40);
 const newerCommit = "b".repeat(40);
@@ -156,6 +156,64 @@ describe("recorded canary retry", () => {
         published
       )
     ).toEqual({ kind: "publish", upload: false, promote: true });
+  });
+});
+
+describe("descendant stable supersession", () => {
+  const recorded: VerifiedRelease = {
+    channel: "canary",
+    version: "0.3.0-canary.0",
+    commit,
+    archive: "/verified/package.tgz",
+    integrity: "sha512-test",
+  };
+
+  it("supersedes when a lower stable is from a descendant commit and the canary is absent", () => {
+    const published = registry();
+    published.versions.set("0.2.0", { commit: newerCommit, integrity: "stable" });
+    expect(publicationPlan(recorded, published)).toEqual({ kind: "superseded" });
+  });
+
+  it("keeps a pending matching canary without uploading or promoting", () => {
+    const published = registry();
+    published.versions.set("0.2.0", { commit: newerCommit, integrity: "stable" });
+    published.versions.set(recorded.version, { commit, integrity: recorded.integrity });
+    expect(publicationPlan(recorded, published)).toEqual({
+      kind: "publish",
+      upload: false,
+      promote: false,
+    });
+  });
+
+  it("still rejects a same-version identity mismatch", () => {
+    const published = registry();
+    published.versions.set("0.2.0", { commit: newerCommit, integrity: "stable" });
+    published.versions.set(recorded.version, { commit, integrity: "sha512-other" });
+    expect(() => publicationPlan(recorded, published)).toThrow("does not match");
+    published.versions.set(recorded.version, { commit: newerCommit, integrity: recorded.integrity });
+    expect(() => publicationPlan(recorded, published)).toThrow("does not match");
+  });
+
+  it("does not supersede via ancestry for an unrelated published stable below the base", () => {
+    const published = registry();
+    published.versions.set("0.2.0", { commit: unrelatedCommit, integrity: "stable" });
+    expect(publicationPlan(recorded, published)).toEqual({
+      kind: "publish",
+      upload: true,
+      promote: true,
+    });
+  });
+
+  it("keeps a fresh cut eligible on the registry that supersedes a recorded retry", () => {
+    const published = registry();
+    published.versions.set("0.2.0", { commit: newerCommit, integrity: "stable" });
+    expect(planPublication(recorded, published, isAncestor)).toEqual({ kind: "superseded" });
+    expect(canaryEligibility({ commit, current: "0.2.0", base: "0.3.0" }, published, isAncestor)).toBe(
+      "eligible"
+    );
+    expect(
+      canaryEligibility({ commit: newerCommit, current: "0.2.0", base: "0.3.0" }, published, isAncestor)
+    ).toBe("eligible");
   });
 });
 

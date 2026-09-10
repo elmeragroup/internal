@@ -1,7 +1,7 @@
-import { distTagFor, npmIdentity, planPublication } from "./release-policy.ts";
-import type { CommitAncestry } from "./release-policy.ts";
-import type { VerifiedRelease } from "./release-record.ts";
-import type { Registry } from "./release-registry.ts";
+import type { VerifiedRelease } from "../packages/release/src/intent.ts";
+import { distTagFor, npmIdentity, planPublication } from "../packages/release/src/policy.ts";
+import type { CommitAncestry } from "../packages/release/src/policy.ts";
+import type { Registry } from "../packages/release/src/registry.ts";
 
 export type PublicationServices = {
   registry: () => Promise<Registry>;

@@ -1,0 +1,34 @@
+{
+  "name": "@elmeragroup/release",
+  "version": "0.0.0",
+  "type": "module",
+  "license": "MIT",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-package.ts",
+    "type-check": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@elmeragroup/typescript-config": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "types": "./dist/index.d.ts",
+  "engines": {
+    "node": ">=24.13.0 <25"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/elmeragroup/internal.git",
+    "directory": "packages/release"
+  },
+  "private": true
+}

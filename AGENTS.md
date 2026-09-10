@@ -8,6 +8,7 @@ This pnpm workspace contains shared engineering packages for the Elmera Group. R
 - `packages/internal` is the only published package and supplies Elmera defaults through explicit exports.
 - `packages/api-artifacts` generates component API JSON and checks for drift.
 - `packages/api-extractor` extracts a semantic API model from TypeScript projects.
+- `packages/release` is the private publication domain: identity, configuration, versioning, and policy.
 - `packages/oxlint-plugin` and `packages/oxlint-anti-slop` contain private lint rules.
 - `tooling/typescript` contains shared TypeScript configuration.
 - `scripts` contains workspace build, packaging, and release tooling. Root `test` contains repository

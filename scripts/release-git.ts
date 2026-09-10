@@ -1,10 +1,9 @@
 import { execFileSync, spawnSync } from "node:child_process";
 
+import { assertCommit } from "../packages/release/src/intent.ts";
+import type { CommitAncestry } from "../packages/release/src/policy.ts";
+import { assertStableReleaseVersion } from "../packages/release/src/version.ts";
 import { asString, parseJsonObject } from "./lib/json-object.mjs";
-import type { CommitAncestry } from "./release-policy.ts";
-import { assertCommit } from "./release-record.ts";
-import { assertStableReleaseVersion } from "./release-version.ts";
-import { repoRoot } from "./release.ts";
 
 export type GitPort = {
   head: () => string;
@@ -13,8 +12,6 @@ export type GitPort = {
   stableVersionAt: (revision: string) => string;
   isAncestor: CommitAncestry;
 };
-
-const packageManifest = "packages/internal/package.json";
 
 function git(cwd: string, args: readonly string[]): string {
   return execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
@@ -33,10 +30,11 @@ function isAncestor(cwd: string, ancestor: string, descendant: string): boolean 
 }
 
 /**
- * Reads git for the release pipeline. `cwd` is the checkout to read, defaulting to this repository;
- * a caller passes a different one so the tests exercise the same code against a fixture checkout.
+ * Reads git for the release pipeline. `cwd` is the checkout to read; tests pass a fixture checkout.
+ * `packageManifest` is the git path to package.json, derived from the resolved package directory.
  */
-export function createGitPort(cwd = repoRoot): GitPort {
+export function createGitPort(cwd: string, packageManifest: string): GitPort {
+  const manifest = packageManifest.replaceAll("\\", "/");
   return {
     head: () => git(cwd, ["rev-parse", "HEAD"]),
     originMain: () => git(cwd, ["rev-parse", "origin/main"]),
@@ -44,7 +42,7 @@ export function createGitPort(cwd = repoRoot): GitPort {
     stableVersionAt: (revision) =>
       assertStableReleaseVersion(
         asString(
-          parseJsonObject(git(cwd, ["show", `${revision}:${packageManifest}`]), "recorded manifest").version,
+          parseJsonObject(git(cwd, ["show", `${revision}:${manifest}`]), "recorded manifest").version,
           "recorded manifest version"
         )
       ),

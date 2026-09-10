@@ -1,13 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { asString, parseJsonArray } from "../scripts/lib/json-object.mjs";
+import { releaseRecordOwner, serializeIntent, verifiedBundleName } from "../packages/release/src/intent.ts";
+import type { ReleaseIntent } from "../packages/release/src/intent.ts";
+import { asString, isString, parseJsonArray, parseJsonObject } from "../scripts/lib/json-object.mjs";
 import { createGitHubClient } from "../scripts/release-github-client.ts";
 import { classifyReleaseAsset, createReleaseStore } from "../scripts/release-github.ts";
 import type { ReleaseStore, SavedRelease } from "../scripts/release-github.ts";
-import { verifiedBundleName } from "../scripts/release-record.ts";
-import type { ReleaseIntent } from "../scripts/release-record.ts";
 
 const commit = "a".repeat(40);
+const packageName = "@elmeragroup/internal";
 const intent: ReleaseIntent = { channel: "stable", version: "0.2.0", commit };
 const saved: SavedRelease = { id: 1, intent, asset: { state: "uploaded", id: 2 } };
 const uploadedAsset = { id: 2, name: verifiedBundleName, state: "uploaded", size: 12 };
@@ -29,6 +30,7 @@ type StoreOptions = {
   tagStatus?: number;
   tagSha?: string;
   status?: number;
+  packageName?: string;
 };
 
 function releaseRecord(overrides: Partial<ReleasePayload> = {}): ReleasePayload {
@@ -50,14 +52,18 @@ async function savedRelease(store: ReleaseStore, tag: string): Promise<SavedRele
 
 function githubStore(releases: readonly ReleasePayload[], options: StoreOptions = {}) {
   const state = { listed: 0, removed: false };
+  const mutations: string[] = [];
+  const posted: { path: string; body: string }[] = [];
   const fetcher: typeof fetch = (url, init) => {
     const path = asString(url, "request URL");
     const method = init?.method ?? "GET";
+    if (method !== "GET") mutations.push(`${method} ${path}`);
     if (method === "DELETE") {
       state.removed = true;
       return Promise.resolve(new Response(null, { status: 204 }));
     }
     if (method === "POST") {
+      if (isString(init?.body)) posted.push({ path, body: init.body });
       if (path.includes("/git/refs")) {
         return Promise.resolve(Response.json({ object: { type: "commit", sha: commit } }));
       }
@@ -87,8 +93,11 @@ function githubStore(releases: readonly ReleasePayload[], options: StoreOptions 
     }
     return Promise.resolve(new Response("", { status: options.status ?? 500 }));
   };
-  const store = createReleaseStore(createGitHubClient("example/package", "test", fetcher));
-  return { store, state };
+  const store = createReleaseStore(
+    createGitHubClient("example/package", "test", fetcher),
+    options.packageName ?? packageName
+  );
+  return { store, state, mutations, posted };
 }
 
 describe("durable GitHub release records", () => {
@@ -122,7 +131,8 @@ describe("durable GitHub release records", () => {
   });
   it("fails closed when the archive was never uploaded", async () => {
     const store = createReleaseStore(
-      createGitHubClient("example/package", "test", () => Promise.reject(new Error("must not request")))
+      createGitHubClient("example/package", "test", () => Promise.reject(new Error("must not request"))),
+      packageName
     );
     await expect(store.download({ ...saved, asset: { state: "missing" } })).rejects.toThrow(
       "original Merge job"
@@ -231,6 +241,130 @@ describe("release asset classification", () => {
     );
     const { store } = githubStore([releaseRecord({ assets: [empty] })]);
     await expect(store.find("v0.2.0")).rejects.toThrow("Uploaded release asset has no bytes");
+  });
+});
+
+describe("release record ownership in the GitHub store", () => {
+  it("ignores a foreign human release on a non-record tag during discovery", async () => {
+    const canaryIntent = { channel: "canary" as const, version: "0.2.0-canary.12", commit };
+    const { store, mutations } = githubStore([
+      {
+        tag_name: "weekly-notes",
+        id: 3,
+        draft: false,
+        body: "Human release notes.",
+        assets: [],
+      },
+      {
+        tag_name: `canary-${commit}`,
+        id: 4,
+        draft: true,
+        body: JSON.stringify({ schema: 1, ...canaryIntent }),
+        assets: [],
+      },
+    ]);
+    expect(await store.reservedCanaryVersions()).toEqual(["0.2.0-canary.12"]);
+    expect(await store.find("weekly-notes")).toBeUndefined();
+    expect(mutations.filter((entry) => !entry.startsWith("GET "))).toEqual([]);
+  });
+
+  it("fails a foreign occupant of the requested record tag without mutation", async () => {
+    const { store, mutations } = githubStore([
+      {
+        tag_name: "v0.2.0",
+        id: 8,
+        draft: false,
+        body: "Human release notes.",
+        assets: [],
+      },
+    ]);
+    await expect(store.find("v0.2.0")).rejects.toThrow("foreign GitHub release occupies the record tag");
+    await expect(store.create(intent)).rejects.toThrow("foreign GitHub release occupies the record tag");
+    expect(mutations.filter((entry) => /POST|PATCH|DELETE/.test(entry))).toEqual([]);
+  });
+
+  it("fails a malformed unmarked schema-1 candidate instead of treating it as foreign", async () => {
+    const { store } = githubStore([
+      {
+        tag_name: "v0.2.0",
+        id: 8,
+        draft: true,
+        body: JSON.stringify({ schema: 1, channel: "stable", version: "0.2.0" }),
+        assets: [],
+      },
+    ]);
+    await expect(store.find("v0.2.0")).rejects.toThrow("commit is not a string");
+    await expect(store.create(intent)).rejects.toThrow("commit is not a string");
+  });
+
+  it("fails a marked owned record whose tag does not match its intent", async () => {
+    const { store } = githubStore([
+      {
+        tag_name: "v0.2.0",
+        id: 8,
+        draft: true,
+        body: serializeIntent({ channel: "canary", version: "0.2.0-canary.0", commit }),
+        assets: [],
+      },
+    ]);
+    await expect(store.find("v0.2.0")).rejects.toThrow("Release tag does not match its intent");
+    await expect(store.reservedCanaryVersions()).rejects.toThrow("Release tag does not match its intent");
+  });
+
+  it("fails a marked owned record that cannot be decoded instead of dropping it", async () => {
+    const { store } = githubStore([
+      {
+        tag_name: `canary-${commit}`,
+        id: 4,
+        draft: true,
+        body: JSON.stringify({
+          schema: 2,
+          owner: releaseRecordOwner,
+          channel: "canary",
+          version: "0.2.0-canary.0",
+          commit,
+        }),
+        assets: [],
+      },
+    ]);
+    await expect(store.reservedCanaryVersions()).rejects.toThrow("Unsupported release intent");
+    await expect(store.find(`canary-${commit}`)).rejects.toThrow("Unsupported release intent");
+  });
+
+  it("reads unmarked schema-1 records without rewriting them", async () => {
+    const { store, mutations } = githubStore([releaseRecord({ assets: [] })]);
+    expect(await store.find("v0.2.0")).toEqual({
+      id: 1,
+      intent,
+      asset: { state: "missing" },
+    });
+    expect(mutations.filter((entry) => /POST|PATCH|DELETE/.test(entry))).toEqual([]);
+  });
+
+  it("writes the owner marker and package display name on create", async () => {
+    const { store, posted } = githubStore([], {
+      tagStatus: 404,
+      releaseId: 9,
+      packageName: "@acme/app",
+      created: {
+        tag_name: "v0.2.0",
+        id: 9,
+        draft: true,
+        body: serializeIntent(intent),
+        assets: [],
+      },
+    });
+    await expect(store.create(intent)).resolves.toEqual({
+      id: 9,
+      intent,
+      asset: { state: "missing" },
+    });
+    const created = posted.find((entry) => entry.path.endsWith("/releases"));
+    expect(created).toBeDefined();
+    const payload = parseJsonObject(created?.body ?? "{}", "created release");
+    expect(payload.name).toBe("@acme/app 0.2.0");
+    expect(payload.body).toBe(serializeIntent(intent));
+    expect(parseJsonObject(asString(payload.body, "intent body"), "intent").owner).toBe(releaseRecordOwner);
   });
 });
 

@@ -3,10 +3,10 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
+import { assertCanaryReleaseVersion, assertReleaseVersion } from "../packages/release/src/version.ts";
 import { asString, readJsonObject } from "../scripts/lib/json-object.mjs";
 import { plannedCanaryBase, readReleasePlan } from "../scripts/release-plan.ts";
 import type { PlannedRelease } from "../scripts/release-plan.ts";
-import { assertCanaryReleaseVersion, assertReleaseVersion } from "../scripts/release-version.ts";
 import { packageName } from "../scripts/release.ts";
 import { commitBaseline, withGitWorkspace, workspaceTimeout } from "./lib/git-workspace.ts";
 import type { WorkspaceHead } from "./lib/git-workspace.ts";
@@ -32,7 +32,14 @@ function writeWorkspaceFixture(workspace: string): void {
     )}\n`
   );
   writeFileSync(join(workspace, "pnpm-workspace.yaml"), readFileSync(join(repoRoot, "pnpm-workspace.yaml")));
-  for (const name of ["internal", "api-artifacts", "api-extractor", "oxlint-plugin", "oxlint-anti-slop"]) {
+  for (const name of [
+    "internal",
+    "api-artifacts",
+    "api-extractor",
+    "oxlint-plugin",
+    "oxlint-anti-slop",
+    "release",
+  ]) {
     mkdirSync(join(workspace, "packages", name), { recursive: true });
     writeFileSync(
       join(workspace, "packages", name, "package.json"),
@@ -85,6 +92,7 @@ describe("changesets umbrella release plan", () => {
     "@elmeragroup/api-artifacts",
     "@elmeragroup/oxlint-plugin",
     "@elmeragroup/oxlint-plugin-anti-slop",
+    "@elmeragroup/release",
   ])(
     "does not release private changes to %s",
     (name) => {
@@ -119,7 +127,7 @@ describe("canary base planning in the publisher's checkout", () => {
         expect(existsSync(join(workspace, ".git/refs/heads/main"))).toBe(false);
         writeChangeset(workspace, "minor-internal", packageName, "minor");
         const planned = plannedVersion(plannedPublicReleases(workspace));
-        expect(plannedCanaryBase("0.0.1", workspace)).toBe(planned);
+        expect(plannedCanaryBase("0.0.1", packageName, workspace)).toBe(planned);
       }, "detached");
     },
     workspaceTimeout
@@ -129,7 +137,7 @@ describe("canary base planning in the publisher's checkout", () => {
     "falls back to the next patch when no changeset is pending",
     () => {
       withPlannerWorkspace((workspace) => {
-        expect(plannedCanaryBase("0.2.9", workspace)).toBe("0.2.10");
+        expect(plannedCanaryBase("0.2.9", packageName, workspace)).toBe("0.2.10");
       }, "detached");
     },
     workspaceTimeout

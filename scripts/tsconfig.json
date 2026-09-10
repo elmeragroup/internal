@@ -1,7 +1,8 @@
 {
   "extends": "@elmeragroup/typescript-config/internal-package.json",
   "compilerOptions": {
-    "noEmit": true
+    "noEmit": true,
+    "rootDir": ".."
   },
   "include": ["**/*.ts", "lib/*.mjs"]
 }

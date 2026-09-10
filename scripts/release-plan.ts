@@ -3,9 +3,8 @@ import { mkdirSync, rmSync } from "node:fs";
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
 
+import { assertStableReleaseVersion, nextPatchVersion } from "../packages/release/src/version.ts";
 import { asRecordArray, asString, isString, readJsonObject } from "./lib/json-object.mjs";
-import { assertStableReleaseVersion, nextPatchVersion } from "./release-version.ts";
-import { packageName, repoRoot } from "./release.ts";
 
 const changesetBin = createRequire(import.meta.url).resolve("@changesets/cli/bin.js");
 // Relative to the directory the CLI runs in, and inside the ignored scratch directory.
@@ -52,7 +51,7 @@ export function readReleasePlan(cwd: string): PlannedRelease[] {
 }
 
 /** The stable version a fresh canary counts up from: the planned release, else the next patch. */
-export function plannedCanaryBase(current: string, cwd = repoRoot): string {
+export function plannedCanaryBase(current: string, packageName: string, cwd: string): string {
   const planned = readReleasePlan(cwd).filter(
     (release) => release.name === packageName && release.type !== "none"
   );

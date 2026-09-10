@@ -34,12 +34,13 @@ Generate artifacts during the build, then import the JSON from your docs pages. 
 - [internal](packages/internal): shared consumer entry point and Elmera defaults.
 - [api-artifacts](packages/api-artifacts): component API generation and drift checking.
 - [api-extractor](packages/api-extractor): TypeScript API extraction and diagnostics.
+- [release](packages/release): private publication identity, configuration, versioning, and policy.
 - `packages/oxlint-plugin`: private Elmera lint rules.
 - `packages/oxlint-anti-slop`: private code-quality rules.
 - `tooling/typescript`: private workspace TypeScript configuration.
 
 Only `@elmeragroup/internal` is published, with one Changesets version. The extractor,
-artifact generator, and lint implementations remain private workspace packages with their own tests.
+artifact generator, lint implementations, and release domain remain private workspace packages with their own tests.
 Packaging and publishing support stable `x.y.z` and canary `x.y.z-canary.N` versions.
 
 The package has explicit ESM entries:

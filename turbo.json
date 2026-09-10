@@ -13,6 +13,7 @@
         "test/**",
         ".oxlintrc.json",
         "packages/api-extractor/**",
+        "packages/release/**",
         "scripts/lib/**",
         "scripts/release*.ts",
         "scripts/publish-release.ts",
@@ -60,10 +61,10 @@
       ]
     },
     "//#type-check:scripts": {
-      "inputs": ["scripts/**", "tooling/typescript/**"]
+      "inputs": ["scripts/**", "packages/release/**", "tooling/typescript/**"]
     },
     "//#type-check:tests": {
-      "inputs": ["test/**", "scripts/**", "tooling/typescript/**"]
+      "inputs": ["test/**", "scripts/**", "packages/release/**", "tooling/typescript/**"]
     },
     "@elmeragroup/internal#build": {
       "dependsOn": ["^build"],

@@ -97,3 +97,20 @@ describe("release workflow gates", () => {
     });
   });
 });
+
+describe("release package composition", () => {
+  it("derives the previous-version git path from the resolved package", () => {
+    for (const file of [
+      "scripts/check-release-pr.ts",
+      "scripts/release-git.ts",
+      "scripts/release-pipeline.ts",
+      "scripts/release-gate.ts",
+    ]) {
+      expect(readFileSync(join(repoRoot, file), "utf8")).not.toContain("packages/internal/package.json");
+    }
+    expect(readFileSync(join(repoRoot, "scripts/release.ts"), "utf8")).toContain("resolveReleasePackage");
+    expect(readFileSync(join(repoRoot, "scripts/check-release-pr.ts"), "utf8")).toContain(
+      "origin/main:${packageManifest}"
+    );
+  });
+});

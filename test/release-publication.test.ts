@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
+import type { VerifiedRelease } from "../packages/release/src/intent.ts";
+import type { Registry } from "../packages/release/src/registry.ts";
 import { publishVerifiedRelease } from "../scripts/release-publication.ts";
 import type { PublicationServices } from "../scripts/release-publication.ts";
-import type { VerifiedRelease } from "../scripts/release-record.ts";
-import type { Registry } from "../scripts/release-registry.ts";
 
 const commit = "a".repeat(40);
 const newerCommit = "b".repeat(40);
@@ -142,7 +142,7 @@ describe("registry integrity", () => {
   });
   it("still publishes when an unrelated historical version lacks integrity", async () => {
     const { services, registry } = publication();
-    registry.versions.set("0.1.0", { commit: newerCommit });
+    registry.versions.set("0.1.0", { commit: "c".repeat(40) });
     await publishVerifiedRelease(release, services);
     expect(services.publish).toHaveBeenCalledWith(release.archive);
   });
