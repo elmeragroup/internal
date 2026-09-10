@@ -1,0 +1,58 @@
+name: Publish Release
+
+on:
+  workflow_call:
+    inputs:
+      source_commit:
+        required: true
+        type: string
+    secrets:
+      NPM_TOKEN:
+        required: true
+      RELEASE_GITHUB_TOKEN:
+        required: false
+  workflow_dispatch:
+    inputs:
+      record_tag:
+        description: "Prepared release to retry: v0.1.2 or canary-<full commit SHA>"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    concurrency:
+      group: npm-release
+      cancel-in-progress: false
+      queue: max
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_commit || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          registry-url: https://registry.npmjs.org
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Publish checked commit or retry recorded archive
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_GITHUB_TOKEN || github.token }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          SOURCE_COMMIT: ${{ inputs.source_commit }}
+          RECORD_TAG: ${{ inputs.record_tag }}
+        run: |
+          if [ -n "$RECORD_TAG" ]; then
+            pnpm release:run retry "$RECORD_TAG"
+          else
+            pnpm release:run main "$SOURCE_COMMIT"
+          fi

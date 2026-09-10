@@ -23,6 +23,10 @@ const { components } = await generateApiArtifacts({
 });
 ```
 
+The `canary` channel receives checked main-branch changes automatically. Stable versions are released
+when a maintainer merges the version PR. After the first stable release, install stable with
+`pnpm add -D @elmeragroup/internal@latest`, or pin an exact version for repeatable builds.
+
 Requires Node >=24.13.0 <25. Generate during the build, then import the JSON from rendering code.
 
 The generator defaults to `includeExternalTypes: ["@base-ui/react"]` and `allowedWarningCodes: ["unsupported-type-fallback"]`. Override either option as needed. Accepted warnings are returned in `diagnostics`.

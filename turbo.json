@@ -2,6 +2,7 @@
   "$schema": "https://turbo.build/schema.json",
   "ui": "stream",
   "globalEnv": ["NODE_ENV"],
+  "globalPassThroughEnv": ["GH_TOKEN", "GITHUB_REPOSITORY"],
   "tasks": {
     "//#lint": {
       "inputs": ["$TURBO_DEFAULT$", "packages/oxlint-plugin/**", "packages/oxlint-anti-slop/**"],
@@ -13,10 +14,10 @@
         ".oxlintrc.json",
         "packages/api-extractor/**",
         "scripts/lib/**",
-        "scripts/release.ts",
-        "scripts/release-version.ts",
+        "scripts/release*.ts",
+        "scripts/publish-release.ts",
+        "scripts/check-release-pr.ts",
         "scripts/canary-pack.ts",
-        "scripts/canary-publish.ts",
         "scripts/canary-version.ts",
         "scripts/packed-consumer.ts",
         "scripts/packed-verification.ts",
@@ -24,7 +25,7 @@
         "packages/api-artifacts/package.json",
         "packages/internal/package.json",
         ".github/workflows/merge.yml",
-        ".github/workflows/publish-canary.yml",
+        ".github/workflows/publish-release.yml",
         ".github/workflows/version-packages.yml",
         "package.json",
         "pnpm-workspace.yaml"
@@ -48,10 +49,21 @@
       "dependsOn": ["build", "test", "type-check"]
     },
     "ci:checks": {
-      "dependsOn": ["//#lint", "//#test:repo-policy", "type-check", "test", "build", "//#type-check:scripts"]
+      "dependsOn": [
+        "//#lint",
+        "//#test:repo-policy",
+        "type-check",
+        "test",
+        "build",
+        "//#type-check:scripts",
+        "//#type-check:tests"
+      ]
     },
     "//#type-check:scripts": {
       "inputs": ["scripts/**", "tooling/typescript/**"]
+    },
+    "//#type-check:tests": {
+      "inputs": ["test/**", "scripts/**", "tooling/typescript/**"]
     },
     "@elmeragroup/internal#build": {
       "dependsOn": ["^build"],

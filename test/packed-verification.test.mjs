@@ -4,9 +4,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
+import { asRecord, readJsonObject } from "../scripts/lib/json-object.mjs";
 import { validateReceipt, verifyPackedArchive } from "../scripts/packed-verification.ts";
 import { packageName } from "../scripts/release.ts";
-import { asRecord, readJsonObject } from "./json-object.mjs";
 
 const version = "0.1.0-canary.1";
 

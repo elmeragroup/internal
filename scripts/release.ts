@@ -2,10 +2,10 @@ import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 
 import { asString, readJsonObject } from "./lib/json-object.mjs";
-import { assertCanaryReleaseVersion, assertReleaseVersion } from "./release-version.ts";
+import { assertReleaseVersion } from "./release-version.ts";
 
 export const repoRoot = resolve(import.meta.dirname, "..");
-export const archiveDirectory = resolve(repoRoot, ".artifacts/canary");
+export const archiveDirectory = resolve(repoRoot, ".artifacts/release");
 export const packageName = "@elmeragroup/internal";
 export const packageDirectory = resolve(repoRoot, "packages/internal");
 export const manifestPath = resolve(packageDirectory, "package.json");
@@ -18,10 +18,6 @@ export function run(command: string, args: readonly string[], cwd = repoRoot): v
 
 export function releaseVersion(): string {
   return assertReleaseVersion(asString(readJsonObject(manifestPath).version, "version"));
-}
-
-export function canaryVersion(): string {
-  return assertCanaryReleaseVersion(releaseVersion());
 }
 
 export function archivePath(version = releaseVersion()): string {

@@ -5,6 +5,10 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
@@ -43,3 +47,29 @@ jobs:
       - name: Changeset presence
         if: ${{ github.event_name == 'pull_request' && !startsWith(github.head_ref, 'changeset-release/') && !contains(github.event.pull_request.labels.*.name, 'no-changeset') }}
         run: pnpm exec changeset status --since=origin/${{ github.base_ref }}
+
+      - name: Validate stable release PR
+        if: github.head_ref == 'changeset-release/main' || github.ref == 'refs/heads/changeset-release/main'
+        run: pnpm release:check-pr
+
+  release:
+    needs: checks
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+      pull-requests: read
+    uses: ./.github/workflows/publish-release.yml
+    with:
+      source_commit: ${{ github.sha }}
+    secrets:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+      RELEASE_GITHUB_TOKEN: ${{ secrets.RELEASE_GITHUB_TOKEN }}
+
+  version:
+    needs: checks
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+    uses: ./.github/workflows/version-packages.yml

@@ -3,7 +3,7 @@ import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-import { asRecordArray, isString, readJsonObject } from "./json-object.mjs";
+import { asRecordArray, isString, readJsonObject } from "../scripts/lib/json-object.mjs";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const extractorRoot = join(repoRoot, "packages", "api-extractor");

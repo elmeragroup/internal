@@ -28,10 +28,19 @@ export function isString(value) {
  * @returns {Record<string, unknown>}
  */
 export function readJsonObject(path) {
+  return parseJsonObject(readFileSync(path, "utf8"), path);
+}
+
+/**
+ * @param {string} text
+ * @param {string} label
+ * @returns {Record<string, unknown>}
+ */
+export function parseJsonObject(text, label) {
   // SAFETY: JSON.parse is untyped; the object guard below is the contract.
-  const parsed = /** @type {unknown} */ (JSON.parse(readFileSync(path, "utf8")));
+  const parsed = /** @type {unknown} */ (JSON.parse(text));
   if (!isPlainObject(parsed)) {
-    throw new Error(`${path} is not a JSON object`);
+    throw new Error(`${label} is not a JSON object`);
   }
   return parsed;
 }
@@ -63,6 +72,17 @@ export function asString(value, label) {
 /**
  * @param {unknown} value
  * @param {string} label
+ * @returns {number}
+ */
+export function asInteger(value, label) {
+  const number = Number(value);
+  if (value !== number || !Number.isSafeInteger(number)) throw new Error(`${label} is not an integer`);
+  return number;
+}
+
+/**
+ * @param {unknown} value
+ * @param {string} label
  * @returns {Record<string, unknown>[]}
  */
 export function asRecordArray(value, label) {
@@ -70,4 +90,18 @@ export function asRecordArray(value, label) {
     throw new Error(`${label} is not an array`);
   }
   return value.map((entry, index) => asRecord(entry, `${label}[${String(index)}]`));
+}
+
+/**
+ * @param {string} text
+ * @param {string} label
+ * @returns {Record<string, unknown>[]}
+ */
+export function parseJsonArray(text, label) {
+  // SAFETY: JSON.parse is untyped; the array guard below is the contract.
+  const parsed = /** @type {unknown} */ (JSON.parse(text));
+  if (!Array.isArray(parsed)) {
+    throw new Error(`${label} is not a JSON array`);
+  }
+  return asRecordArray(parsed, label);
 }

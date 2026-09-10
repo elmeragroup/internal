@@ -16,8 +16,11 @@
     "packages:pack": "pnpm build && node scripts/canary-pack.ts",
     "canary:pack": "pnpm packages:pack",
     "test:packed-consumer": "node scripts/packed-consumer.ts",
-    "canary:publish": "node scripts/canary-publish.ts",
-    "type-check:scripts": "tsc --noEmit -p scripts/tsconfig.json"
+    "release:version": "pnpm exec changeset version && pnpm install --lockfile-only",
+    "release:run": "node scripts/publish-release.ts",
+    "release:check-pr": "node scripts/check-release-pr.ts",
+    "type-check:scripts": "tsc --noEmit -p scripts/tsconfig.json",
+    "type-check:tests": "tsc --noEmit -p test/tsconfig.json"
   },
   "devDependencies": {
     "@changesets/cli": "catalog:",
