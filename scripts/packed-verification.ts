@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, resolve } from "node:path";
 
-import { asRecord, asString, readJsonObject } from "./lib/json-object.mjs";
+import { assertArchiveMatches } from "../packages/release/src/index.ts";
 
 export type PackedInputs = {
   reportPath: string;
@@ -40,26 +40,12 @@ function writePassReceipt(receiptPath: string, version: string, archiveReportSha
 
 function captureArchive(inputs: PackedInputs, packageName: string): CapturedArchive {
   const reportBytes = readFileSync(inputs.reportPath);
-  const reportSha256 = sha256Hex(reportBytes);
-  // SAFETY: JSON.parse is untyped; asRecord below is the contract.
-  const parsed = JSON.parse(reportBytes.toString("utf8")) as unknown;
-  const report = asRecord(parsed, "archive report");
-  if (report.version !== inputs.version) {
-    throw new Error("Packed consumer verification does not match this archive");
-  }
-  const expected = asRecord(report.archive, "archive");
-  if (expected.name !== packageName) {
-    throw new Error("Packed consumer verification does not match this archive");
-  }
   const archiveBytes = readFileSync(inputs.archivePath);
-  const archiveSha256 = sha256Hex(archiveBytes);
-  if (asString(expected.sha256, "sha256") !== archiveSha256 || expected.bytes !== archiveBytes.length) {
-    throw new Error("Packed consumer verification does not match this archive");
-  }
+  const reportSha256 = assertArchiveMatches(reportBytes, archiveBytes, inputs.version, packageName);
   return {
     version: inputs.version,
     reportSha256,
-    archiveSha256,
+    archiveSha256: sha256Hex(archiveBytes),
     archiveBytes,
   };
 }
@@ -88,17 +74,4 @@ export function verifyPackedArchive(
   } finally {
     rmSync(snapshotDirectory, { recursive: true, force: true });
   }
-}
-
-export function validateReceipt(inputs: PackedInputs, packageName: string): string {
-  const captured = captureArchive(inputs, packageName);
-  const verification = readJsonObject(inputs.receiptPath);
-  if (
-    verification.status !== "pass" ||
-    verification.version !== inputs.version ||
-    verification.archiveReportSha256 !== captured.reportSha256
-  ) {
-    throw new Error("Packed consumer verification does not match this archive");
-  }
-  return inputs.archivePath;
 }

@@ -1,18 +1,28 @@
-import { Context } from "effect";
+import { Schema } from "effect";
 import { execFileSync } from "node:child_process";
 import { mkdirSync, rmSync } from "node:fs";
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
 
-import { asRecordArray, asString, isString, readJsonObject } from "./json.ts";
+import { readJson } from "./json.ts";
 import { assertStableReleaseVersion, nextPatchVersion } from "./version.ts";
 
 // Relative to the directory the CLI runs in, and inside the ignored scratch directory.
 const planFileName = ".artifacts/changeset-release-plan.json";
 
-export class Planner extends Context.Service<Planner, { plannedCanaryBase: (current: string) => string }>()(
-  "elmera/release/Planner"
-) {}
+const ChangesetConfig = Schema.Struct({
+  baseBranch: Schema.String,
+});
+
+const PlannedReleaseEntry = Schema.Struct({
+  name: Schema.String,
+  type: Schema.String,
+  newVersion: Schema.String,
+});
+
+const ChangesetPlan = Schema.Struct({
+  releases: Schema.Array(PlannedReleaseEntry),
+});
 
 /** One entry of the Changesets release plan; `type` is `none` for a package that stays put. */
 export type PlannedRelease = {
@@ -26,14 +36,16 @@ function changesetBin(checkoutRoot: string): string {
 }
 
 export function changesetBaseBranch(checkoutRoot: string): string {
-  const base = asString(
-    readJsonObject(resolve(checkoutRoot, ".changeset/config.json")).baseBranch,
-    "changeset baseBranch"
-  );
+  const base = readJson(resolve(checkoutRoot, ".changeset/config.json"), ChangesetConfig).baseBranch;
   if (!base.startsWith("origin/")) {
     throw new Error("Changesets baseBranch must be a remote-tracking ref (origin/<branch>)");
   }
   return base;
+}
+
+/** The branch Changesets tracks, without the `origin/` prefix. */
+export function changesetTrackedBranch(checkoutRoot: string): string {
+  return changesetBaseBranch(checkoutRoot).slice("origin/".length);
 }
 
 /**
@@ -57,14 +69,15 @@ export function readReleasePlan(checkoutRoot: string): PlannedRelease[] {
       cwd: checkoutRoot,
       stdio: "pipe",
     });
-    return asRecordArray(readJsonObject(planPath).releases, "release plan").map((release) => ({
-      name: asString(release.name, "planned package"),
-      type: asString(release.type, "planned bump"),
-      newVersion: asString(release.newVersion, "planned version"),
+    return readJson(planPath, ChangesetPlan).releases.map((release) => ({
+      name: release.name,
+      type: release.type,
+      newVersion: release.newVersion,
     }));
   } catch (error) {
     const message = error instanceof Error ? error.message : "changeset status failed";
-    const details = error instanceof Error && "stderr" in error && isString(error.stderr) ? error.stderr : "";
+    const stderr = error instanceof Error && "stderr" in error ? error.stderr : undefined;
+    const details = Object.prototype.toString.call(stderr) === "[object String]" ? String(stderr) : "";
     throw new Error(details === "" ? message : `${message}\n${details}`, { cause: error });
   } finally {
     rmSync(planPath, { force: true });

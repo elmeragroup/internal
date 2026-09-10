@@ -5,7 +5,6 @@ import { describe, expect, it } from "vitest";
 
 import { createStableReleaseGate } from "../src/gate.ts";
 import { createGitHubClient } from "../src/github.ts";
-import { asString } from "../src/json.ts";
 
 const commit = "a".repeat(40);
 
@@ -20,6 +19,7 @@ type CheckoutOptions = {
   version?: string;
   changelog?: string;
   pendingChangeset?: boolean;
+  baseBranch?: string;
 };
 
 /** A disposable stand-in for the release checkout the gate reads. */
@@ -38,6 +38,10 @@ function withCheckout(
     `# changelog\n\n## ${options.changelog ?? version}\n`
   );
   writeFileSync(resolve(root, ".changeset/README.md"), "ignored\n");
+  writeFileSync(
+    resolve(root, ".changeset/config.json"),
+    `${JSON.stringify({ baseBranch: options.baseBranch ?? "origin/main" })}\n`
+  );
   if (options.pendingChangeset === true) writeFileSync(resolve(root, ".changeset/pending.md"), "pending\n");
   return run(root, packageDirectory).finally(() => {
     rmSync(root, { recursive: true, force: true });
@@ -48,7 +52,7 @@ function withCheckout(
 function gitHub(pulls: readonly unknown[]) {
   const requested: string[] = [];
   const client = createGitHubClient("example/package", "test", (url) => {
-    const path = asString(url, "request URL");
+    const path = url instanceof URL ? url.href : url instanceof Request ? url.url : url;
     requested.push(path);
     if (path.includes("/pulls")) return Promise.resolve(Response.json(pulls));
     return Promise.resolve(new Response("", { status: 500 }));
@@ -132,6 +136,29 @@ describe("stable release gate", () => {
       const { client } = gitHub([{ ...mergedReleasePull, ...override }]);
       await expect(createStableReleaseGate(client, root, packageDirectory)(commit, "0.1.9")).rejects.toThrow(
         "merged changeset-release/main PR"
+      );
+    });
+  });
+
+  it("uses the Changesets tracked branch for the release PR", async () => {
+    const pull = {
+      ...mergedReleasePull,
+      head: { ref: "changeset-release/develop", repo: { full_name: "example/package" } },
+      base: { ref: "develop" },
+    };
+    await withCheckout({ version: "0.2.0", baseBranch: "origin/develop" }, async (root, packageDirectory) => {
+      const { client } = gitHub([pull]);
+      await expect(createStableReleaseGate(client, root, packageDirectory)(commit, "0.1.9")).resolves.toEqual(
+        {
+          channel: "stable",
+          version: "0.2.0",
+        }
+      );
+    });
+    await withCheckout({ version: "0.2.0", baseBranch: "origin/develop" }, async (root, packageDirectory) => {
+      const { client } = gitHub([mergedReleasePull]);
+      await expect(createStableReleaseGate(client, root, packageDirectory)(commit, "0.1.9")).rejects.toThrow(
+        "merged changeset-release/develop PR"
       );
     });
   });

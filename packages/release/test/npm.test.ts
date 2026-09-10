@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { asString } from "../src/json.ts";
 import { readRegistry } from "../src/npm.ts";
 
 const commit = "a".repeat(40);
@@ -10,7 +9,7 @@ describe("registry failures", () => {
   it("looks up the requested package name", async () => {
     const requested: string[] = [];
     await readRegistry("@acme/app", (url) => {
-      requested.push(asString(url, "request URL"));
+      requested.push(url instanceof URL ? url.href : url instanceof Request ? url.url : url);
       return Promise.resolve(new Response("", { status: 404 }));
     });
     expect(requested).toEqual(["https://registry.npmjs.org/@acme%2fapp"]);

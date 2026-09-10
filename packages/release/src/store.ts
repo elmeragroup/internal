@@ -1,10 +1,13 @@
-import { Context } from "effect";
-
 import { createGitHubClient } from "./github.ts";
-import type { GitHubClient, GitHubObject } from "./github.ts";
+import type { GitHubClient, GitHubRelease, GitHubReleaseAsset } from "./github.ts";
+import {
+  decodeGitHubRelease,
+  decodeGitHubTagRef,
+  GitHubReleaseAsset as GitHubReleaseAssetSchema,
+} from "./github.ts";
 import { releaseTag, serializeIntent, verifiedBundleName } from "./intent.ts";
 import type { ReleaseIntent } from "./intent.ts";
-import { asInteger, asRecord, asRecordArray, asString, isString } from "./json.ts";
+import { decodeUnknown, isJsonString } from "./json.ts";
 import { classifyReleaseRecord } from "./ownership.ts";
 
 export type ReleaseAsset = { state: "missing" } | { state: "starter" | "uploaded"; id: number };
@@ -24,15 +27,14 @@ export type ReleaseStore = {
   reservedCanaryVersions: () => Promise<string[]>;
 };
 
-export class Store extends Context.Service<Store, ReleaseStore>()("elmera/release/Store") {}
-
 export type ReleaseAssetFields = {
   id: number;
   state: string;
   size: number;
 };
 
-type ReleaseCatalog = Map<string, SavedRelease | "foreign">;
+type CatalogEntry = { kind: "saved"; release: SavedRelease } | { kind: "foreign" };
+type ReleaseCatalog = Map<string, CatalogEntry>;
 
 function assertSameIntent(saved: ReleaseIntent, intended: ReleaseIntent): void {
   if (
@@ -43,23 +45,18 @@ function assertSameIntent(saved: ReleaseIntent, intended: ReleaseIntent): void {
     throw new Error("Release intent differs from the saved release");
 }
 
-function releaseBodyText(value: GitHubObject): string {
+function releaseBodyText(value: GitHubRelease): string {
   if (value.body === null || value.body === undefined) return "";
-  return asString(value.body, "release body");
+  if (!isJsonString(value.body)) throw new Error("release body is not a string");
+  return value.body;
 }
 
-function assetNames(value: GitHubObject): string[] {
-  return asRecordArray(value.assets, "release assets").map((asset, index) =>
-    asString(asset.name, `release assets[${String(index)}].name`)
-  );
+function assetNames(value: GitHubRelease): string[] {
+  return value.assets.map((asset) => asset.name);
 }
 
-function recordIntent(value: GitHubObject): ReleaseIntent {
-  const classification = classifyReleaseRecord(
-    asString(value.tag_name, "release tag"),
-    releaseBodyText(value),
-    assetNames(value)
-  );
+function recordIntent(value: GitHubRelease): ReleaseIntent {
+  const classification = classifyReleaseRecord(value.tag_name, releaseBodyText(value), assetNames(value));
   switch (classification.kind) {
     case "owned":
     case "legacy":
@@ -85,22 +82,16 @@ export function classifyReleaseAsset(
   return { state: "uploaded", id: asset.id };
 }
 
-function assetFields(value: GitHubObject): ReleaseAssetFields {
-  return {
-    id: asInteger(value.id, "asset id"),
-    state: asString(value.state, "asset state"),
-    size: asInteger(value.size, "asset size"),
-  };
+function assetFields(asset: GitHubReleaseAsset): ReleaseAssetFields {
+  return { id: asset.id, state: asset.state, size: asset.size };
 }
 
-function savedReleaseFrom(value: GitHubObject, intent: ReleaseIntent): SavedRelease {
-  const assets = asRecordArray(value.assets, "release assets").filter(
-    (asset) => asset.name === verifiedBundleName
-  );
+function savedReleaseFrom(value: GitHubRelease, intent: ReleaseIntent): SavedRelease {
+  const assets = value.assets.filter((asset) => asset.name === verifiedBundleName);
   if (assets.length > 1) throw new Error("Duplicate release archives");
   const raw = assets[0];
   return {
-    id: asInteger(value.id, "release id"),
+    id: value.id,
     intent,
     asset: classifyReleaseAsset(value.draft === true, raw === undefined ? undefined : assetFields(raw)),
   };
@@ -113,8 +104,8 @@ export function createReleaseStore(client: GitHubClient, packageName: string): R
   async function readTagSha(tag: string): Promise<string | undefined> {
     const response = await request(`${root}/git/ref/tags/${encodeURIComponent(tag)}`, { allow404: true });
     if (response === undefined) return undefined;
-    const object = asRecord((await data(response)).object, "tag target");
-    if (object.type !== "commit" || !isString(object.sha)) {
+    const object = decodeGitHubTagRef(await data(response), "tag target").object;
+    if (object.type !== "commit") {
       throw new Error("Release tag was moved or is not a direct commit reference");
     }
     return object.sha;
@@ -133,18 +124,25 @@ export function createReleaseStore(client: GitHubClient, packageName: string): R
         await request(`${root}/releases?per_page=100&page=${String(page)}`),
         "GitHub releases"
       );
-      for (const value of pageItems) {
-        const tag = asString(value.tag_name, "release tag");
-        const classification = classifyReleaseRecord(tag, releaseBodyText(value), assetNames(value));
+      for (const item of pageItems) {
+        const value = decodeGitHubRelease(item, "GitHub release");
+        const classification = classifyReleaseRecord(
+          value.tag_name,
+          releaseBodyText(value),
+          assetNames(value)
+        );
         switch (classification.kind) {
           case "ignored":
             break;
           case "foreign":
-            listed.set(tag, "foreign");
+            listed.set(value.tag_name, { kind: "foreign" });
             break;
           case "owned":
           case "legacy":
-            listed.set(tag, savedReleaseFrom(value, classification.intent));
+            listed.set(value.tag_name, {
+              kind: "saved",
+              release: savedReleaseFrom(value, classification.intent),
+            });
             break;
         }
       }
@@ -160,24 +158,27 @@ export function createReleaseStore(client: GitHubClient, packageName: string): R
   }
 
   async function remember(saved: SavedRelease): Promise<void> {
-    (await releaseCatalog()).set(releaseTag(saved.intent), saved);
+    (await releaseCatalog()).set(releaseTag(saved.intent), { kind: "saved", release: saved });
   }
 
   async function find(tag: string): Promise<SavedRelease | undefined> {
     // Listing with push access includes drafts, unlike the published-release-by-tag endpoint.
-    const saved = (await releaseCatalog()).get(tag);
-    if (saved === "foreign") {
+    const entry = (await releaseCatalog()).get(tag);
+    if (entry?.kind === "foreign") {
       throw new Error("A foreign GitHub release occupies the record tag");
     }
-    if (saved !== undefined) {
-      await assertTagMatchesCommit(saved);
-      return saved;
+    if (entry?.kind === "saved") {
+      await assertTagMatchesCommit(entry.release);
+      return entry.release;
     }
     return undefined;
   }
 
   async function readSaved(id: number): Promise<SavedRelease> {
-    const value = await data(await request(`${root}/releases/${String(id)}`));
+    const value = decodeGitHubRelease(
+      await data(await request(`${root}/releases/${String(id)}`)),
+      "GitHub release"
+    );
     const saved = savedReleaseFrom(value, recordIntent(value));
     await assertTagMatchesCommit(saved);
     await remember(saved);
@@ -202,18 +203,21 @@ export function createReleaseStore(client: GitHubClient, packageName: string): R
     } else if (sha !== intent.commit) {
       throw new Error("Existing release tag points to a different commit");
     }
-    const value = await data(
-      await request(`${root}/releases`, {
-        method: "POST",
-        body: JSON.stringify({
-          tag_name: tag,
-          target_commitish: intent.commit,
-          name: `${packageName} ${intent.version}`,
-          body: serializeIntent(intent),
-          draft: true,
-          prerelease: intent.channel === "canary",
-        }),
-      })
+    const value = decodeGitHubRelease(
+      await data(
+        await request(`${root}/releases`, {
+          method: "POST",
+          body: JSON.stringify({
+            tag_name: tag,
+            target_commitish: intent.commit,
+            name: `${packageName} ${intent.version}`,
+            body: serializeIntent(intent),
+            draft: true,
+            prerelease: intent.channel === "canary",
+          }),
+        })
+      ),
+      "GitHub release"
     );
     const created = savedReleaseFrom(value, recordIntent(value));
     assertSameIntent(created.intent, intent);
@@ -230,16 +234,23 @@ export function createReleaseStore(client: GitHubClient, packageName: string): R
     if (current.asset.state === "starter") {
       await request(`${root}/releases/assets/${String(current.asset.id)}`, { method: "DELETE" });
     }
-    const value = await data(
-      await request(`${client.uploadRoot}/releases/${String(release.id)}/assets?name=${verifiedBundleName}`, {
-        method: "POST",
-        body: new Blob([new Uint8Array(bytes)]),
-      })
+    const uploadedAsset = decodeUnknown(
+      await data(
+        await request(
+          `${client.uploadRoot}/releases/${String(release.id)}/assets?name=${verifiedBundleName}`,
+          {
+            method: "POST",
+            body: new Blob([new Uint8Array(bytes)]),
+          }
+        )
+      ),
+      GitHubReleaseAssetSchema,
+      "uploaded asset"
     );
     const uploaded: SavedRelease = {
       id: release.id,
       intent: current.intent,
-      asset: classifyReleaseAsset(false, assetFields(value)),
+      asset: classifyReleaseAsset(false, assetFields(uploadedAsset)),
     };
     await remember(uploaded);
     return uploaded;
@@ -269,8 +280,10 @@ export function createReleaseStore(client: GitHubClient, packageName: string): R
 
   async function reservedCanaryVersions(): Promise<string[]> {
     const versions: string[] = [];
-    for (const saved of (await releaseCatalog()).values()) {
-      if (saved !== "foreign" && saved.intent.channel === "canary") versions.push(saved.intent.version);
+    for (const entry of (await releaseCatalog()).values()) {
+      if (entry.kind === "saved" && entry.release.intent.channel === "canary") {
+        versions.push(entry.release.intent.version);
+      }
     }
     return versions;
   }

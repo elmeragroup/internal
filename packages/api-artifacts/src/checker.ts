@@ -214,9 +214,17 @@ export type PartRequest = ComponentSourceRequest & {
   type: Type;
 };
 
-function callSignature(checker: Checker, type: Type): Signature | null {
+type CallSignatureSet =
+  | { kind: "none" }
+  | { kind: "one"; signature: Signature }
+  | { kind: "many"; count: number };
+
+function callSignaturesOf(checker: Checker, type: Type): CallSignatureSet {
   const signatures = checker.getSignaturesOfType(type, SignatureKind.Call);
-  return signatures[0] ?? null;
+  const first = signatures[0];
+  if (first === undefined) return { kind: "none" };
+  if (signatures.length === 1) return { kind: "one", signature: first };
+  return { kind: "many", count: signatures.length };
 }
 
 function isForwardedProp(context: LibraryProject, symbol: TsSymbol): boolean {
@@ -307,14 +315,14 @@ export function componentPartRequests(
       addProblem(problems, `${exportName}: exported value has an unresolvable type`);
       continue;
     }
-    if (callSignature(checker, rootType) !== null) {
+    if (callSignaturesOf(checker, rootType).kind !== "none") {
       parts.push({ name: exportName, exportName, type: rootType });
       continue;
     }
     const start = parts.length;
     for (const member of checker.getPropertiesOfType(rootType)) {
       const memberType = checker.getTypeOfSymbol(member);
-      if (memberType === undefined || callSignature(checker, memberType) === null) continue;
+      if (memberType === undefined || callSignaturesOf(checker, memberType).kind === "none") continue;
       parts.push({
         name: `${exportName}.${member.name}`,
         exportName,
@@ -389,8 +397,7 @@ export type ComponentApi = {
 function describePart(
   context: LibraryProject,
   request: PartRequest,
-  signature: Signature | null,
-  signatureCount: number,
+  signatures: CallSignatureSet,
   source: PartSource | null,
   hasPropsParameter: boolean,
   propsResolved: boolean,
@@ -399,11 +406,11 @@ function describePart(
   problems: ProblemLog
 ): ApiPart | null {
   const { checker } = context;
-  if (signature === null) {
+  if (signatures.kind !== "one") {
     problems.add(
-      signatureCount === 0
+      signatures.kind === "none"
         ? `${request.name}: no call signature — it does not look like a component`
-        : `${request.name}: ${signatureCount} call signatures — API artifacts describe one public props contract; keep one public overload`
+        : `${request.name}: ${String(signatures.count)} call signatures — API artifacts describe one public props contract; keep one public overload`
     );
     return null;
   }
@@ -479,8 +486,8 @@ export function extractPart(
 ): LibraryPartApi {
   const source = partSourceFromInspection(context, request.name, sourceResult, problems);
   const { checker } = context;
-  const signatures = checker.getSignaturesOfType(request.type, SignatureKind.Call);
-  const signature = signatures.length === 1 ? (signatures[0] ?? null) : null;
+  const signatures = callSignaturesOf(checker, request.type);
+  const signature = signatures.kind === "one" ? signatures.signature : undefined;
   const declarationPaths = signature?.declaration === undefined ? [] : [signature.declaration.path];
   const parameter = signature?.getParameters()[0];
   const declared = parameter === undefined ? undefined : checker.getTypeOfSymbol(parameter);
@@ -504,8 +511,7 @@ export function extractPart(
     part: describePart(
       context,
       request,
-      signature,
-      signatures.length,
+      signatures,
       source,
       parameter !== undefined,
       propsType !== null,

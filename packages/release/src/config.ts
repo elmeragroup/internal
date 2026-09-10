@@ -1,7 +1,8 @@
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { Schema } from "effect";
+import { existsSync, statSync } from "node:fs";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 
-import { asString, parseJsonObject } from "./json.ts";
+import { readJson } from "./json.ts";
 
 export type ReleasePackage = {
   checkoutRoot: string;
@@ -39,11 +40,20 @@ export function resolveReleasePackage(
   }
   const manifestPath = resolve(directory, "package.json");
   if (!existsSync(manifestPath)) throw new Error("Package directory does not contain package.json");
-  const name = asString(parseJsonObject(readFileSync(manifestPath, "utf8"), "package manifest").name, "name");
+  const name = readJson(manifestPath, Schema.Struct({ name: Schema.String })).name;
   if (name !== packageName) {
     throw new Error(`Package name ${packageName} does not match ${name}`);
   }
   return { checkoutRoot: root, packageDirectory: directory, packageName };
+}
+
+const PackageVersionManifest = Schema.Struct({
+  version: Schema.String,
+});
+
+/** The `version` field of `package.json` in `packageDirectory`. */
+export function readManifestVersion(packageDirectory: string): string {
+  return readJson(resolve(packageDirectory, "package.json"), PackageVersionManifest).version;
 }
 
 /** Git path to the package manifest, always with forward slashes. */

@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { asRecord, readJsonObject } from "../scripts/lib/json-object.mjs";
-import { validateReceipt, verifyPackedArchive } from "../scripts/packed-verification.ts";
+import { verifyPackedArchive } from "../scripts/packed-verification.ts";
 import { packageName } from "../scripts/release.ts";
 
 const version = "0.1.0-canary.1";
@@ -70,7 +70,7 @@ function withFixture(run) {
 }
 
 describe("packed verification", () => {
-  it("writes a receipt for archive A that validateReceipt accepts", () => {
+  it("writes a pass receipt for archive A", () => {
     withFixture(({ inputs }) => {
       let calls = 0;
       verifyPackedArchive(inputs, packageName, () => {
@@ -81,7 +81,6 @@ describe("packed verification", () => {
       expect(receipt.status).toBe("pass");
       expect(receipt.version).toBe(version);
       expect(receipt.archiveReportSha256).toBe(sha256(readFileSync(inputs.reportPath)));
-      expect(validateReceipt(inputs, packageName)).toBe(inputs.archivePath);
     });
   });
 
@@ -172,24 +171,13 @@ describe("packed verification", () => {
     });
   });
 
-  it("does not let a replaced archive B validate after checks for A", () => {
+  it("does not let a replaced archive B pass verification of A", () => {
     withFixture(({ directory, inputs, bytesB }) => {
-      try {
+      expect(() =>
         verifyPackedArchive(inputs, packageName, () => {
           writeArchive(directory, bytesB);
-        });
-      } catch {
-        // Replacement may be rejected before the receipt is written.
-      }
-      expect(() => validateReceipt(inputs, packageName)).toThrow();
-    });
-  });
-
-  it("rejects validateReceipt after the shared files are replaced", () => {
-    withFixture(({ directory, inputs, bytesB }) => {
-      verifyPackedArchive(inputs, packageName, () => undefined);
-      writeArchive(directory, bytesB);
-      expect(() => validateReceipt(inputs, packageName)).toThrow();
+        })
+      ).toThrow(/archive changed since verification/);
     });
   });
 
@@ -207,20 +195,6 @@ describe("packed verification", () => {
       expect(existsSync(inputs.receiptPath)).toBe(false);
       expect(snapshotPath).toBeDefined();
       expect(existsSync(snapshotPath)).toBe(false);
-    });
-  });
-
-  it.each(["fail", "0.2.0-canary.1", "stale-digest"])("rejects a receipt with invalid %s", (kind) => {
-    withFixture(({ inputs }) => {
-      verifyPackedArchive(inputs, packageName, () => undefined);
-      const receipt = readJsonObject(inputs.receiptPath);
-      if (kind === "fail") receipt.status = "fail";
-      else if (kind === "0.2.0-canary.1") receipt.version = kind;
-      else receipt.archiveReportSha256 = "0".repeat(64);
-      writeFileSync(inputs.receiptPath, `${JSON.stringify(receipt, null, 2)}\n`);
-      expect(() => validateReceipt(inputs, packageName)).toThrow(
-        /Packed consumer verification does not match this archive/
-      );
     });
   });
 });

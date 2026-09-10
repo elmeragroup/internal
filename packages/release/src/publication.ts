@@ -1,4 +1,4 @@
-import { Context, Effect } from "effect";
+import { Effect, Result } from "effect";
 
 import { attempt, attemptPromise, ReleaseError } from "./errors.ts";
 import type { VerifiedRelease } from "./intent.ts";
@@ -13,13 +13,6 @@ export type PublicationServices = {
   isAncestor: CommitAncestry;
   wait: () => Promise<void>;
 };
-
-export class Publisher extends Context.Service<
-  Publisher,
-  {
-    publishVerified: (release: VerifiedRelease) => Effect.Effect<"published" | "superseded", ReleaseError>;
-  }
->()("elmera/release/Publisher") {}
 
 const propagationAttempts = 6;
 
@@ -45,15 +38,8 @@ function uploadAndConfirm(
   services: PublicationServices
 ): Effect.Effect<Registry, ReleaseError> {
   return Effect.gen(function* () {
-    let publishFailure: string | undefined;
-    try {
-      services.publish(release.archive);
-    } catch (error) {
-      if (!(error instanceof Error)) {
-        return yield* new ReleaseError({ message: "Release operation failed" });
-      }
-      publishFailure = error.message;
-    }
+    const published = yield* Effect.result(attempt(() => services.publish(release.archive)));
+    const publishFailure = Result.isFailure(published) ? published.failure.message : undefined;
     const confirmed = yield* confirmRegistry(
       services,
       (registry) => npmIdentity(release, registry) === "match"
@@ -94,10 +80,9 @@ export function publishVerifiedRelease(
     const intended = yield* attempt(() => planPublication(release, registry, services.isAncestor));
     if (intended.kind === "superseded") return "superseded";
     const confirmed = intended.upload ? yield* uploadAndConfirm(release, services) : registry;
-    const plan = intended.upload
-      ? yield* attempt(() => planPublication(release, confirmed, services.isAncestor))
-      : intended;
-    if (plan.kind === "publish" && plan.promote) yield* promoteAndConfirm(release, services);
+    const planned = yield* attempt(() => planPublication(release, confirmed, services.isAncestor));
+    if (planned.kind === "superseded") return "superseded";
+    if (planned.promote) yield* promoteAndConfirm(release, services);
     return "published";
   });
 }

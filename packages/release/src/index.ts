@@ -1,6 +1,12 @@
 export type { PackAndVerify } from "./adapter.ts";
 export { parseReleaseCommand, type ReleaseCommand } from "./command.ts";
-export { packageManifestGitPath, resolveReleasePackage, type ReleasePackage } from "./config.ts";
+export { assertReceipt, assertArchiveMatches, packReleaseBundle, verifyRelease } from "./bundle.ts";
+export {
+  packageManifestGitPath,
+  readManifestVersion,
+  resolveReleasePackage,
+  type ReleasePackage,
+} from "./config.ts";
 export { checkReleasePr, releaseCheckedCommit, retryRelease } from "./engine.ts";
 export { ReleaseError } from "./errors.ts";
 export {
@@ -27,6 +33,7 @@ export {
   type CommitAncestry,
   type PublicationPlan,
 } from "./policy.ts";
+export { runCommand } from "./process.ts";
 export type { PublishedVersion, Registry } from "./registry.ts";
 export {
   assertCanaryReleaseVersion,

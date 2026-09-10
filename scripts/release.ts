@@ -1,9 +1,10 @@
-import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 
-import { resolveReleasePackage } from "../packages/release/src/config.ts";
-import { assertReleaseVersion } from "../packages/release/src/version.ts";
-import { asString, readJsonObject } from "./lib/json-object.mjs";
+import {
+  assertReleaseVersion,
+  readManifestVersion,
+  resolveReleasePackage,
+} from "../packages/release/src/index.ts";
 
 const checkoutRoot = resolve(import.meta.dirname, "..");
 export const releasePackage = resolveReleasePackage(
@@ -17,14 +18,8 @@ export const packageName = releasePackage.packageName;
 export const manifestPath = resolve(releasePackage.packageDirectory, "package.json");
 export const archiveDirectory = resolve(releasePackage.checkoutRoot, ".artifacts/release");
 
-export function run(command: string, args: readonly string[], cwd = repoRoot): void {
-  const result = spawnSync(command, args, { cwd, stdio: "inherit" });
-  if (result.error !== undefined) throw result.error;
-  if (result.status !== 0) throw new Error(`${command} failed with status ${String(result.status)}`);
-}
-
 export function releaseVersion(): string {
-  return assertReleaseVersion(asString(readJsonObject(manifestPath).version, "version"));
+  return assertReleaseVersion(readManifestVersion(packageDirectory));
 }
 
 export function archivePath(version = releaseVersion()): string {

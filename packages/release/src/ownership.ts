@@ -1,7 +1,8 @@
+import { Schema } from "effect";
+
 import { isReleaseTag, parseIntent, releaseRecordOwner, releaseTag, verifiedBundleName } from "./intent.ts";
 import type { ReleaseIntent } from "./intent.ts";
-import { parseJsonObject } from "./json.ts";
-import type { JsonObject } from "./json.ts";
+import { decodeJson } from "./json.ts";
 
 export type ReleaseRecordClassification =
   | { kind: "ignored" }
@@ -9,9 +10,15 @@ export type ReleaseRecordClassification =
   | { kind: "owned"; intent: ReleaseIntent }
   | { kind: "legacy"; intent: ReleaseIntent };
 
-function tryParseBody(body: string): JsonObject | undefined {
+const IntentProbe = Schema.Struct({
+  schema: Schema.optionalKey(Schema.Json),
+  owner: Schema.optionalKey(Schema.Json),
+});
+type IntentProbe = typeof IntentProbe.Type;
+
+function tryParseBody(body: string): IntentProbe | undefined {
   try {
-    return parseJsonObject(body, "release body");
+    return decodeJson(body, IntentProbe, "release body");
   } catch {
     return undefined;
   }
@@ -23,7 +30,7 @@ function intentMatchingTag(body: string, tag: string): ReleaseIntent {
   return intent;
 }
 
-function clearlyForeignIdentity(parsed: JsonObject | undefined): boolean {
+function clearlyForeignIdentity(parsed: IntentProbe | undefined): boolean {
   return parsed !== undefined && parsed.owner !== undefined && parsed.owner !== releaseRecordOwner;
 }
 

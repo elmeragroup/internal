@@ -142,7 +142,7 @@ describe("verified publication", () => {
       registry.versions.set(release.version, { commit, integrity: release.integrity });
       registry.versions.set("0.2.0-canary.12", { commit: newerCommit, integrity: "newer" });
     });
-    await publish(release, services);
+    await expect(publish(release, services)).resolves.toBe("published");
     expect(services.publish).toHaveBeenCalledOnce();
     expect(services.promote).not.toHaveBeenCalled();
   });

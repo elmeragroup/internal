@@ -1,9 +1,9 @@
-import { Context } from "effect";
-import { resolve } from "node:path";
-
+import { readManifestVersion } from "./config.ts";
 import { assertStableReleaseFiles } from "./files.ts";
+import { decodeGitHubPullRequest } from "./github.ts";
 import type { GitHubClient } from "./github.ts";
-import { asRecord, asString, isString, readJsonObject } from "./json.ts";
+import { isJsonString } from "./json.ts";
+import { changesetTrackedBranch } from "./plan.ts";
 import { assertStableReleaseVersion } from "./version.ts";
 
 /** Which release line the checked-out manifest puts a main commit on. */
@@ -15,26 +15,30 @@ export type ReleaseLine = { channel: "stable"; version: string } | { channel: "c
  */
 export type StableReleaseGate = (commit: string, previous: string) => Promise<ReleaseLine>;
 
-export class Gate extends Context.Service<Gate, { decide: StableReleaseGate }>()("elmera/release/Gate") {}
-
 /** Only the merge of the generated release PR may raise the published stable version. */
-async function assertMergedReleasePullRequest(client: GitHubClient, commit: string): Promise<void> {
+async function assertMergedReleasePullRequest(
+  client: GitHubClient,
+  commit: string,
+  trackedBranch: string
+): Promise<void> {
   const pulls = await client.items(
     await client.request(`${client.root}/commits/${commit}/pulls?per_page=100`),
     "commit pull requests"
   );
+  const releaseHead = `changeset-release/${trackedBranch}`;
   const merged = pulls.some((pull) => {
-    const head = asRecord(pull.head, "PR head");
-    const base = asRecord(pull.base, "PR base");
+    const parsed = decodeGitHubPullRequest(pull, "PR");
     return (
-      isString(pull.merged_at) &&
-      pull.merge_commit_sha === commit &&
-      head.ref === "changeset-release/main" &&
-      base.ref === "main" &&
-      asRecord(head.repo, "head repository").full_name === client.repository
+      isJsonString(parsed.merged_at) &&
+      parsed.merge_commit_sha === commit &&
+      parsed.head.ref === releaseHead &&
+      parsed.base.ref === trackedBranch &&
+      parsed.head.repo.full_name === client.repository
     );
   });
-  if (!merged) throw new Error("A stable version change must come from a merged changeset-release/main PR");
+  if (!merged) {
+    throw new Error(`A stable version change must come from a merged ${releaseHead} PR`);
+  }
 }
 
 export function createStableReleaseGate(
@@ -42,14 +46,12 @@ export function createStableReleaseGate(
   root: string,
   packageDirectory: string
 ): StableReleaseGate {
-  const manifestPath = resolve(packageDirectory, "package.json");
+  const trackedBranch = changesetTrackedBranch(root);
   return async (commit, previous) => {
-    const current = assertStableReleaseVersion(
-      asString(readJsonObject(manifestPath).version, "package version")
-    );
+    const current = assertStableReleaseVersion(readManifestVersion(packageDirectory));
     if (current === previous) return { channel: "canary", current };
     assertStableReleaseFiles(previous, current, root, packageDirectory);
-    await assertMergedReleasePullRequest(client, commit);
+    await assertMergedReleasePullRequest(client, commit, trackedBranch);
     return { channel: "stable", version: current };
   };
 }

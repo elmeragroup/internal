@@ -358,21 +358,21 @@ function bindingPropertyKey(propertyName: Node): string | undefined {
   return undefined;
 }
 
+function bindingElementKey(element: { propertyName?: Node; name?: Node }): string | undefined {
+  if (element.propertyName !== undefined) return bindingPropertyKey(element.propertyName);
+  if (element.name !== undefined && isIdentifier(element.name)) return element.name.text;
+  return undefined;
+}
+
 function collectBindingDefaults(
   name: Node | undefined,
-  isIdentifierTarget: (elementName: Node | undefined) => boolean
+  requireIdentifierName: boolean
 ): readonly { readonly name: string; readonly initializerText: string }[] {
   if (name === undefined || !isObjectBindingPattern(name)) return [];
   return name.elements.flatMap((element) => {
     if (!isBindingElement(element) || element.initializer === undefined) return [];
-    if (!isIdentifierTarget(element.name)) return [];
-    const propertyName = element.propertyName;
-    const key =
-      propertyName === undefined
-        ? element.name !== undefined && isIdentifier(element.name)
-          ? element.name.text
-          : undefined
-        : bindingPropertyKey(propertyName);
+    if (requireIdentifierName && (element.name === undefined || !isIdentifier(element.name))) return [];
+    const key = bindingElementKey(element);
     if (key === undefined) return [];
     return [
       {
@@ -386,16 +386,13 @@ function collectBindingDefaults(
 function bindingDefaults(
   name: Node | undefined
 ): readonly { readonly name: string; readonly initializerText: string }[] {
-  return collectBindingDefaults(
-    name,
-    (elementName) => elementName !== undefined && isIdentifier(elementName)
-  );
+  return collectBindingDefaults(name, true);
 }
 
 function sourceBindingDefaults(
   name: Node | undefined
 ): readonly { readonly name: string; readonly initializerText: string }[] {
-  return collectBindingDefaults(name, () => true);
+  return collectBindingDefaults(name, false);
 }
 
 /**

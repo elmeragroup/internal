@@ -8,15 +8,8 @@ import { describe, expect, it, vi } from "vitest";
 import type { PackAndVerify } from "../src/adapter.ts";
 import { parseReleaseCommand } from "../src/command.ts";
 import type { ReleasePackage } from "../src/config.ts";
-import {
-  executeCheckedCommit,
-  executeRetry,
-  releaseCheckedCommit,
-  releaseLayer,
-  retryRelease,
-  runEngine,
-} from "../src/engine.ts";
-import type { EngineBindings } from "../src/engine.ts";
+import { executeCheckedCommit, executeRetry, releaseCheckedCommit, retryRelease } from "../src/engine.ts";
+import type { EngineDeps } from "../src/engine.ts";
 import { ReleaseError } from "../src/errors.ts";
 import type { ReleaseLine } from "../src/gate.ts";
 import type { GitPort } from "../src/git.ts";
@@ -137,16 +130,16 @@ function pipeline(options: PipelineOptions = {}) {
     publishVerified: options.publishVerified ?? vi.fn(() => Effect.succeed("published" as const)),
     restore,
     log: vi.fn(),
-  } satisfies EngineBindings;
+  } satisfies EngineDeps;
   return { bindings, store, adapter, restore, stableGate, plannedCanaryBase, stableVersionAt };
 }
 
-function runMain(commitSha: string, bindings: EngineBindings, adapter: PackAndVerify): Promise<void> {
-  return runEngine(executeCheckedCommit(pkg, adapter, commitSha), bindings);
+function runMain(commitSha: string, bindings: EngineDeps, adapter: PackAndVerify): Promise<void> {
+  return Effect.runPromise(executeCheckedCommit(pkg, adapter, commitSha, bindings).pipe(Effect.scoped));
 }
 
-function runRetry(tag: string, bindings: EngineBindings): Promise<void> {
-  return runEngine(executeRetry(pkg, tag), bindings);
+function runRetry(tag: string, bindings: EngineDeps): Promise<void> {
+  return Effect.runPromise(executeRetry(pkg, tag, bindings).pipe(Effect.scoped));
 }
 
 describe("release CLI command", () => {
@@ -367,13 +360,6 @@ describe("scoped scratch cleanup", () => {
     ).rejects.toThrow("restore failed");
     const leftover = readdirSync(tmpdir()).filter((name) => name.startsWith(prefix) && !before.has(name));
     expect(leftover).toEqual([]);
-  });
-});
-
-describe("release layer wiring", () => {
-  it("provides injected ports without assembling production adapters", () => {
-    const { bindings } = pipeline();
-    expect(releaseLayer(bindings)).toBeDefined();
   });
 });
 

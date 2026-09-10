@@ -1,7 +1,46 @@
-import { parseJsonArray, parseJsonObject } from "./json.ts";
-import type { JsonObject } from "./json.ts";
+import { Schema } from "effect";
 
-export type GitHubObject = JsonObject;
+import { decodeJson, decodeJsonArray, decodeUnknown } from "./json.ts";
+
+export const GitHubReleaseAsset = Schema.Struct({
+  name: Schema.String,
+  id: Schema.Number,
+  state: Schema.String,
+  size: Schema.Number,
+});
+export type GitHubReleaseAsset = typeof GitHubReleaseAsset.Type;
+
+export const GitHubRelease = Schema.Struct({
+  id: Schema.Number,
+  tag_name: Schema.String,
+  body: Schema.optionalKey(Schema.Json),
+  draft: Schema.optionalKey(Schema.Boolean),
+  assets: Schema.Array(GitHubReleaseAsset),
+});
+export type GitHubRelease = typeof GitHubRelease.Type;
+
+export const GitHubTagRef = Schema.Struct({
+  object: Schema.Struct({
+    type: Schema.String,
+    sha: Schema.String,
+  }),
+});
+export type GitHubTagRef = typeof GitHubTagRef.Type;
+
+export const GitHubPullRequest = Schema.Struct({
+  merged_at: Schema.Json,
+  merge_commit_sha: Schema.optionalKey(Schema.Json),
+  head: Schema.Struct({
+    ref: Schema.String,
+    repo: Schema.Struct({
+      full_name: Schema.String,
+    }),
+  }),
+  base: Schema.Struct({
+    ref: Schema.String,
+  }),
+});
+export type GitHubPullRequest = typeof GitHubPullRequest.Type;
 
 export type GitHubRequest = {
   method?: string;
@@ -20,9 +59,21 @@ export type GitHubClient = {
   root: string;
   uploadRoot: string;
   request: GitHubRequester;
-  data: (response: Response) => Promise<GitHubObject>;
-  items: (response: Response, label: string) => Promise<GitHubObject[]>;
+  data: (response: Response) => Promise<Schema.Json>;
+  items: (response: Response, label: string) => Promise<readonly Schema.Json[]>;
 };
+
+export function decodeGitHubRelease(value: Schema.Json, label: string): GitHubRelease {
+  return decodeUnknown(value, GitHubRelease, label);
+}
+
+export function decodeGitHubTagRef(value: Schema.Json, label: string): GitHubTagRef {
+  return decodeUnknown(value, GitHubTagRef, label);
+}
+
+export function decodeGitHubPullRequest(value: Schema.Json, label: string): GitHubPullRequest {
+  return decodeUnknown(value, GitHubPullRequest, label);
+}
 
 export function createGitHubClient(
   repository: string,
@@ -60,7 +111,7 @@ export function createGitHubClient(
     root: `https://api.github.com/repos/${repository}`,
     uploadRoot: `https://uploads.github.com/repos/${repository}`,
     request,
-    data: async (response) => parseJsonObject(await response.text(), "GitHub response"),
-    items: async (response, label) => parseJsonArray(await response.text(), label),
+    data: async (response) => decodeJson(await response.text(), Schema.Json, "GitHub response"),
+    items: async (response, label) => decodeJsonArray(await response.text(), Schema.Json, label),
   };
 }

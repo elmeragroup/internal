@@ -1,8 +1,8 @@
-import { Context } from "effect";
+import { Schema } from "effect";
 import { execFileSync, spawnSync } from "node:child_process";
 
 import { assertCommit } from "./intent.ts";
-import { asString, parseJsonObject } from "./json.ts";
+import { decodeJson, isJsonString } from "./json.ts";
 import type { CommitAncestry } from "./policy.ts";
 import { assertStableReleaseVersion } from "./version.ts";
 
@@ -13,8 +13,6 @@ export type GitPort = {
   stableVersionAt: (revision: string) => string;
   isAncestor: CommitAncestry;
 };
-
-export class Git extends Context.Service<Git, GitPort>()("elmera/release/Git") {}
 
 function git(cwd: string, args: readonly string[]): string {
   return execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
@@ -48,13 +46,17 @@ export function createGitPort(cwd: string, packageManifest: string, remoteTracki
     head: () => git(cwd, ["rev-parse", "HEAD"]),
     originMain: () => git(cwd, ["rev-parse", remoteTrackingRef]),
     isClean: () => git(cwd, ["status", "--porcelain", "--untracked-files=no"]) === "",
-    stableVersionAt: (revision) =>
-      assertStableReleaseVersion(
-        asString(
-          parseJsonObject(git(cwd, ["show", `${revision}:${manifest}`]), "recorded manifest").version,
-          "recorded manifest version"
-        )
-      ),
+    stableVersionAt: (revision) => {
+      const recorded = decodeJson(
+        git(cwd, ["show", `${revision}:${manifest}`]),
+        Schema.Struct({ version: Schema.optionalKey(Schema.Json) }),
+        "recorded manifest"
+      );
+      if (!isJsonString(recorded.version)) {
+        throw new Error("recorded manifest version is not a string");
+      }
+      return assertStableReleaseVersion(recorded.version);
+    },
     isAncestor: createCommitAncestry(cwd),
   };
 }

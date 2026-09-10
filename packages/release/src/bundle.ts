@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Effect, Schema } from "effect";
 import type { Scope } from "effect";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -9,37 +9,69 @@ import { attempt } from "./errors.ts";
 import type { ReleaseError } from "./errors.ts";
 import type { ReleaseIntent, VerifiedRelease } from "./intent.ts";
 import { verifiedBundleName } from "./intent.ts";
-import { asRecord, asString, parseJsonObject, readJsonObject } from "./json.ts";
+import { decodeJson, readJson } from "./json.ts";
 import { scratchDirectory } from "./scratch.ts";
 
 const releaseBundleMembers = ["archive.json", "package.tgz", "verified.json"] as const;
+
+const ArchiveReport = Schema.Struct({
+  version: Schema.String,
+  archive: Schema.Struct({
+    name: Schema.String,
+    sha256: Schema.String,
+    bytes: Schema.Number,
+  }),
+});
+
+const PackedReceipt = Schema.Struct({
+  status: Schema.String,
+  version: Schema.String,
+  archiveReportSha256: Schema.String,
+});
+
+const PackedManifest = Schema.Struct({
+  name: Schema.String,
+  version: Schema.String,
+  elmeraRelease: Schema.Struct({
+    commit: Schema.String,
+    channel: Schema.Literals(["canary", "stable"] as const),
+  }),
+});
 
 function sha256Hex(bytes: Buffer): string {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
-function assertReceipt(directory: string, intent: ReleaseIntent, packageName: string): string {
-  const archive = resolve(directory, "package.tgz");
-  const reportPath = resolve(directory, "archive.json");
-  const receiptPath = resolve(directory, "verified.json");
-  const reportBytes = readFileSync(reportPath);
+export function assertArchiveMatches(
+  reportBytes: Buffer,
+  archiveBytes: Buffer,
+  version: string,
+  packageName: string
+): string {
   const reportSha256 = sha256Hex(reportBytes);
-  const report = asRecord(parseJsonObject(reportBytes.toString("utf8"), "archive report"), "archive report");
-  if (report.version !== intent.version) {
-    throw new Error("Packed consumer verification does not match this archive");
-  }
-  const expected = asRecord(report.archive, "archive");
-  if (expected.name !== packageName) {
-    throw new Error("Packed consumer verification does not match this archive");
-  }
-  const archiveBytes = readFileSync(archive);
+  const report = decodeJson(reportBytes.toString("utf8"), ArchiveReport, "archive report");
   if (
-    asString(expected.sha256, "sha256") !== sha256Hex(archiveBytes) ||
-    expected.bytes !== archiveBytes.length
+    report.version !== version ||
+    report.archive.name !== packageName ||
+    report.archive.sha256 !== sha256Hex(archiveBytes) ||
+    report.archive.bytes !== archiveBytes.length
   ) {
     throw new Error("Packed consumer verification does not match this archive");
   }
-  const verification = readJsonObject(receiptPath);
+  return reportSha256;
+}
+
+export function assertReceipt(directory: string, intent: ReleaseIntent, packageName: string): string {
+  const archive = resolve(directory, "package.tgz");
+  const reportPath = resolve(directory, "archive.json");
+  const receiptPath = resolve(directory, "verified.json");
+  const reportSha256 = assertArchiveMatches(
+    readFileSync(reportPath),
+    readFileSync(archive),
+    intent.version,
+    packageName
+  );
+  const verification = readJson(receiptPath, PackedReceipt);
   if (
     verification.status !== "pass" ||
     verification.version !== intent.version ||
@@ -56,11 +88,12 @@ export function verifyRelease(
   packageName: string
 ): VerifiedRelease {
   const archive = assertReceipt(directory, intent, packageName);
-  const manifest = parseJsonObject(
+  const manifest = decodeJson(
     execFileSync("tar", ["-xOzf", archive, "package/package.json"], { encoding: "utf8" }),
+    PackedManifest,
     "packed manifest"
   );
-  const source = asRecord(manifest.elmeraRelease, "packed source");
+  const source = manifest.elmeraRelease;
   if (
     manifest.name !== packageName ||
     manifest.version !== intent.version ||

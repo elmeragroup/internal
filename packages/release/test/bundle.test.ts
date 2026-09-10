@@ -6,7 +6,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { packReleaseBundle, restoreVerifiedRelease, unpackRelease, verifyRelease } from "../src/bundle.ts";
+import {
+  assertReceipt,
+  packReleaseBundle,
+  restoreVerifiedRelease,
+  unpackRelease,
+  verifyRelease,
+} from "../src/bundle.ts";
 import { assertStableReleaseFiles } from "../src/files.ts";
 import type { ReleaseIntent } from "../src/intent.ts";
 
@@ -106,6 +112,20 @@ describe("recorded archive recovery", () => {
     withRecordedArchive((directory) => {
       expect(verifyRelease(directory, intent, "@acme/app").integrity).toMatch(/^sha512-/);
     }, "@acme/app");
+  });
+  it("rejects a receipt that no longer matches the archive", () => {
+    withRecordedArchive((directory) => {
+      expect(assertReceipt(directory, intent, packageName)).toMatch(/package\.tgz$/);
+      writeFileSync(
+        join(directory, "verified.json"),
+        JSON.stringify({
+          version: intent.version,
+          archiveReportSha256: "0".repeat(64),
+          status: "fail",
+        })
+      );
+      expect(() => assertReceipt(directory, intent, packageName)).toThrow("does not match");
+    });
   });
   it("rejects tampered bytes and a different source commit", () => {
     withRecordedArchive((directory) => {

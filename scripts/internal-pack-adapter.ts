@@ -2,12 +2,15 @@ import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSy
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 
-import type { PackAndVerify } from "../packages/release/src/adapter.ts";
-import { packReleaseBundle, verifyRelease } from "../packages/release/src/bundle.ts";
-import type { ReleaseIntent } from "../packages/release/src/intent.ts";
-import { verifiedBundleName } from "../packages/release/src/intent.ts";
+import type { PackAndVerify, ReleaseIntent } from "../packages/release/src/index.ts";
+import {
+  packReleaseBundle,
+  runCommand,
+  verifiedBundleName,
+  verifyRelease,
+} from "../packages/release/src/index.ts";
 import { readJsonObject } from "./lib/json-object.mjs";
-import { archiveDirectory, archivePath, manifestPath, packageName, repoRoot, run } from "./release.ts";
+import { archiveDirectory, archivePath, manifestPath, packageName, repoRoot } from "./release.ts";
 
 const lockfilePath = resolve(repoRoot, "pnpm-lock.yaml");
 
@@ -24,9 +27,9 @@ function prepareArchive(intent: ReleaseIntent, bundleDirectory: string): void {
     manifest.version = intent.version;
     manifest.elmeraRelease = { commit: intent.commit, channel: intent.channel };
     writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
-    run("pnpm", ["install", "--lockfile-only"]);
-    run("pnpm", ["packages:pack"]);
-    run("pnpm", ["test:packed-consumer"]);
+    runCommand("pnpm", ["install", "--lockfile-only"], repoRoot);
+    runCommand("pnpm", ["packages:pack"], repoRoot);
+    runCommand("pnpm", ["test:packed-consumer"], repoRoot);
     copyFileSync(archivePath(intent.version), resolve(bundleDirectory, "package.tgz"));
     copyFileSync(resolve(archiveDirectory, "archive.json"), resolve(bundleDirectory, "archive.json"));
     copyFileSync(resolve(archiveDirectory, "verified.json"), resolve(bundleDirectory, "verified.json"));

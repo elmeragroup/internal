@@ -30,7 +30,7 @@ retryRelease(pkg: ReleasePackage, recordTag: string): Effect<void, ReleaseError>
 - `retryRelease` finishes a prepared record from its saved bundle bytes. It does not pack. A missing
   or incomplete bundle keeps the current error: rerun the original Merge job.
 
-Callers do not assemble production Layers for git, store, registry, or changesets.
+Callers do not assemble production adapters for git, store, registry, or changesets.
 
 ## Pack-and-verify adapter
 

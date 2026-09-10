@@ -1,9 +1,10 @@
+import { Schema } from "effect";
 import { existsSync, mkdirSync, readFileSync, readdirSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-import { asString, readJsonObject } from "../src/json.ts";
+import { readJson } from "../src/json.ts";
 import { changesetBaseBranch, plannedCanaryBase, readReleasePlan } from "../src/plan.ts";
 import type { PlannedRelease } from "../src/plan.ts";
 import { assertCanaryReleaseVersion, assertReleaseVersion } from "../src/version.ts";
@@ -18,14 +19,17 @@ function writeChangeset(workspace: string, id: string, name: string, bump: strin
 }
 
 function writeWorkspaceFixture(workspace: string): void {
-  const rootManifest = readJsonObject(join(repoRoot, "package.json"));
+  const rootManifest = readJson(
+    join(repoRoot, "package.json"),
+    Schema.Struct({ name: Schema.String, packageManager: Schema.String })
+  );
   writeFileSync(
     join(workspace, "package.json"),
     `${JSON.stringify(
       {
-        name: asString(rootManifest.name, "name"),
+        name: rootManifest.name,
         private: true,
-        packageManager: asString(rootManifest.packageManager, "packageManager"),
+        packageManager: rootManifest.packageManager,
       },
       null,
       2
@@ -46,7 +50,10 @@ function writeWorkspaceFixture(workspace: string): void {
       readFileSync(join(repoRoot, "packages", name, "package.json"))
     );
   }
-  const changesetConfig = readJsonObject(join(repoRoot, ".changeset/config.json"));
+  const changesetConfig = readJson(
+    join(repoRoot, ".changeset/config.json"),
+    Schema.Record(Schema.String, Schema.Json)
+  );
   mkdirSync(join(workspace, ".changeset"));
   writeFileSync(
     join(workspace, ".changeset/config.json"),
@@ -71,7 +78,8 @@ function plannedVersion(releases: readonly PlannedRelease[]): string {
   expect(releases).toHaveLength(1);
   const release = releases[0];
   expect(release?.name).toBe(packageName);
-  const version = assertReleaseVersion(asString(release?.newVersion, "newVersion"));
+  if (release === undefined) throw new Error("expected a planned release");
+  const version = assertReleaseVersion(release.newVersion);
   expect(() => assertCanaryReleaseVersion(version)).toThrow(/Canary publication requires/);
   return version;
 }

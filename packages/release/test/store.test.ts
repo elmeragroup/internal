@@ -1,9 +1,10 @@
+import { Schema } from "effect";
 import { describe, expect, it } from "vitest";
 
 import { createGitHubClient } from "../src/github.ts";
 import { releaseRecordOwner, serializeIntent, verifiedBundleName } from "../src/intent.ts";
 import type { ReleaseIntent } from "../src/intent.ts";
-import { asString, isString, parseJsonArray, parseJsonObject } from "../src/json.ts";
+import { decodeJson, decodeJsonArray } from "../src/json.ts";
 import { classifyReleaseAsset, createReleaseStore } from "../src/store.ts";
 import type { ReleaseStore, SavedRelease } from "../src/store.ts";
 
@@ -50,12 +51,16 @@ async function savedRelease(store: ReleaseStore, tag: string): Promise<SavedRele
   return found;
 }
 
+function isPostedJson(body: RequestInit["body"]): body is string {
+  return Object.prototype.toString.call(body) === "[object String]";
+}
+
 function githubStore(releases: readonly ReleasePayload[], options: StoreOptions = {}) {
   const state = { listed: 0, removed: false };
   const mutations: string[] = [];
   const posted: { path: string; body: string }[] = [];
   const fetcher: typeof fetch = (url, init) => {
-    const path = asString(url, "request URL");
+    const path = url instanceof URL ? url.href : url instanceof Request ? url.url : url;
     const method = init?.method ?? "GET";
     if (method !== "GET") mutations.push(`${method} ${path}`);
     if (method === "DELETE") {
@@ -63,7 +68,7 @@ function githubStore(releases: readonly ReleasePayload[], options: StoreOptions 
       return Promise.resolve(new Response(null, { status: 204 }));
     }
     if (method === "POST") {
-      if (isString(init?.body)) posted.push({ path, body: init.body });
+      if (isPostedJson(init?.body)) posted.push({ path, body: init.body });
       if (path.includes("/git/refs")) {
         return Promise.resolve(Response.json({ object: { type: "commit", sha: commit } }));
       }
@@ -361,16 +366,26 @@ describe("release record ownership in the GitHub store", () => {
     });
     const created = posted.find((entry) => entry.path.endsWith("/releases"));
     expect(created).toBeDefined();
-    const payload = parseJsonObject(created?.body ?? "{}", "created release");
+    const payload = decodeJson(
+      created?.body ?? "{}",
+      Schema.Struct({ name: Schema.String, body: Schema.String }),
+      "created release"
+    );
     expect(payload.name).toBe("@acme/app 0.2.0");
     expect(payload.body).toBe(serializeIntent(intent));
-    expect(parseJsonObject(asString(payload.body, "intent body"), "intent").owner).toBe(releaseRecordOwner);
+    expect(
+      decodeJson(payload.body, Schema.Struct({ owner: Schema.optionalKey(Schema.String) }), "intent").owner
+    ).toBe(releaseRecordOwner);
   });
 });
 
 describe("GitHub JSON arrays", () => {
   it("parses arrays directly and rejects a wrapped object", () => {
-    expect(parseJsonArray('[{"id":1}]', "releases")).toEqual([{ id: 1 }]);
-    expect(() => parseJsonArray('{"releases":[]}', "releases")).toThrow("not a JSON array");
+    expect(decodeJsonArray('[{"id":1}]', Schema.Struct({ id: Schema.Number }), "releases")).toEqual([
+      { id: 1 },
+    ]);
+    expect(() =>
+      decodeJsonArray('{"releases":[]}', Schema.Struct({ id: Schema.Number }), "releases")
+    ).toThrow("not a JSON array");
   });
 });

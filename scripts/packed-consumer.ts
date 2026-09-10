@@ -3,9 +3,10 @@ import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { parse } from "yaml";
 
+import { runCommand } from "../packages/release/src/index.ts";
 import { asRecord, asString } from "./lib/json-object.mjs";
 import { verifyPackedArchive } from "./packed-verification.ts";
-import { archiveDirectory, archivePath, packageName, releaseVersion, repoRoot, run } from "./release.ts";
+import { archiveDirectory, archivePath, packageName, releaseVersion, repoRoot } from "./release.ts";
 
 const version = releaseVersion();
 const catalog = asRecord(
@@ -43,10 +44,10 @@ try {
       );
       writeFileSync(resolve(consumer, "pnpm-workspace.yaml"), "autoInstallPeers: false\n");
       cpSync(resolve(repoRoot, "test/packed-consumer"), resolve(consumer, "checks"), { recursive: true });
-      run("pnpm", ["install", "--ignore-scripts"], consumer);
+      runCommand("pnpm", ["install", "--ignore-scripts"], consumer);
       // Node's type stripping is disabled to prove only compiled JavaScript is loaded.
       for (const check of ["api", "types", "lint", "tree-shaking", "release"]) {
-        run(process.execPath, ["--no-experimental-strip-types", `checks/${check}.mjs`], consumer);
+        runCommand(process.execPath, ["--no-experimental-strip-types", `checks/${check}.mjs`], consumer);
       }
     }
   );

@@ -3,20 +3,14 @@ import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
+import { runCommand } from "../packages/release/src/index.ts";
 import { asRecord, asString, readJsonObject } from "./lib/json-object.mjs";
-import {
-  archiveDirectory,
-  archivePath,
-  packageDirectory,
-  packageName,
-  releaseVersion,
-  run,
-} from "./release.ts";
+import { archiveDirectory, archivePath, packageDirectory, packageName, releaseVersion } from "./release.ts";
 
 const version = releaseVersion();
 rmSync(archiveDirectory, { recursive: true, force: true });
 mkdirSync(archiveDirectory, { recursive: true });
-run("pnpm", ["pack", "--pack-destination", archiveDirectory], packageDirectory);
+runCommand("pnpm", ["pack", "--pack-destination", archiveDirectory], packageDirectory);
 const archive = archivePath(version);
 const files = execFileSync("tar", ["-tzf", archive], { encoding: "utf8" }).trim().split("\n");
 if (files.some((file) => !/^package\/(?:dist\/|package\.json$|README\.md$|LICENSE$|NOTICE$)/.test(file)))
