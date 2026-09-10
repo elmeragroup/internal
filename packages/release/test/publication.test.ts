@@ -23,7 +23,9 @@ function publication() {
     publish: vi.fn((_archive: string) => {
       registry.versions.set(release.version, { commit, integrity: release.integrity });
     }),
-    promote: vi.fn((version: string, tag: string) => registry.tags.set(tag, version)),
+    promote: vi.fn((version: string, tag: string) => {
+      registry.tags.set(tag, version);
+    }),
     isAncestor: vi.fn(
       (ancestor: string, descendant: string) => ancestor === commit && descendant === newerCommit
     ),
