@@ -307,6 +307,7 @@ export function nodeFacts(
     isPropertyAssignment(node) ||
     isVariableDeclaration(node)
   ) {
+    const bindingDefaults = isParameterDeclaration(node) ? bindingDefaultsFor(node.name) : undefined;
     const propertyFacts: BackendNodeFacts = {
       ...result,
       name: isIdentifier(node.name) ? node.name.text : undefined,
@@ -315,8 +316,8 @@ export function nodeFacts(
       optional: "questionToken" in node && node.questionToken !== undefined,
       declarationFlags: modifierFlags(node),
       ...definedFields({
-        bindingDefaults: isParameterDeclaration(node) ? bindingDefaults(node.name) : undefined,
-        sourceBindingDefaults: isParameterDeclaration(node) ? sourceBindingDefaults(node.name) : undefined,
+        bindingDefaults: bindingDefaults?.authored,
+        sourceBindingDefaults: bindingDefaults?.source,
       }),
     };
     return propertyFacts;
@@ -364,35 +365,35 @@ function bindingElementKey(element: { propertyName?: Node; name?: Node }): strin
   return undefined;
 }
 
-function collectBindingDefaults(
-  name: Node | undefined,
-  requireIdentifierName: boolean
-): readonly { readonly name: string; readonly initializerText: string }[] {
-  if (name === undefined || !isObjectBindingPattern(name)) return [];
-  return name.elements.flatMap((element) => {
-    if (!isBindingElement(element) || element.initializer === undefined) return [];
-    if (requireIdentifierName && (element.name === undefined || !isIdentifier(element.name))) return [];
+type BindingDefaultFact = {
+  readonly name: string;
+  readonly initializerText: string;
+};
+
+type BindingDefaults = {
+  readonly authored: readonly BindingDefaultFact[];
+  readonly source: readonly BindingDefaultFact[];
+};
+
+/**
+ * Reads both binding-default sets in one pass over a parameter's object-binding
+ * pattern. Both require an initializer and a resolvable key; `authored` (the
+ * semantic model's view) additionally requires an identifier-named element,
+ * while `source` (source inspection) accepts any keyed binding element.
+ */
+function bindingDefaultsFor(name: Node | undefined): BindingDefaults {
+  if (name === undefined || !isObjectBindingPattern(name)) return { authored: [], source: [] };
+  const authored: BindingDefaultFact[] = [];
+  const source: BindingDefaultFact[] = [];
+  for (const element of name.elements) {
+    if (!isBindingElement(element) || element.initializer === undefined) continue;
     const key = bindingElementKey(element);
-    if (key === undefined) return [];
-    return [
-      {
-        name: key,
-        initializerText: element.initializer.getText().trim(),
-      },
-    ];
-  });
-}
-
-function bindingDefaults(
-  name: Node | undefined
-): readonly { readonly name: string; readonly initializerText: string }[] {
-  return collectBindingDefaults(name, true);
-}
-
-function sourceBindingDefaults(
-  name: Node | undefined
-): readonly { readonly name: string; readonly initializerText: string }[] {
-  return collectBindingDefaults(name, false);
+    if (key === undefined) continue;
+    const fact = { name: key, initializerText: element.initializer.getText().trim() };
+    if (element.name !== undefined && isIdentifier(element.name)) authored.push(fact);
+    source.push(fact);
+  }
+  return { authored, source };
 }
 
 /**
