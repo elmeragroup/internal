@@ -17,6 +17,23 @@ part of upstream. Keep them, their `index.ts` registrations, and
 `[A-Z][A-Z0-9]*-\d+`), for the bare ticket ids that count as a tracker reference.
 The root `.oxlintrc.json` sets it to `ELM-\d+`.
 
+`no-slop-comments` and `no-narration-comments` offer a `removeComment` suggestion
+only when the deletion cannot join tokens or drop a line terminator: `//` comments,
+and block comments that start or end their line. Inline block comments with code on
+both sides are still reported without a suggestion. The predicate is
+`isSafeCommentRemoval` in `shared/slop-comments.ts`.
+
+`shared/type-name-scope.ts` and the scope-aware resolution in
+`shared/dictionary-types.ts`, `rules/no-object-parameters.ts` and
+`rules/no-unknown-returns.ts` are local changes: type names resolve in their
+lexical scope instead of a module-level alias table. Scope containers include
+`StaticBlock`, whose `body` is a statement list, so inner type aliases in
+`class C { static { ... } }` are found. `TSImportEqualsDeclaration` locals,
+including `import Promise = require("./p")`, are recorded as `shadowed`, and
+any other identifier-bearing declaration kind fail-closes as `shadowed` so
+lookup never walks to an outer name. Keep them when refreshing the vendored
+upstream files.
+
 ## Tests
 
 Run the rule tests with Node 24:

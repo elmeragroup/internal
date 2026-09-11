@@ -6,10 +6,46 @@ import { extractStrings } from "../extract-strings.js";
 const RULE_NAME = "no-tailwind-dark-variant";
 
 /**
+ * Tailwind names the built-in dark axis `dark`; `not-dark` is its compound negation. Other
+ * `-dark` segments are named or custom variants (`data-dark:`, `theme-dark:`) and stay valid.
+ * @param {string} segment
+ */
+function isDarkSegment(segment) {
+  return segment === "dark" || segment === "not-dark";
+}
+
+/**
+ * @param {string} token
+ */
+function tokenHasDarkVariant(token) {
+  let depth = 0;
+  let start = 0;
+  for (let i = 0; i < token.length; i += 1) {
+    const ch = token[i];
+    if (ch === "\\") {
+      i += 1;
+      continue;
+    }
+    if (ch === "[" || ch === "(") {
+      depth += 1;
+    } else if ((ch === "]" || ch === ")") && depth > 0) {
+      depth -= 1;
+    } else if (ch === ":" && depth === 0) {
+      const segment = token.slice(start, i);
+      if (isDarkSegment(segment) && i + 1 < token.length) {
+        return true;
+      }
+      start = i + 1;
+    }
+  }
+  return false;
+}
+
+/**
  * @param {string} str
  */
 function hasDarkVariant(str) {
-  return /\bdark:[a-z]+[-\w]*/.test(str);
+  return str.split(/\s+/).some((token) => token !== "" && tokenHasDarkVariant(token));
 }
 
 /**

@@ -1,22 +1,28 @@
+import { Schema } from "effect";
 import { execFileSync } from "node:child_process";
-import { createHash } from "node:crypto";
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { mkdirSync, rmSync } from "node:fs";
 
-import { asRecord, asString, readJsonObject } from "./lib/json-object.mjs";
-import {
-  archiveDirectory,
-  archivePath,
-  packageDirectory,
-  packageName,
-  releaseVersion,
-  run,
-} from "./release.ts";
+import { runCommand } from "./lib/run-command.ts";
+import { archiveDirectory, archivePath, packageDirectory, packageName, releaseVersion } from "./release.ts";
+
+/**
+ * The stricter shape of this repository's packed publish manifest. Unlike the package's
+ * `PackageManifest`, which must read consumer packages too, these fields are ours and every one is
+ * required to be absent or exactly as packaging expects.
+ */
+const PublishManifest = Schema.Struct({
+  name: Schema.String,
+  version: Schema.String,
+  private: Schema.optionalKey(Schema.Boolean),
+  sideEffects: Schema.optionalKey(Schema.Boolean),
+  dependencies: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
+  exports: Schema.optionalKey(Schema.Record(Schema.String, Schema.Record(Schema.String, Schema.String))),
+});
 
 const version = releaseVersion();
 rmSync(archiveDirectory, { recursive: true, force: true });
 mkdirSync(archiveDirectory, { recursive: true });
-run("pnpm", ["pack", "--pack-destination", archiveDirectory], packageDirectory);
+runCommand("pnpm", ["pack", "--pack-destination", archiveDirectory], packageDirectory);
 const archive = archivePath(version);
 const files = execFileSync("tar", ["-tzf", archive], { encoding: "utf8" }).trim().split("\n");
 if (files.some((file) => !/^package\/(?:dist\/|package\.json$|README\.md$|LICENSE$|NOTICE$)/.test(file)))
@@ -29,14 +35,13 @@ if (
   )
 )
   throw new Error(`${packageName}: tests or TypeScript sources in archive`);
-const manifestFile = resolve(archiveDirectory, "internal.json");
-writeFileSync(manifestFile, execFileSync("tar", ["-xOzf", archive, "package/package.json"]));
-const manifest = readJsonObject(manifestFile);
+const manifest = Schema.decodeUnknownSync(PublishManifest)(
+  JSON.parse(execFileSync("tar", ["-xOzf", archive, "package/package.json"], { encoding: "utf8" }))
+);
 if (manifest.private === true || manifest.version !== version)
   throw new Error(`${packageName}: invalid publish manifest`);
-const dependencies = asRecord(manifest.dependencies, "dependencies");
-for (const [dependency, value] of Object.entries(dependencies)) {
-  const specifier = asString(value, dependency);
+const dependencies = manifest.dependencies ?? {};
+for (const [dependency, specifier] of Object.entries(dependencies)) {
   if (/^(?:workspace|catalog|file|link):/.test(specifier))
     throw new Error(`${packageName}: unresolved dependency ${dependency}`);
   if (dependency.startsWith("@elmeragroup/"))
@@ -57,13 +62,14 @@ const expectedExports = [
   "./api-extractor",
   "./oxlint",
   "./oxlint/anti-slop",
+  "./release",
 ];
-const exports = asRecord(manifest.exports, "exports");
+const exports = manifest.exports ?? {};
 if (JSON.stringify(Object.keys(exports)) !== JSON.stringify(expectedExports))
   throw new Error(`${packageName}: unexpected public exports`);
 for (const [entry, conditions] of Object.entries(exports)) {
-  for (const target of Object.values(asRecord(conditions, entry))) {
-    if (!files.includes(`package/${asString(target, entry).slice(2)}`))
+  for (const target of Object.values(conditions)) {
+    if (!files.includes(`package/${target.slice(2)}`))
       throw new Error(`${packageName}: missing export target ${entry}`);
   }
 }
@@ -76,14 +82,4 @@ for (const file of files.filter((file) => /\.[cm]?[jt]s$/.test(file))) {
 const notice = execFileSync("tar", ["-xOzf", archive, "package/NOTICE"], { encoding: "utf8" });
 if (!notice.includes("Dillon Mulroy") || !notice.includes("Michał Dudak"))
   throw new Error(`${packageName}: missing third-party attribution`);
-const packedArchive = {
-  name: asString(manifest.name, "name"),
-  archive,
-  bytes: readFileSync(archive).length,
-  sha256: createHash("sha256").update(readFileSync(archive)).digest("hex"),
-};
-writeFileSync(
-  resolve(archiveDirectory, "archive.json"),
-  `${JSON.stringify({ version, archive: packedArchive }, null, 2)}\n`
-);
-console.log(JSON.stringify({ version, archive: packedArchive }, null, 2));
+console.log(JSON.stringify({ version, archive }, null, 2));

@@ -2,28 +2,33 @@
   "$schema": "https://turbo.build/schema.json",
   "ui": "stream",
   "globalEnv": ["NODE_ENV"],
+  "globalPassThroughEnv": ["GITHUB_REPOSITORY"],
   "tasks": {
     "//#lint": {
       "inputs": ["$TURBO_DEFAULT$", "packages/oxlint-plugin/**", "packages/oxlint-anti-slop/**"],
       "dependsOn": ["@elmeragroup/internal#build"]
     },
     "//#test:repo-policy": {
+      "dependsOn": ["@elmeragroup/release#build"],
       "inputs": [
         "test/**",
         ".oxlintrc.json",
         "packages/api-extractor/**",
+        "packages/release/**",
         "scripts/lib/**",
-        "scripts/release.ts",
-        "scripts/release-version.ts",
+        "scripts/release*.ts",
+        "scripts/publish-release.ts",
+        "scripts/check-release-pr.ts",
+        "scripts/internal-pack-adapter.ts",
         "scripts/canary-pack.ts",
-        "scripts/canary-publish.ts",
         "scripts/canary-version.ts",
         "scripts/packed-consumer.ts",
+        "scripts/packed-verification.ts",
         ".changeset/config.json",
         "packages/api-artifacts/package.json",
         "packages/internal/package.json",
         ".github/workflows/merge.yml",
-        ".github/workflows/publish-canary.yml",
+        ".github/workflows/publish-release.yml",
         ".github/workflows/version-packages.yml",
         "package.json",
         "pnpm-workspace.yaml"
@@ -47,10 +52,23 @@
       "dependsOn": ["build", "test", "type-check"]
     },
     "ci:checks": {
-      "dependsOn": ["//#lint", "//#test:repo-policy", "type-check", "test", "build", "//#type-check:scripts"]
+      "dependsOn": [
+        "//#lint",
+        "//#test:repo-policy",
+        "type-check",
+        "test",
+        "build",
+        "//#type-check:scripts",
+        "//#type-check:tests"
+      ]
     },
     "//#type-check:scripts": {
-      "inputs": ["scripts/**", "tooling/typescript/**"]
+      "dependsOn": ["@elmeragroup/release#build"],
+      "inputs": ["scripts/**", "packages/release/**", "tooling/typescript/**"]
+    },
+    "//#type-check:tests": {
+      "dependsOn": ["@elmeragroup/release#build"],
+      "inputs": ["test/**", "scripts/**", "packages/release/**", "tooling/typescript/**"]
     },
     "@elmeragroup/internal#build": {
       "dependsOn": ["^build"],
@@ -62,7 +80,8 @@
         "$TURBO_ROOT$/packages/api-extractor/src/**",
         "$TURBO_ROOT$/packages/api-artifacts/src/**",
         "$TURBO_ROOT$/packages/oxlint-plugin/**",
-        "$TURBO_ROOT$/packages/oxlint-anti-slop/**"
+        "$TURBO_ROOT$/packages/oxlint-anti-slop/**",
+        "$TURBO_ROOT$/packages/release/src/**"
       ]
     }
   }

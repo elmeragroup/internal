@@ -28,10 +28,19 @@ export function isString(value) {
  * @returns {Record<string, unknown>}
  */
 export function readJsonObject(path) {
+  return parseJsonObject(readFileSync(path, "utf8"), path);
+}
+
+/**
+ * @param {string} text
+ * @param {string} label
+ * @returns {Record<string, unknown>}
+ */
+function parseJsonObject(text, label) {
   // SAFETY: JSON.parse is untyped; the object guard below is the contract.
-  const parsed = /** @type {unknown} */ (JSON.parse(readFileSync(path, "utf8")));
+  const parsed = /** @type {unknown} */ (JSON.parse(text));
   if (!isPlainObject(parsed)) {
-    throw new Error(`${path} is not a JSON object`);
+    throw new Error(`${label} is not a JSON object`);
   }
   return parsed;
 }

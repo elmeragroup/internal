@@ -30,6 +30,14 @@ tester.run("anti-slop/no-unsafe-dictionary-type", noUnsafeDictionaryTypeRule, {
 		"interface Escape { readonly id: string } interface Escape {} type A = Record<string, Escape>;",
 		"interface Owner { readonly id: string } type A = Record<string, object & Owner>;",
 		"type Wrap<T> = { readonly wrapped: T }; type Inner<T, U> = { readonly value: T } & Wrap<U>; type Outer<T, U> = Record<string, Inner<T, U>>; declare function f<T, U>(): Outer<T, U>;",
+		"type Value = unknown; type Dictionary<Value extends { id: string }> = Record<string, Value>;",
+		"type Value = unknown; function f() { type Value = { id: string }; type D = Record<string, Value>; }",
+		"function f() { type D = Record<string, Value>; } type Value = { id: string };",
+		'import { Record } from "./local"; function f() { type A = Record<string, unknown>; }',
+		"function f() { type Record<K, V> = { key: K; value: V }; type A = Record<string, unknown>; }",
+		"type Item = unknown; type Unpacked<Input> = Input extends Promise<infer Item> ? Record<string, Item> : never;",
+		"type A = B; type B = A; type D = Record<string, A>;",
+		"type Value = unknown; class C { static { type Value = { id: string }; type D = Record<string, Value>; } }",
 	],
 	invalid: [
 		{ code: "type A = Record<string, unknown>;", errors: [error] },
@@ -98,5 +106,14 @@ tester.run("anti-slop/no-unsafe-dictionary-type", noUnsafeDictionaryTypeRule, {
 			code: "type Marker<T> = { readonly __brand?: never }; type Index<T, U = Marker<T>> = Record<string, U>; type A = Index<Item>;",
 			errors: 1,
 		},
+		{
+			code: "type Value = { id: string }; function f() { type Value = unknown; type D = Record<string, Value>; }",
+			errors: [error],
+		},
+		{
+			code: "type Item = unknown; type Fallback<Input> = Input extends infer Item ? string : Record<string, Item>;",
+			errors: [error],
+		},
+		{ code: "function Record() {} type A = Record<string, unknown>;", errors: [error] },
 	],
 });

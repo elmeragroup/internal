@@ -32,9 +32,12 @@ the scope closes it on success, typed failure, interruption, or defect. Reuse th
 file in the same project rather than opening one project per file.
 
 `inspectComponentSources(filePath, requests)` recovers authored implementation files and
-destructuring defaults without running semantic extraction or admitting warnings. It follows React
-`memo` and `forwardRef` wrappers, including nested wrappers, aliased React imports, re-exported
-values, namespace and object property references, and an implementation in another project file.
+destructuring defaults without running semantic extraction or admitting warnings. Defaults are
+reported for identifier, string-literal, and numeric-literal keys under the decoded property name
+(`"aria-label": x = 1` reports `aria-label`); computed keys are omitted rather than guessed. It
+follows React `memo` and `forwardRef` wrappers, including nested wrappers, aliased React imports,
+re-exported values, namespace and object property references, and an implementation in another
+project file.
 Overloaded functions use the declaration with an actual syntax body, excluding return-type annotations.
 Each request produces one result at the same
 index. A value that authored code only forwards from a dependency, through named or `export *`
@@ -53,7 +56,8 @@ guessing. Compiler objects never cross this boundary.
   environments, including repeated instantiations of the same donor alias and nested spreads.
 - `warnings`: recoverable losses in the returned model. A warning has a stable `code`, location, and
   code-specific fields; `message` explains what failed, what the extractor did, and what a maintainer
-  can do next. Diagnostics from a discarded speculative candidate are not published.
+  can do next. Diagnostics from a speculative component-props candidate are published only when the
+  export is recognized as a component; a rejected or uncertain candidate contributes none.
 - `provenance`: repository-relative declaration and re-export paths for model nodes.
 
 Fatal setup, compiler, missing-file, and resolver failures remain typed Effect errors. Recoverable

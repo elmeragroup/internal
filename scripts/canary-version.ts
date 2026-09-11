@@ -1,7 +1,8 @@
 import { writeFileSync } from "node:fs";
 
+import { assertCanaryReleaseVersion } from "@elmeragroup/release";
+
 import { readJsonObject } from "./lib/json-object.mjs";
-import { assertCanaryReleaseVersion } from "./release-version.ts";
 import { manifestPath } from "./release.ts";
 
 const version = process.argv[2];

@@ -20,6 +20,7 @@
     "@elmeragroup/api-extractor": "workspace:*",
     "@elmeragroup/oxlint-plugin": "workspace:*",
     "@elmeragroup/oxlint-plugin-anti-slop": "workspace:*",
+    "@elmeragroup/release": "workspace:*",
     "tsdown": "catalog:"
   },
   "version": "0.1.1",
@@ -47,6 +48,10 @@
     "./oxlint/anti-slop": {
       "types": "./dist/oxlint/anti-slop.d.mts",
       "import": "./dist/oxlint/anti-slop.mjs"
+    },
+    "./release": {
+      "types": "./dist/release.d.mts",
+      "import": "./dist/release.mjs"
     }
   },
   "types": "./dist/index.d.mts",
@@ -60,8 +65,7 @@
     "node": ">=24.13.0 <25"
   },
   "publishConfig": {
-    "access": "public",
-    "tag": "canary"
+    "access": "public"
   },
   "repository": {
     "type": "git",

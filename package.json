@@ -12,12 +12,15 @@
     "test": "turbo run test",
     "test:repo-policy": "vitest run --config test/vitest.config.mjs",
     "type-check": "turbo run type-check",
-    "canary:version": "node scripts/canary-version.ts",
+    "canary:version": "pnpm --filter @elmeragroup/release build && node scripts/canary-version.ts",
     "packages:pack": "pnpm build && node scripts/canary-pack.ts",
     "canary:pack": "pnpm packages:pack",
     "test:packed-consumer": "node scripts/packed-consumer.ts",
-    "canary:publish": "node scripts/canary-publish.ts",
-    "type-check:scripts": "tsc --noEmit -p scripts/tsconfig.json"
+    "release:version": "pnpm exec changeset version && pnpm install --lockfile-only",
+    "release:run": "pnpm --filter @elmeragroup/release build && node scripts/publish-release.ts",
+    "release:check-pr": "pnpm --filter @elmeragroup/release build && node scripts/check-release-pr.ts",
+    "type-check:scripts": "tsc --noEmit -p scripts/tsconfig.json",
+    "type-check:tests": "tsc --noEmit -p test/tsconfig.json"
   },
   "devDependencies": {
     "@changesets/cli": "catalog:",
@@ -36,6 +39,7 @@
     "yaml": "catalog:",
     "@elmeragroup/internal": "workspace:*",
     "@elmeragroup/api-extractor": "workspace:*",
+    "@elmeragroup/release": "workspace:*",
     "effect": "catalog:",
     "tsdown": "catalog:",
     "esbuild": "catalog:"

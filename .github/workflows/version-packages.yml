@@ -1,9 +1,11 @@
 name: Version Packages
 
 on:
-  push:
-    branches:
-      - main
+  workflow_call:
+
+concurrency:
+  group: version-packages
+  cancel-in-progress: false
 
 jobs:
   version:
@@ -11,17 +13,18 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+      actions: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version-file: .node-version
           cache: pnpm
@@ -29,11 +32,29 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      - name: Check for a superseded main commit
+        id: current
+        env:
+          SOURCE_COMMIT: ${{ github.sha }}
+        run: |
+          MAIN_COMMIT=$(git ls-remote origin refs/heads/main | cut -f1)
+          if [ "$SOURCE_COMMIT" = "$MAIN_COMMIT" ]; then
+            echo "current=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Version Packages PR
+        if: steps.current.outputs.current == 'true'
+        id: changesets
         uses: changesets/action@v1
         with:
-          version: pnpm exec changeset version
+          version: pnpm release:version
           title: Version Packages
           commit: "chore: version packages"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run checks on the bot-created release PR
+        if: steps.changesets.outputs.pullRequestNumber
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run merge.yml --ref changeset-release/main

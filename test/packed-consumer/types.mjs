@@ -11,9 +11,33 @@ import type { ApiPart } from "@elmeragroup/internal/api-artifacts/model";
 import { ProjectExtractor } from "@elmeragroup/internal/api-extractor";
 import elmera from "@elmeragroup/internal/oxlint";
 import antiSlop from "@elmeragroup/internal/oxlint/anti-slop";
+import {
+  assertCanaryReleaseVersion,
+  assertReleaseVersion,
+  checkReleasePr,
+  readManifestVersion,
+  releaseCheckedCommit,
+  resolveReleasePackage,
+  retryRelease,
+  ReleaseError,
+} from "@elmeragroup/internal/release";
+import type {
+  PackAndVerify,
+  ReleaseIntent,
+  ReleasePackage,
+} from "@elmeragroup/internal/release";
 void ProjectExtractor;
 void elmera;
 void antiSlop;
+void ReleaseError;
+void assertCanaryReleaseVersion;
+void assertReleaseVersion;
+void readManifestVersion;
+const releasePackage: ReleasePackage = resolveReleasePackage(".", ".", "canary-consumer");
+const adapter: PackAndVerify = { pack: (_intent: ReleaseIntent) => new Uint8Array() };
+void checkReleasePr(releasePackage);
+void releaseCheckedCommit(releasePackage, adapter, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+void retryRelease(releasePackage, "v0.2.0");
 const options: GenerateApiArtifactsOptions = { projectRoot: ".", tsconfigPath: "tsconfig.json", components: [] };
 const result = await generateApiArtifacts(options);
 const parts: readonly ApiPart[] = result.components.flatMap(component => component.parts);

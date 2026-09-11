@@ -145,6 +145,7 @@ function resolveExport(entry: BackendExportDraft, base: Context): ExportNode {
   };
   const authored = recoverAuthoredComponent(entry.symbol, componentContext);
   const authoredProvenance: ProvenanceEntry[] = [];
+  const authoredWarnings: BackendWarningFact[] = [];
   const authoredPropsTypes = authored.propNodes.map((authoredProps) =>
     typeNode(base.operations.typeAtNode(authoredProps), authoredProps, undefined, {
       ...base,
@@ -153,6 +154,7 @@ function resolveExport(entry: BackendExportDraft, base: Context): ExportNode {
       provenancePropertyContainer: "componentProps",
       propertyDepth: 0,
       symbolStack,
+      warnings: authoredWarnings,
       ...definedFields({ bindingDefaults: authored.bindingDefaults }),
     })
   );
@@ -162,6 +164,11 @@ function resolveExport(entry: BackendExportDraft, base: Context): ExportNode {
   const namedOutputType = publicExportName(resolvedType, entry);
   const transformedComponent = componentNode(namedOutputType, entry.name, authoredPropsTypes);
   const resolvedOutputType = transformedComponent.type;
+  // Rejected and uncertain candidates never publish their speculative props, so
+  // diagnostics collected while resolving those props are dropped with them.
+  if (transformedComponent.recognition.outcome === "transformed") {
+    base.warnings.push(...authoredWarnings);
+  }
   if (transformedComponent.recognition.outcome === "uncertain")
     recordUncertainComponentRecognition(base, entry, symbolFacts, transformedComponent.recognition);
   // A dependency-owned bare interface/value at the export root is deliberately

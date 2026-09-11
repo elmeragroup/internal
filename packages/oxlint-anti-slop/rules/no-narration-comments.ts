@@ -5,6 +5,7 @@ import type { ESTree, SourceCode } from "@oxlint/plugins";
 import {
   commentRemovalRange,
   createSlopCommentSkipper,
+  isSafeCommentRemoval,
   isStandaloneLineComment,
 } from "../shared/slop-comments.ts";
 
@@ -88,10 +89,14 @@ export const noNarrationCommentsRule = defineRule({
           if (shouldSkip(comment)) continue;
           if (!isNarration(context.sourceCode, comment)) continue;
           const range = commentRemovalRange(context.sourceCode, comment);
+          // Line comments always pass; isNarration never reports a block, so suggest is never empty.
+          const safe = isSafeCommentRemoval(context.sourceCode, comment);
           context.report({
             loc: comment.loc,
             messageId: "narrationComment",
-            suggest: [{ messageId: "removeComment", fix: (fixer) => fixer.removeRange(range) }],
+            suggest: safe
+              ? [{ messageId: "removeComment", fix: (fixer) => fixer.removeRange(range) }]
+              : [],
           });
         }
       },

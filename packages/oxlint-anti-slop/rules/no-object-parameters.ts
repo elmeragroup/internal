@@ -2,7 +2,8 @@ import { defineRule } from "@oxlint/plugins";
 
 import type { ESTree, SourceCode } from "@oxlint/plugins";
 
-import { lexicalTypeParameterNames } from "../shared/lexical-type-parameters.ts";
+import { createTypeNameScope } from "../shared/type-name-scope.ts";
+import type { TypeNameScope } from "../shared/type-name-scope.ts";
 
 type Parameter = ESTree.ParamPattern;
 type ParameterOwner =
@@ -47,48 +48,47 @@ export const noObjectParametersRule = defineRule({
 		},
 	},
 	createOnce(context) {
-		const aliases = new Map<string, ESTree.TSType>();
+		let scope: TypeNameScope | null = null;
 
 		const resolvesToObject = (
 			type: ESTree.TSType,
-			shadowedAliases: ReadonlySet<string>,
-			visited = new Set<string>(),
+			visited = new Set<ESTree.TSTypeAliasDeclaration>(),
 		): boolean => {
+			if (scope === null) return false;
 			if (type.type === "TSObjectKeyword") return true;
 			if (type.type === "TSParenthesizedType")
-				return resolvesToObject(type.typeAnnotation, shadowedAliases, visited);
+				return resolvesToObject(type.typeAnnotation, visited);
 			if (type.type === "TSUnionType") {
-				return type.types.some((member) =>
-					resolvesToObject(member, shadowedAliases, visited),
-				);
+				return type.types.some((member) => resolvesToObject(member, visited));
 			}
 			if (
 				type.type !== "TSTypeReference" ||
 				type.typeName.type !== "Identifier" ||
 				(type.typeArguments !== null &&
 					type.typeArguments !== undefined &&
-					type.typeArguments.params.length > 0) ||
-				visited.has(type.typeName.name) ||
-				shadowedAliases.has(type.typeName.name)
+					type.typeArguments.params.length > 0)
 			) {
 				return false;
 			}
-			const alias = aliases.get(type.typeName.name);
-			if (alias === undefined) return false;
+			const binding = scope.resolve(type, type.typeName.name);
+			if (binding?.kind !== "alias") return false;
+			const alias = binding.declaration;
+			if (
+				(alias.typeParameters !== null && alias.typeParameters !== undefined) ||
+				visited.has(alias)
+			) {
+				return false;
+			}
 			const nextVisited = new Set(visited);
-			nextVisited.add(type.typeName.name);
-			return resolvesToObject(alias, shadowedAliases, nextVisited);
+			nextVisited.add(alias);
+			return resolvesToObject(alias.typeAnnotation, nextVisited);
 		};
 
 		const checkParameters = (node: ParameterOwner) => {
-			const shadowedAliases = lexicalTypeParameterNames(
-				node,
-				context.sourceCode.visitorKeys,
-			);
 			for (const parameter of node.params) {
 				const annotation = parameterAnnotation(parameter);
 				if (annotation === null || annotation === undefined) continue;
-				if (!resolvesToObject(annotation.typeAnnotation, shadowedAliases)) continue;
+				if (!resolvesToObject(annotation.typeAnnotation)) continue;
 				context.report({
 					node: annotation.typeAnnotation,
 					messageId: "objectParameter",
@@ -99,17 +99,7 @@ export const noObjectParametersRule = defineRule({
 
 		return {
 			Program(node) {
-				aliases.clear();
-				for (const statement of node.body) {
-					const declaration =
-						statement.type === "ExportNamedDeclaration" ? statement.declaration : statement;
-					if (
-						declaration?.type === "TSTypeAliasDeclaration" &&
-						(declaration.typeParameters === null || declaration.typeParameters === undefined)
-					) {
-						aliases.set(declaration.id.name, declaration.typeAnnotation);
-					}
-				}
+				scope = createTypeNameScope(node, context.sourceCode.visitorKeys);
 			},
 			ArrowFunctionExpression: checkParameters,
 			FunctionDeclaration: checkParameters,

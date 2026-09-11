@@ -1,0 +1,4 @@
+{
+  "extends": "@elmeragroup/typescript-config/internal-package.json",
+  "include": ["src", "test", "vitest.config.ts"]
+}

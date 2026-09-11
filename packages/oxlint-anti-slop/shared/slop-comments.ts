@@ -101,3 +101,18 @@ export function commentRemovalRange(sourceCode: SourceCode, comment: ESTree.Comm
   }
   return [start, end];
 }
+
+/**
+ * Whether deleting `commentRemovalRange(comment)` can never join two tokens or remove
+ * the only line terminator between them. Line comments always qualify. A block comment
+ * qualifies when only indentation precedes it on its line or only whitespace follows it
+ * before the next line terminator; an inline block with code on both sides does not.
+ */
+export function isSafeCommentRemoval(sourceCode: SourceCode, comment: ESTree.Comment): boolean {
+  if (comment.type === "Line") return true;
+  const text = sourceCode.text;
+  const [start] = commentRemovalRange(sourceCode, comment);
+  if (start === 0 || text[start - 1] === "\n") return true;
+  const restOfLine = /^[^\r\n]*/u.exec(text.slice(comment.end))?.[0] ?? "";
+  return restOfLine.trim() === "";
+}

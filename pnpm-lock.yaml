@@ -77,6 +77,9 @@ importers:
       '@elmeragroup/oxlint-plugin-anti-slop':
         specifier: workspace:*
         version: link:packages/oxlint-anti-slop
+      '@elmeragroup/release':
+        specifier: workspace:*
+        version: link:packages/release
       '@elmeragroup/typescript-config':
         specifier: workspace:*
         version: link:tooling/typescript
@@ -203,6 +206,9 @@ importers:
       '@elmeragroup/oxlint-plugin-anti-slop':
         specifier: workspace:*
         version: link:../oxlint-anti-slop
+      '@elmeragroup/release':
+        specifier: workspace:*
+        version: link:../release
       '@elmeragroup/typescript-config':
         specifier: workspace:*
         version: link:../../tooling/typescript
@@ -235,6 +241,25 @@ importers:
       oxlint:
         specifier: 'catalog:'
         version: 1.78.0(oxlint-tsgolint@7.0.2001)
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.10(@types/node@25.9.5)(@vitest/browser-playwright@4.1.10)(vite@8.2.1(@types/node@25.9.5)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.0))
+
+  packages/release:
+    dependencies:
+      effect:
+        specifier: 'catalog:'
+        version: 4.0.0-rc.111
+    devDependencies:
+      '@elmeragroup/typescript-config':
+        specifier: workspace:*
+        version: link:../../tooling/typescript
+      '@types/node':
+        specifier: 'catalog:'
+        version: 25.9.5
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
       vitest:
         specifier: 'catalog:'
         version: 4.1.10(@types/node@25.9.5)(@vitest/browser-playwright@4.1.10)(vite@8.2.1(@types/node@25.9.5)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.0))

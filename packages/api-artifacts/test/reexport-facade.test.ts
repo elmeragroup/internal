@@ -89,6 +89,25 @@ describe("re-export-only facades (issue #4)", () => {
     });
   });
 
+  it("keeps forwarded facades prop-free when the dependency is selected for enrichment", async () => {
+    const root = await facade(focusableFacade);
+    const result = await generateApiArtifacts({
+      ...options(root, [focusableComponent]),
+      includeExternalTypes: ["dep-aria"],
+    });
+    expect(result.components[0]?.parts).toEqual([
+      focusablePart,
+      {
+        name: "useFocusable",
+        rsc: "client",
+        sourcePath: "src/focusable/focusable.tsx",
+        props: [],
+        forwardedFrom: ["dep-aria"],
+        forwardedCount: 1,
+      },
+    ]);
+  });
+
   it("passes check mode once the forwarded artifact is written, and reports drift before", async () => {
     const root = await facade(focusableFacade);
     const generate = options(root, [focusableComponent]);
@@ -148,6 +167,35 @@ describe("re-export-only facades (issue #4)", () => {
     expect(result.components[0]?.parts).toEqual([focusablePart]);
   });
 
+  it.each([
+    { form: "export * from the dependency", source: `"use client";\nexport * from "dep-aria";\n` },
+    {
+      form: "an imported binding exported by name",
+      source: `"use client";\nimport { Focusable } from "dep-aria";\nexport { Focusable };\n`,
+    },
+    {
+      form: "an authored value alias",
+      source: `"use client";\nimport { Focusable as DepFocusable } from "dep-aria";\nexport const Focusable = DepFocusable;\n`,
+    },
+  ])("keeps a $form facade prop-free when the dependency is selected", async ({ source }) => {
+    const root = await facade({
+      "src/entry.ts": `export { Focusable } from "./focusable/focusable";\n`,
+      "src/focusable/focusable.tsx": source,
+    });
+    const result = await generateApiArtifacts({
+      ...options(root, [
+        {
+          slug: "form",
+          entryFile: "src/entry.ts",
+          exportNames: ["Focusable"],
+          outputFile: "docs/form/api.json",
+        },
+      ]),
+      includeExternalTypes: ["dep-aria"],
+    });
+    expect(result.components[0]?.parts).toEqual([focusablePart]);
+  });
+
   it.each(["src/barrel.ts", "src/entry.ts"])(
     "follows consecutive star exports from %s to the client facade",
     async (entryFile) => {
@@ -180,6 +228,69 @@ describe("re-export-only facades (issue #4)", () => {
     );
     expect(result.components[0]?.parts).toEqual([
       { ...focusablePart, name: "Group.Focusable", sourcePath: "src/focusable/group.tsx" },
+    ]);
+  });
+
+  it("keeps a forwarded container member prop-free when the dependency is selected", async () => {
+    const root = await facade({
+      "src/entry.ts": `export { Group } from "./focusable/group";\n`,
+      "src/focusable/group.tsx": `"use client";\nimport { Group as DepGroup } from "dep-aria";\nexport const Group = DepGroup;\n`,
+    });
+    const result = await generateApiArtifacts({
+      ...options(root, [
+        {
+          slug: "group",
+          entryFile: "src/entry.ts",
+          exportNames: ["Group"],
+          outputFile: "docs/group/api.json",
+        },
+      ]),
+      includeExternalTypes: ["dep-aria"],
+      allowedWarningCodes: ["unsupported-type-fallback"],
+    });
+    expect(result.components[0]?.parts).toEqual([
+      { ...focusablePart, name: "Group.Focusable", sourcePath: "src/focusable/group.tsx" },
+    ]);
+  });
+
+  it("still enriches a resolved local wrapper that accepts selected dependency props", async () => {
+    const root = await facade({
+      "src/wrapper.tsx": `"use client";
+import { Focusable, type FocusableProps } from "dep-aria";
+/** Local wrapper around dep-aria Focusable. */
+export function Wrapper(props: FocusableProps) { return Focusable(props); }
+`,
+    });
+    const result = await generateApiArtifacts({
+      ...options(root, [
+        {
+          slug: "wrapper",
+          entryFile: "src/wrapper.tsx",
+          exportNames: ["Wrapper"],
+          outputFile: "docs/wrapper/api.json",
+        },
+      ]),
+      includeExternalTypes: ["dep-aria"],
+    });
+    expect(result.components[0]?.parts).toEqual([
+      {
+        name: "Wrapper",
+        rsc: "client",
+        sourcePath: "src/wrapper.tsx",
+        props: [
+          {
+            name: "isDisabled",
+            origin: { packageName: "dep-aria" },
+            type: "boolean | undefined",
+            shortType: null,
+            defaultValue: null,
+            description: "Whether the element is disabled.",
+            required: false,
+          },
+        ],
+        forwardedFrom: ["dep-aria"],
+        forwardedCount: 1,
+      },
     ]);
   });
 

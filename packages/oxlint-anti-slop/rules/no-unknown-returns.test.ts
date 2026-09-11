@@ -17,6 +17,10 @@ tester.run("anti-slop/no-unknown-returns", noUnknownReturnsRule, {
     "function cause(): { cause: unknown } { return { cause: input }; }",
     "type Result = { value: unknown }; function load(): Result { return result; }",
     "function load(): Promise<User> { return promise; }",
+    "type Promise<T> = { value: T }; declare function f(): Promise<unknown>;",
+    'import { Promise } from "./p"; declare function f(): Promise<unknown>;',
+    "function outer() { type Promise<T> = { value: T }; function f(): Promise<unknown> { return x; } }",
+    'import Promise = require("./p"); declare function f(): Promise<unknown>;',
   ],
   invalid: [
     { code: "function load(): unknown { return input; }", errors: [error] },
@@ -28,5 +32,10 @@ tester.run("anti-slop/no-unknown-returns", noUnknownReturnsRule, {
     { code: "function load(): Promise<unknown> { return promise; }", errors: [error] },
     { code: "type UnknownValue = unknown; function load(): UnknownValue { return input; }", errors: [error] },
     { code: "type Item = unknown; type Fallback<Input> = Input extends infer Item ? string : () => Item;", errors: [error] },
+    {
+      code: "type Value = string; function outer() { type Value = unknown; function inner(): Value { return x; } }",
+      errors: [error],
+    },
+    { code: "function Promise() {} function load(): Promise<unknown> { return p; }", errors: [error] },
   ],
 });
