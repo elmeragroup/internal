@@ -53,20 +53,34 @@ type GitHubRequester = {
   (url: string, options?: GitHubRequest): Promise<Response>;
 };
 
-/** Authenticated GitHub transport: one request shape, plus a typed JSON read of its body. */
+/** Authenticated GitHub transport: one request shape, plus typed JSON reads of its bodies. */
 export type GitHubClient = {
   repository: string;
   root: string;
   uploadRoot: string;
   request: GitHubRequester;
   json: <A>(response: Response, schema: Schema.Codec<A>, label: string) => Promise<A>;
+  jsonFrom: <A>(url: string, schema: Schema.Codec<A>, label: string) => Promise<A>;
 };
 
-export function createGitHubClient(
-  repository: string,
-  token: string,
-  fetcher: typeof fetch = fetch
-): GitHubClient {
+/** Repository and credentials shared by every production port; `fetch` is the injectable transport. */
+export type ReleaseEnvironment = {
+  repository: string;
+  token: string;
+  fetch: typeof fetch;
+};
+
+/** Reads credentials no earlier than the operation that needs them. */
+export function releaseEnvironment(): ReleaseEnvironment {
+  return {
+    repository: process.env.GITHUB_REPOSITORY ?? "",
+    token: process.env.GH_TOKEN ?? "",
+    fetch: (input, init) => globalThis.fetch(input, init),
+  };
+}
+
+export function createGitHubClient(environment: ReleaseEnvironment): GitHubClient {
+  const { repository, token, fetch: fetcher } = environment;
   if (!/^[\w.-]+\/[\w.-]+$/.test(repository) || token === "")
     throw new Error("GitHub repository and token are required");
 
@@ -99,5 +113,6 @@ export function createGitHubClient(
     uploadRoot: `https://uploads.github.com/repos/${repository}`,
     request,
     json: async (response, schema, label) => decodeJson(await response.text(), schema, label),
+    jsonFrom: async (url, schema, label) => decodeJson(await (await request(url)).text(), schema, label),
   };
 }

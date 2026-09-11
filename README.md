@@ -77,9 +77,8 @@ pnpm test:packed-consumer
 `packages:pack` builds the package archive without publishing. `canary:pack` is a compatibility alias
 for the same command. The consumer test installs the packed package in a temporary project and
 checks extraction, defaults, drift detection, all public declarations, both lint plugins, consumer tree-shaking, and packed UI-shaped release consumption without workspace links.
-It installs a private copy of the archive it verified and writes a receipt bound to that archive's
-report. Repacking after verification invalidates the receipt, so re-run `pnpm test:packed-consumer`
-before preparing a release record.
+It runs every check against a private snapshot of the archive, so repacking after verification
+requires re-running `pnpm test:packed-consumer` before preparing a release record.
 
 ## Releases
 
@@ -126,23 +125,22 @@ archive. A stable retry may publish an older version without moving `latest` bac
 ### Recorded archives and retries
 
 Before npm publication, the workflow creates a draft GitHub release tied to the source commit and
-uploads `verified-release.tgz`. Stable records use `v<version>` tags. Canary records use
-`canary-<full-commit-SHA>` tags. The bundle contains the package archive, archive report, and passing
-packed-consumer receipt. Automation never moves these tags or replaces an uploaded bundle. Do not
-edit release-record bodies or delete their assets; they are used for retries and version reservations.
+uploads `release.tgz`, the verified package archive. Stable records use `v<version>` tags. Canary records use
+`canary-<full-commit-SHA>` tags. Automation never moves these tags or replaces an uploaded archive.
+Do not edit release-record bodies or delete their assets; they are used for retries and version reservations.
 
-The publisher downloads that saved bundle and validates its source and receipt. It uploads to npm
-under `pending`, verifies the registry's archive integrity and source commit, and only then updates
-`canary` or `latest`. Finally it makes the GitHub release visible. `pending` is an internal staging
-tag, not a supported installation channel.
+The publisher re-verifies the recorded archive's packed manifest and integrity against the record's
+intent, then uploads to npm under `pending`. It verifies the registry's archive integrity and source
+commit, and only then updates `canary` or `latest`. Finally it makes the GitHub release visible.
+`pending` is an internal staging tag, not a supported installation channel.
 
-If publication or finalization fails after the bundle was saved, run **Publish Release** manually
+If publication or finalization fails after the archive was saved, run **Publish Release** manually
 from `main` and supply its record tag. The retry uses the original archive, even if main has advanced.
 An existing npm version must match both the archive integrity and source commit. A mismatch fails;
 it is never treated as a successful retry. The retry also finishes an interrupted channel update or
 GitHub release finalization.
 
-If preparation failed before the bundle was uploaded, rerun the original **Merge** workflow's failed
+If preparation failed before the archive was uploaded, rerun the original **Merge** workflow's failed
 jobs. That rebuilds the original checked commit using its reserved version. The manual retry workflow
 intentionally refuses an incomplete record. Retain the record and original workflow run until recovery
 is complete. Lookup and manual retry leave incomplete records untouched. Preparation removes an empty

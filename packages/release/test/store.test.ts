@@ -1,8 +1,8 @@
-import { Schema } from "effect";
+import { Effect, Schema } from "effect";
 import { describe, expect, it } from "vitest";
 
 import { createGitHubClient } from "../src/github.ts";
-import { releaseRecordOwner, serializeIntent, verifiedBundleName } from "../src/intent.ts";
+import { releaseArchiveName, releaseRecordOwner, serializeIntent } from "../src/intent.ts";
 import type { ReleaseIntent } from "../src/intent.ts";
 import { decodeJson } from "../src/json.ts";
 import { classifyReleaseAsset, createReleaseStore } from "../src/store.ts";
@@ -12,8 +12,8 @@ const commit = "a".repeat(40);
 const packageName = "@elmeragroup/internal";
 const intent: ReleaseIntent = { channel: "stable", version: "0.2.0", commit };
 const saved: SavedRelease = { id: 1, intent, asset: { state: "uploaded", id: 2 } };
-const uploadedAsset = { id: 2, name: verifiedBundleName, state: "uploaded", size: 12 };
-const starterAsset = { id: 2, name: verifiedBundleName, state: "starter", size: 0 };
+const uploadedAsset = { id: 2, name: releaseArchiveName, state: "uploaded", size: 12 };
+const starterAsset = { id: 2, name: releaseArchiveName, state: "starter", size: 0 };
 
 type ReleaseAssetPayload = { id: number; name: string; state: string; size: number };
 
@@ -46,7 +46,7 @@ function releaseRecord(overrides: Partial<ReleasePayload> = {}): ReleasePayload 
 }
 
 async function savedRelease(store: ReleaseStore, tag: string): Promise<SavedRelease> {
-  const found = await store.find(tag);
+  const found = await Effect.runPromise(store.find(tag));
   if (found === undefined) throw new Error(`No saved release for ${tag}`);
   return found;
 }
@@ -74,7 +74,7 @@ function githubStore(releases: readonly ReleasePayload[], options: StoreOptions 
       }
       if (path.includes("/assets")) {
         return Promise.resolve(
-          Response.json({ id: 3, state: "uploaded", size: 1, name: verifiedBundleName })
+          Response.json({ id: 3, state: "uploaded", size: 1, name: releaseArchiveName })
         );
       }
       return Promise.resolve(
@@ -99,7 +99,7 @@ function githubStore(releases: readonly ReleasePayload[], options: StoreOptions 
     return Promise.resolve(new Response("", { status: options.status ?? 500 }));
   };
   const store = createReleaseStore(
-    createGitHubClient("example/package", "test", fetcher),
+    createGitHubClient({ repository: "example/package", token: "test", fetch: fetcher }),
     options.packageName ?? packageName
   );
   return { store, state, mutations, posted };
@@ -109,51 +109,59 @@ describe("durable GitHub release records", () => {
   it("keeps starter lookup and publication retry read-only", async () => {
     const { store, state } = githubStore([releaseRecord()]);
     const found = await savedRelease(store, "v0.2.0");
-    await expect(store.download(found)).rejects.toThrow("original Merge job");
+    await expect(Effect.runPromise(store.download(found))).rejects.toThrow("original Merge job");
     expect(state.removed).toBe(false);
-    await expect(store.create({ ...intent, commit: "b".repeat(40) })).rejects.toThrow("intent differs");
+    await expect(Effect.runPromise(store.create({ ...intent, commit: "b".repeat(40) }))).rejects.toThrow(
+      "intent differs"
+    );
     expect(state.removed).toBe(false);
-    await store.upload(await store.create(intent), new Uint8Array());
+    await Effect.runPromise(store.upload(await Effect.runPromise(store.create(intent)), new Uint8Array()));
     expect(state.removed).toBe(true);
   });
   it("rejects a moved tag before downloading an archive", async () => {
     const { store } = githubStore([releaseRecord({ assets: [uploadedAsset] })], { tagSha: "b".repeat(40) });
-    await expect(store.find("v0.2.0")).rejects.toThrow("tag was moved");
+    await expect(Effect.runPromise(store.find("v0.2.0"))).rejects.toThrow("tag was moved");
   });
   it("recovers an uploaded asset from a still-draft release", async () => {
     const { store, state } = githubStore([releaseRecord({ assets: [uploadedAsset] })]);
-    expect(await store.find("v0.2.0")).toEqual(saved);
-    await expect(store.upload(saved, new Uint8Array())).rejects.toThrow("cannot be replaced");
+    expect(await Effect.runPromise(store.find("v0.2.0"))).toEqual(saved);
+    await expect(Effect.runPromise(store.upload(saved, new Uint8Array()))).rejects.toThrow(
+      "cannot be replaced"
+    );
     expect(state.listed).toBe(1);
   });
   it("revalidates upload against the known release id instead of listing again", async () => {
     const { store, state } = githubStore([releaseRecord()]);
-    const created = await store.create(intent);
+    const created = await Effect.runPromise(store.create(intent));
     expect(state.listed).toBe(1);
-    const uploaded = await store.upload(created, new Uint8Array());
+    const uploaded = await Effect.runPromise(store.upload(created, new Uint8Array()));
     expect(state.listed).toBe(1);
     expect(uploaded).toEqual({ id: 1, intent, asset: { state: "uploaded", id: 3 } });
   });
   it("fails closed when the archive was never uploaded", async () => {
     const store = createReleaseStore(
-      createGitHubClient("example/package", "test", () => Promise.reject(new Error("must not request"))),
+      createGitHubClient({
+        repository: "example/package",
+        token: "test",
+        fetch: () => Promise.reject(new Error("must not request")),
+      }),
       packageName
     );
-    await expect(store.download({ ...saved, asset: { state: "missing" } })).rejects.toThrow(
-      "original Merge job"
-    );
+    await expect(
+      Effect.runPromise(store.download({ ...saved, asset: { state: "missing" } }))
+    ).rejects.toThrow("original Merge job");
   });
   it("does not interpret authentication failures as missing releases", async () => {
     const { store } = githubStore([], { status: 403 });
-    await expect(store.find("v0.2.0")).rejects.toThrow("403");
+    await expect(Effect.runPromise(store.find("v0.2.0"))).rejects.toThrow("403");
   });
   it("does not treat a missing listing page as an empty history", async () => {
     const { store } = githubStore([], { status: 404 });
-    await expect(store.find("v0.2.0")).rejects.toThrow("404");
+    await expect(Effect.runPromise(store.find("v0.2.0"))).rejects.toThrow("404");
   });
   it("creates a tag when the ref lookup returns 404", async () => {
     const { store } = githubStore([], { tagStatus: 404, releaseId: 9 });
-    await expect(store.create(intent)).resolves.toEqual({
+    await expect(Effect.runPromise(store.create(intent))).resolves.toEqual({
       id: 9,
       intent,
       asset: { state: "missing" },
@@ -170,12 +178,12 @@ describe("durable GitHub release records", () => {
         assets: [],
       },
     ]);
-    expect(await store.find(`canary-${commit}`)).toEqual({
+    expect(await Effect.runPromise(store.find(`canary-${commit}`))).toEqual({
       id: 4,
       intent: canaryIntent,
       asset: { state: "missing" },
     });
-    expect(await store.reservedCanaryVersions()).toEqual(["0.2.0-canary.12"]);
+    expect(await Effect.runPromise(store.reservedCanaryVersions())).toEqual(["0.2.0-canary.12"]);
     expect(state.listed).toBe(1);
   });
   it("parses the created release rather than trusting the requested intent", async () => {
@@ -186,24 +194,24 @@ describe("durable GitHub release records", () => {
         body: JSON.stringify({ schema: 1, ...intent, commit: "b".repeat(40) }),
       }),
     });
-    await expect(store.create(intent)).rejects.toThrow("intent differs");
+    await expect(Effect.runPromise(store.create(intent))).rejects.toThrow("intent differs");
   });
   it("refuses to publish a record whose archive was never uploaded", async () => {
     const { store } = githubStore([releaseRecord({ assets: [uploadedAsset] })]);
-    await expect(store.complete({ ...saved, asset: { state: "missing" } })).rejects.toThrow(
-      "without its verified archive"
-    );
-    await expect(store.complete(saved)).resolves.toBeUndefined();
+    await expect(
+      Effect.runPromise(store.complete({ ...saved, asset: { state: "missing" } }))
+    ).rejects.toThrow("without its verified archive");
+    await expect(Effect.runPromise(store.complete(saved))).resolves.toBeUndefined();
   });
   it("remembers a created draft without listing GitHub releases again", async () => {
     const { store, state } = githubStore([], { releaseId: 9 });
-    await expect(store.create(intent)).resolves.toEqual({
+    await expect(Effect.runPromise(store.create(intent))).resolves.toEqual({
       id: 9,
       intent,
       asset: { state: "missing" },
     });
     expect(state.listed).toBe(1);
-    expect(await store.find("v0.2.0")).toEqual({
+    expect(await Effect.runPromise(store.find("v0.2.0"))).toEqual({
       id: 9,
       intent,
       asset: { state: "missing" },
@@ -221,19 +229,25 @@ describe("release asset classification", () => {
   it("rejects a non-draft starter asset", async () => {
     expect(() => classifyReleaseAsset(false, starterAsset)).toThrow("Unsupported starter release asset");
     const { store } = githubStore([releaseRecord({ draft: false })]);
-    await expect(store.find("v0.2.0")).rejects.toThrow("Unsupported starter release asset");
+    await expect(Effect.runPromise(store.find("v0.2.0"))).rejects.toThrow(
+      "Unsupported starter release asset"
+    );
   });
   it("rejects an unknown asset state", async () => {
-    const unknown = { id: 2, name: verifiedBundleName, state: "open", size: 0 };
+    const unknown = { id: 2, name: releaseArchiveName, state: "open", size: 0 };
     expect(() => classifyReleaseAsset(true, unknown)).toThrow("Unsupported release asset state open");
     const { store } = githubStore([releaseRecord({ assets: [unknown] })]);
-    await expect(store.find("v0.2.0")).rejects.toThrow("Unsupported release asset state open");
+    await expect(Effect.runPromise(store.find("v0.2.0"))).rejects.toThrow(
+      "Unsupported release asset state open"
+    );
   });
   it("rejects a size-zero uploaded asset", async () => {
-    const empty = { id: 2, name: verifiedBundleName, state: "uploaded", size: 0 };
+    const empty = { id: 2, name: releaseArchiveName, state: "uploaded", size: 0 };
     expect(() => classifyReleaseAsset(true, empty)).toThrow("Uploaded release asset has no bytes");
     const { store } = githubStore([releaseRecord({ assets: [empty] })]);
-    await expect(store.find("v0.2.0")).rejects.toThrow("Uploaded release asset has no bytes");
+    await expect(Effect.runPromise(store.find("v0.2.0"))).rejects.toThrow(
+      "Uploaded release asset has no bytes"
+    );
   });
 });
 
@@ -256,8 +270,8 @@ describe("release record ownership in the GitHub store", () => {
         assets: [],
       },
     ]);
-    expect(await store.reservedCanaryVersions()).toEqual(["0.2.0-canary.12"]);
-    expect(await store.find("weekly-notes")).toBeUndefined();
+    expect(await Effect.runPromise(store.reservedCanaryVersions())).toEqual(["0.2.0-canary.12"]);
+    expect(await Effect.runPromise(store.find("weekly-notes"))).toBeUndefined();
     expect(mutations.filter((entry) => !entry.startsWith("GET "))).toEqual([]);
   });
 
@@ -271,8 +285,12 @@ describe("release record ownership in the GitHub store", () => {
         assets: [],
       },
     ]);
-    await expect(store.find("v0.2.0")).rejects.toThrow("foreign GitHub release occupies the record tag");
-    await expect(store.create(intent)).rejects.toThrow("foreign GitHub release occupies the record tag");
+    await expect(Effect.runPromise(store.find("v0.2.0"))).rejects.toThrow(
+      "foreign GitHub release occupies the record tag"
+    );
+    await expect(Effect.runPromise(store.create(intent))).rejects.toThrow(
+      "foreign GitHub release occupies the record tag"
+    );
     expect(mutations.filter((entry) => /POST|PATCH|DELETE/.test(entry))).toEqual([]);
   });
 
@@ -286,8 +304,8 @@ describe("release record ownership in the GitHub store", () => {
         assets: [],
       },
     ]);
-    await expect(store.find("v0.2.0")).rejects.toThrow("release intent is invalid");
-    await expect(store.create(intent)).rejects.toThrow("release intent is invalid");
+    await expect(Effect.runPromise(store.find("v0.2.0"))).rejects.toThrow("release intent is invalid");
+    await expect(Effect.runPromise(store.create(intent))).rejects.toThrow("release intent is invalid");
   });
 
   it("fails a marked owned record whose tag does not match its intent", async () => {
@@ -300,8 +318,12 @@ describe("release record ownership in the GitHub store", () => {
         assets: [],
       },
     ]);
-    await expect(store.find("v0.2.0")).rejects.toThrow("Release tag does not match its intent");
-    await expect(store.reservedCanaryVersions()).rejects.toThrow("Release tag does not match its intent");
+    await expect(Effect.runPromise(store.find("v0.2.0"))).rejects.toThrow(
+      "Release tag does not match its intent"
+    );
+    await expect(Effect.runPromise(store.reservedCanaryVersions())).rejects.toThrow(
+      "Release tag does not match its intent"
+    );
   });
 
   it("fails a marked owned record that cannot be decoded instead of dropping it", async () => {
@@ -320,13 +342,17 @@ describe("release record ownership in the GitHub store", () => {
         assets: [],
       },
     ]);
-    await expect(store.reservedCanaryVersions()).rejects.toThrow("release intent is invalid");
-    await expect(store.find(`canary-${commit}`)).rejects.toThrow("release intent is invalid");
+    await expect(Effect.runPromise(store.reservedCanaryVersions())).rejects.toThrow(
+      "release intent is invalid"
+    );
+    await expect(Effect.runPromise(store.find(`canary-${commit}`))).rejects.toThrow(
+      "release intent is invalid"
+    );
   });
 
   it("reads unmarked schema-1 records without rewriting them", async () => {
     const { store, mutations } = githubStore([releaseRecord({ assets: [] })]);
-    expect(await store.find("v0.2.0")).toEqual({
+    expect(await Effect.runPromise(store.find("v0.2.0"))).toEqual({
       id: 1,
       intent,
       asset: { state: "missing" },
@@ -347,7 +373,7 @@ describe("release record ownership in the GitHub store", () => {
         assets: [],
       },
     });
-    await expect(store.create(intent)).resolves.toEqual({
+    await expect(Effect.runPromise(store.create(intent))).resolves.toEqual({
       id: 9,
       intent,
       asset: { state: "missing" },
@@ -370,9 +396,15 @@ describe("release record ownership in the GitHub store", () => {
 describe("GitHub JSON arrays", () => {
   it("rejects a wrapped object where a release array is required", async () => {
     const store = createReleaseStore(
-      createGitHubClient("example/package", "test", () => Promise.resolve(Response.json({ releases: [] }))),
+      createGitHubClient({
+        repository: "example/package",
+        token: "test",
+        fetch: () => Promise.resolve(Response.json({ releases: [] })),
+      }),
       packageName
     );
-    await expect(store.reservedCanaryVersions()).rejects.toThrow("GitHub releases is invalid");
+    await expect(Effect.runPromise(store.reservedCanaryVersions())).rejects.toThrow(
+      "GitHub releases is invalid"
+    );
   });
 });

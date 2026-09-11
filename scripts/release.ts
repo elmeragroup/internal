@@ -1,10 +1,6 @@
 import { resolve } from "node:path";
 
-import {
-  assertReleaseVersion,
-  readManifestVersion,
-  resolveReleasePackage,
-} from "../packages/release/src/index.ts";
+import { assertReleaseVersion, readManifestVersion, resolveReleasePackage } from "@elmeragroup/release";
 
 const checkoutRoot = resolve(import.meta.dirname, "..");
 export const releasePackage = resolveReleasePackage(
@@ -22,6 +18,6 @@ export function releaseVersion(): string {
   return assertReleaseVersion(readManifestVersion(packageDirectory));
 }
 
-export function archivePath(version = releaseVersion()): string {
+export function archivePath(version: string): string {
   return resolve(archiveDirectory, `elmeragroup-internal-${version}.tgz`);
 }

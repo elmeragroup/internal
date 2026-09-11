@@ -16,7 +16,7 @@ _Avoid_: channel
 The identity of a release: its channel, version, and source commit.
 
 **Record**:
-An owned release's durable saved intent and any verified bundle. An incomplete record still preserves the intent and reservation. Ownership is distinct from intent validity; an invalid owned record is an error, not a foreign release.
+An owned release's durable saved intent and, once prepared, its recorded archive. An incomplete record still preserves the intent and reservation. Ownership is distinct from intent validity; an invalid owned record is an error, not a foreign release.
 _Avoid_: GitHub release, npm version
 
 **Record tag**:
@@ -38,17 +38,14 @@ The next stable version Changesets would cut. Canary versions are numbered from 
 The package tarball that npm will receive.
 _Avoid_: bundle, the on-disk artifacts directory
 
-**Receipt**:
-Proof that this repository's packed-consumer checks passed against that exact archive. Repacking invalidates it.
-
-**Bundle**:
-The archive, the archive report, and the receipt, bound together as the bytes stored on a record.
+**Recorded archive**:
+The package archive stored on a release record. The engine re-verifies its packed manifest and integrity against the intent before every publication or retry; no separate report or receipt travels with it.
 
 **Verified release**:
 An intent plus the archive's integrity.
 
 **Retry**:
-Finish a prepared record from its saved bundle. It does not pack again. The checkout tip may have moved. An incomplete record (no uploaded bundle) is not a retry; that commit's original prepare must be rerun.
+Finish a prepared record from its recorded archive. It does not pack again. The checkout tip may have moved. An incomplete record (no uploaded archive) is not a retry; that commit's original prepare must be rerun.
 
 **Superseded**:
 A canary that must not be promoted. A later published canary on a descendant commit supersedes it. A published stable whose commit is a descendant of the recorded canary also supersedes it, even when that stable version is below the canary's planned base.

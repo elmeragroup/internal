@@ -1,25 +1,20 @@
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import type { PackAndVerify, ReleaseIntent } from "../packages/release/src/index.ts";
-import {
-  packReleaseBundle,
-  runCommand,
-  verifiedBundleName,
-  verifyRelease,
-} from "../packages/release/src/index.ts";
+import type { PackAndVerify, ReleaseIntent } from "@elmeragroup/release";
+
 import { readJsonObject } from "./lib/json-object.mjs";
-import { archiveDirectory, archivePath, manifestPath, packageName, repoRoot } from "./release.ts";
+import { runCommand } from "./lib/run-command.ts";
+import { archiveDirectory, archivePath, manifestPath, repoRoot } from "./release.ts";
 
 const lockfilePath = resolve(repoRoot, "pnpm-lock.yaml");
 
 /**
- * Stamps the release version and source onto the published manifest, packs, and verifies the result.
- * The `finally` restore covers an ordinary failure, but this is meant for the disposable CI checkout:
- * a killed process leaves the manifest and lockfile rewritten in the working tree.
+ * Stamps the release version and source onto the published manifest, then builds, packs, and runs
+ * the packed-consumer checks. The `finally` restore covers an ordinary failure, but this is meant
+ * for the disposable CI checkout: a killed process leaves the manifest and lockfile rewritten.
  */
-function prepareArchive(intent: ReleaseIntent, bundleDirectory: string): void {
+function prepareArchive(intent: ReleaseIntent): void {
   const manifestBytes = readFileSync(manifestPath);
   const lockfileBytes = readFileSync(lockfilePath);
   try {
@@ -30,10 +25,6 @@ function prepareArchive(intent: ReleaseIntent, bundleDirectory: string): void {
     runCommand("pnpm", ["install", "--lockfile-only"], repoRoot);
     runCommand("pnpm", ["packages:pack"], repoRoot);
     runCommand("pnpm", ["test:packed-consumer"], repoRoot);
-    copyFileSync(archivePath(intent.version), resolve(bundleDirectory, "package.tgz"));
-    copyFileSync(resolve(archiveDirectory, "archive.json"), resolve(bundleDirectory, "archive.json"));
-    copyFileSync(resolve(archiveDirectory, "verified.json"), resolve(bundleDirectory, "verified.json"));
-    verifyRelease(bundleDirectory, intent, packageName);
   } finally {
     writeFileSync(manifestPath, manifestBytes);
     writeFileSync(lockfilePath, lockfileBytes);
@@ -41,16 +32,9 @@ function prepareArchive(intent: ReleaseIntent, bundleDirectory: string): void {
 }
 
 function packInternal(intent: ReleaseIntent): Uint8Array {
-  const bundleDirectory = mkdtempSync(resolve(tmpdir(), "elmera-release-"));
-  try {
-    mkdirSync(archiveDirectory, { recursive: true });
-    prepareArchive(intent, bundleDirectory);
-    const bundlePath = resolve(bundleDirectory, verifiedBundleName);
-    packReleaseBundle(bundleDirectory, bundlePath);
-    return new Uint8Array(readFileSync(bundlePath));
-  } finally {
-    rmSync(bundleDirectory, { recursive: true, force: true });
-  }
+  mkdirSync(archiveDirectory, { recursive: true });
+  prepareArchive(intent);
+  return new Uint8Array(readFileSync(archivePath(intent.version)));
 }
 
 export function createInternalPackAndVerify(): PackAndVerify {

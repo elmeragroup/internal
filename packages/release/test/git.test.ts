@@ -1,16 +1,22 @@
+import { Effect } from "effect";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { createGitPort } from "../src/git.ts";
+import { createCommitAncestry, createGitPort } from "../src/git.ts";
+import type { GitPort } from "../src/git.ts";
 import { commitBaseline, withGitWorkspace, workspaceTimeout } from "./lib/git-workspace.ts";
 import type { GitWorkspace, WorkspaceHead } from "./lib/git-workspace.ts";
 
 const manifestPath = "packages/internal/package.json";
-const packageManifest = "packages/internal/package.json";
 const remoteTrackingRef = "origin/main";
 const packageName = "@elmeragroup/internal";
 const unknownCommit = "0".repeat(40);
+
+/** A live git port over `root`. */
+function gitPort(root: string, manifest = manifestPath): GitPort {
+  return createGitPort(root, manifest, remoteTrackingRef);
+}
 
 function writeManifest(workspace: GitWorkspace, version: string): void {
   mkdirSync(join(workspace.path, "packages/internal"), { recursive: true });
@@ -48,7 +54,7 @@ describe("git port head resolution", () => {
     "reads the checked-out commit as a full SHA",
     () => {
       withCheckout("0.4.0", (workspace, baseline) => {
-        const head = createGitPort(workspace.path, packageManifest, remoteTrackingRef).head();
+        const head = Effect.runSync(gitPort(workspace.path).head());
         expect(head).toBe(baseline);
         expect(head).toMatch(/^[0-9a-f]{40}$/);
       });
@@ -65,9 +71,9 @@ describe("git port head resolution", () => {
           expect(() => workspace.git(["rev-parse", "--verify", "main"])).toThrow();
           writeManifest(workspace, "0.4.1");
           const advanced = commitAll(workspace, "advance past origin/main");
-          const port = createGitPort(workspace.path, packageManifest, remoteTrackingRef);
-          expect(port.originMain()).toBe(baseline);
-          expect(port.head()).toBe(advanced);
+          const port = gitPort(workspace.path);
+          expect(Effect.runSync(port.originMain())).toBe(baseline);
+          expect(Effect.runSync(port.head())).toBe(advanced);
         },
         "detached"
       );
@@ -81,7 +87,7 @@ describe("git port working tree cleanliness", () => {
     "reports a freshly committed tree as clean",
     () => {
       withCheckout("0.4.0", (workspace) => {
-        expect(createGitPort(workspace.path, packageManifest, remoteTrackingRef).isClean()).toBe(true);
+        expect(Effect.runSync(gitPort(workspace.path).isClean())).toBe(true);
       });
     },
     workspaceTimeout
@@ -93,7 +99,7 @@ describe("git port working tree cleanliness", () => {
       withCheckout("0.4.0", (workspace) => {
         writeFileSync(join(workspace.path, "scratch.txt"), "build output\n");
         expect(workspace.git(["status", "--porcelain"])).not.toBe("");
-        expect(createGitPort(workspace.path, packageManifest, remoteTrackingRef).isClean()).toBe(true);
+        expect(Effect.runSync(gitPort(workspace.path).isClean())).toBe(true);
       });
     },
     workspaceTimeout
@@ -104,7 +110,7 @@ describe("git port working tree cleanliness", () => {
     () => {
       withCheckout("0.4.0", (workspace) => {
         writeManifest(workspace, "0.4.1");
-        expect(createGitPort(workspace.path, packageManifest, remoteTrackingRef).isClean()).toBe(false);
+        expect(Effect.runSync(gitPort(workspace.path).isClean())).toBe(false);
       });
     },
     workspaceTimeout
@@ -115,7 +121,7 @@ describe("git port working tree cleanliness", () => {
     () => {
       withCheckout("0.4.0", (workspace) => {
         workspace.git(["rm", "--quiet", manifestPath]);
-        expect(createGitPort(workspace.path, packageManifest, remoteTrackingRef).isClean()).toBe(false);
+        expect(Effect.runSync(gitPort(workspace.path).isClean())).toBe(false);
       });
     },
     workspaceTimeout
@@ -134,9 +140,7 @@ describe("git port manifest version at a revision", () => {
         );
         const baseline = commitBaseline(workspace);
         expect(
-          createGitPort(workspace.path, "packages/app/package.json", remoteTrackingRef).stableVersionAt(
-            baseline
-          )
+          Effect.runSync(gitPort(workspace.path, "packages/app/package.json").stableVersionAt(baseline))
         ).toBe("1.4.2");
       });
     },
@@ -149,10 +153,10 @@ describe("git port manifest version at a revision", () => {
       withCheckout("0.4.0", (workspace, baseline) => {
         writeManifest(workspace, "0.4.1");
         const advanced = commitAll(workspace, "release 0.4.1");
-        const port = createGitPort(workspace.path, packageManifest, remoteTrackingRef);
-        expect(port.stableVersionAt(advanced)).toBe("0.4.1");
-        expect(port.stableVersionAt(`${advanced}^1`)).toBe("0.4.0");
-        expect(port.stableVersionAt(baseline)).toBe("0.4.0");
+        const port = gitPort(workspace.path);
+        expect(Effect.runSync(port.stableVersionAt(advanced))).toBe("0.4.1");
+        expect(Effect.runSync(port.stableVersionAt(`${advanced}^1`))).toBe("0.4.0");
+        expect(Effect.runSync(port.stableVersionAt(baseline))).toBe("0.4.0");
       });
     },
     workspaceTimeout
@@ -162,9 +166,9 @@ describe("git port manifest version at a revision", () => {
     "rejects a canary version recorded in the manifest",
     () => {
       withCheckout("0.4.1-canary.3", (workspace, baseline) => {
-        expect(() =>
-          createGitPort(workspace.path, packageManifest, remoteTrackingRef).stableVersionAt(baseline)
-        ).toThrow("Expected a stable version; received 0.4.1-canary.3");
+        expect(() => Effect.runSync(gitPort(workspace.path).stableVersionAt(baseline))).toThrow(
+          "Expected a stable version; received 0.4.1-canary.3"
+        );
       });
     },
     workspaceTimeout
@@ -176,9 +180,9 @@ describe("git port manifest version at a revision", () => {
       withGitWorkspace("elmera-release-git-", (workspace) => {
         writeFileSync(join(workspace.path, "README.md"), "no package here\n");
         const baseline = commitBaseline(workspace);
-        expect(() =>
-          createGitPort(workspace.path, packageManifest, remoteTrackingRef).stableVersionAt(baseline)
-        ).toThrow(/does not exist/);
+        expect(() => Effect.runSync(gitPort(workspace.path).stableVersionAt(baseline))).toThrow(
+          /does not exist/
+        );
       });
     },
     workspaceTimeout
@@ -190,9 +194,9 @@ describe("git port manifest version at a revision", () => {
       withGitWorkspace("elmera-release-git-", (workspace) => {
         writeManifestText(workspace, `${JSON.stringify({ name: packageName })}\n`);
         const baseline = commitBaseline(workspace);
-        expect(() =>
-          createGitPort(workspace.path, packageManifest, remoteTrackingRef).stableVersionAt(baseline)
-        ).toThrow("recorded manifest is invalid");
+        expect(() => Effect.runSync(gitPort(workspace.path).stableVersionAt(baseline))).toThrow(
+          "recorded manifest is invalid"
+        );
       });
     },
     workspaceTimeout
@@ -204,26 +208,26 @@ describe("git port manifest version at a revision", () => {
       withGitWorkspace("elmera-release-git-", (workspace) => {
         writeManifestText(workspace, "[]\n");
         const baseline = commitBaseline(workspace);
-        expect(() =>
-          createGitPort(workspace.path, packageManifest, remoteTrackingRef).stableVersionAt(baseline)
-        ).toThrow("recorded manifest is invalid");
+        expect(() => Effect.runSync(gitPort(workspace.path).stableVersionAt(baseline))).toThrow(
+          "recorded manifest is invalid"
+        );
       });
     },
     workspaceTimeout
   );
 });
 
-describe("git port commit ancestry", () => {
+describe("commit ancestry", () => {
   it(
     "answers in the direction the supersession check depends on",
     () => {
       withCheckout("0.4.0", (workspace, baseline) => {
         writeManifest(workspace, "0.4.1");
         const advanced = commitAll(workspace, "release 0.4.1");
-        const port = createGitPort(workspace.path, packageManifest, remoteTrackingRef);
-        expect(port.isAncestor(baseline, advanced)).toBe(true);
-        expect(port.isAncestor(advanced, baseline)).toBe(false);
-        expect(port.isAncestor(baseline, baseline)).toBe(true);
+        const ancestry = createCommitAncestry(workspace.path);
+        expect(ancestry(baseline, advanced)).toBe(true);
+        expect(ancestry(advanced, baseline)).toBe(false);
+        expect(ancestry(baseline, baseline)).toBe(true);
       });
     },
     workspaceTimeout
@@ -238,11 +242,11 @@ describe("git port commit ancestry", () => {
         workspace.git(["checkout", "--quiet", baseline]);
         writeFileSync(join(workspace.path, "right.txt"), "right\n");
         const right = commitAll(workspace, "right");
-        const port = createGitPort(workspace.path, packageManifest, remoteTrackingRef);
-        expect(port.isAncestor(left, right)).toBe(false);
-        expect(port.isAncestor(right, left)).toBe(false);
-        expect(port.isAncestor(baseline, left)).toBe(true);
-        expect(port.isAncestor(baseline, right)).toBe(true);
+        const ancestry = createCommitAncestry(workspace.path);
+        expect(ancestry(left, right)).toBe(false);
+        expect(ancestry(right, left)).toBe(false);
+        expect(ancestry(baseline, left)).toBe(true);
+        expect(ancestry(baseline, right)).toBe(true);
       });
     },
     workspaceTimeout
@@ -252,13 +256,9 @@ describe("git port commit ancestry", () => {
     "refuses to guess when a commit is unknown to the checkout",
     () => {
       withCheckout("0.4.0", (workspace, baseline) => {
-        const port = createGitPort(workspace.path, packageManifest, remoteTrackingRef);
-        expect(() => port.isAncestor(unknownCommit, baseline)).toThrow(
-          "Cannot establish release commit ancestry"
-        );
-        expect(() => port.isAncestor(baseline, unknownCommit)).toThrow(
-          "Cannot establish release commit ancestry"
-        );
+        const ancestry = createCommitAncestry(workspace.path);
+        expect(() => ancestry(unknownCommit, baseline)).toThrow("Cannot establish release commit ancestry");
+        expect(() => ancestry(baseline, unknownCommit)).toThrow("Cannot establish release commit ancestry");
       });
     },
     workspaceTimeout
@@ -268,17 +268,9 @@ describe("git port commit ancestry", () => {
     "rejects %s as a commit before running git",
     (invalid) => {
       withCheckout("0.4.0", (workspace, baseline) => {
-        const port = createGitPort(
-          join(workspace.path, "absent-checkout"),
-          packageManifest,
-          remoteTrackingRef
-        );
-        expect(() => port.isAncestor(invalid, baseline)).toThrow(
-          `Expected a full commit SHA; received ${invalid}`
-        );
-        expect(() => port.isAncestor(baseline, invalid)).toThrow(
-          `Expected a full commit SHA; received ${invalid}`
-        );
+        const ancestry = createCommitAncestry(join(workspace.path, "absent-checkout"));
+        expect(() => ancestry(invalid, baseline)).toThrow(`Expected a full commit SHA; received ${invalid}`);
+        expect(() => ancestry(baseline, invalid)).toThrow(`Expected a full commit SHA; received ${invalid}`);
       });
     },
     workspaceTimeout
@@ -288,12 +280,8 @@ describe("git port commit ancestry", () => {
     "rethrows a spawn failure instead of reporting an answer",
     () => {
       withCheckout("0.4.0", (workspace, baseline) => {
-        const port = createGitPort(
-          join(workspace.path, "absent-checkout"),
-          packageManifest,
-          remoteTrackingRef
-        );
-        expect(() => port.isAncestor(baseline, baseline)).toThrow(/ENOENT/);
+        const ancestry = createCommitAncestry(join(workspace.path, "absent-checkout"));
+        expect(() => ancestry(baseline, baseline)).toThrow(/ENOENT/);
       });
     },
     workspaceTimeout

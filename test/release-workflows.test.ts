@@ -1,8 +1,10 @@
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
+
+import { assertReleaseVersion, readManifestVersion, resolveReleasePackage } from "@elmeragroup/release";
 
 import { asRecord, asRecordArray, asString, readJsonObject } from "../scripts/lib/json-object.mjs";
 
@@ -99,41 +101,17 @@ describe("release workflow gates", () => {
 });
 
 describe("release package composition", () => {
-  it("derives the previous-version git path from the resolved package", () => {
-    for (const file of [
-      "scripts/check-release-pr.ts",
-      "scripts/publish-release.ts",
-      "scripts/internal-pack-adapter.ts",
-      "packages/release/src/git.ts",
-      "packages/release/src/engine.ts",
-      "packages/release/src/gate.ts",
-    ]) {
-      expect(readFileSync(join(repoRoot, file), "utf8")).not.toContain("packages/internal/package.json");
-    }
-    expect(readFileSync(join(repoRoot, "scripts/release.ts"), "utf8")).toContain("resolveReleasePackage");
-    expect(readFileSync(join(repoRoot, "packages/release/src/engine.ts"), "utf8")).toContain(
-      "packageManifestGitPath"
-    );
-    expect(readFileSync(join(repoRoot, "packages/release/src/plan.ts"), "utf8")).toContain(
-      'createRequire(resolve(checkoutRoot, "package.json"))'
-    );
+  it("resolves the repository's published package from its layout", () => {
+    const pkg = resolveReleasePackage(repoRoot, join(repoRoot, "packages/internal"), "@elmeragroup/internal");
+    expect(pkg.checkoutRoot).toBe(repoRoot);
+    const version = readManifestVersion(pkg.packageDirectory);
+    expect(assertReleaseVersion(version)).toBe(version);
+    expect(readJsonObject(join(pkg.packageDirectory, "package.json")).version).toBe(version);
   });
 
-  it("does not keep a second engine under scripts/", () => {
-    for (const file of [
-      "release-pipeline.ts",
-      "release-github.ts",
-      "release-github-client.ts",
-      "release-git.ts",
-      "release-publication.ts",
-      "release-plan.ts",
-      "release-gate.ts",
-      "release-registry.ts",
-      "release-files.ts",
-      "release-record.ts",
-      "release-archive.ts",
-    ]) {
-      expect(existsSync(join(repoRoot, "scripts", file))).toBe(false);
-    }
+  it("rejects a package whose directory does not carry the requested name", () => {
+    expect(() =>
+      resolveReleasePackage(repoRoot, join(repoRoot, "packages/release"), "@elmeragroup/internal")
+    ).toThrow("does not match");
   });
 });

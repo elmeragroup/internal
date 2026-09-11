@@ -1,6 +1,6 @@
 import { Schema } from "effect";
 
-import { isReleaseTag, parseIntent, releaseRecordOwner, releaseTag, verifiedBundleName } from "./intent.ts";
+import { isReleaseTag, parseIntent, releaseArchiveName, releaseRecordOwner, releaseTag } from "./intent.ts";
 import type { ReleaseIntent } from "./intent.ts";
 import { decodeJson } from "./json.ts";
 
@@ -47,7 +47,7 @@ export function classifyReleaseRecord(
   if (parsed?.schema === 1 && parsed.owner === undefined) {
     return { kind: "legacy", intent: intentMatchingTag(body, tag) };
   }
-  if (assetNames.includes(verifiedBundleName) && !clearlyForeignIdentity(parsed)) {
+  if (assetNames.includes(releaseArchiveName) && !clearlyForeignIdentity(parsed)) {
     return { kind: "legacy", intent: intentMatchingTag(body, tag) };
   }
   return { kind: "foreign" };

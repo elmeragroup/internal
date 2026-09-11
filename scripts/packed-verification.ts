@@ -1,76 +1,26 @@
-import { createHash } from "node:crypto";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, resolve } from "node:path";
 
-import { assertArchiveMatches } from "../packages/release/src/index.ts";
-
-export type PackedInputs = {
-  reportPath: string;
-  archivePath: string;
-  receiptPath: string;
-  version: string;
-};
-
-type CapturedArchive = {
-  version: string;
-  reportSha256: string;
-  archiveSha256: string;
-  archiveBytes: Buffer;
-};
-
-function sha256Hex(bytes: Buffer): string {
-  return createHash("sha256").update(bytes).digest("hex");
-}
-
-function writePassReceipt(receiptPath: string, version: string, archiveReportSha256: string): void {
-  writeFileSync(
-    receiptPath,
-    `${JSON.stringify(
-      {
-        version,
-        archiveReportSha256,
-        status: "pass",
-      },
-      null,
-      2
-    )}\n`
-  );
-}
-
-function captureArchive(inputs: PackedInputs, packageName: string): CapturedArchive {
-  const reportBytes = readFileSync(inputs.reportPath);
-  const archiveBytes = readFileSync(inputs.archivePath);
-  const reportSha256 = assertArchiveMatches(reportBytes, archiveBytes, inputs.version, packageName);
-  return {
-    version: inputs.version,
-    reportSha256,
-    archiveSha256: sha256Hex(archiveBytes),
-    archiveBytes,
-  };
-}
-
+/**
+ * Runs the consumer checks against a private snapshot of the packed archive, then fails if the
+ * live archive changed while the checks ran. The recorded release re-verifies the archive's
+ * manifest and integrity, so this only guards the local check itself.
+ */
 export function verifyPackedArchive(
-  inputs: PackedInputs,
+  archivePath: string,
   packageName: string,
   runChecks: (snapshotArchivePath: string) => void
 ): void {
-  rmSync(inputs.receiptPath, { force: true });
-  const captured = captureArchive(inputs, packageName);
+  const archiveBytes = readFileSync(archivePath);
   const snapshotDirectory = mkdtempSync(resolve(tmpdir(), "elmera-packed-snapshot-"));
-  const snapshotArchivePath = resolve(snapshotDirectory, basename(inputs.archivePath));
+  const snapshotArchivePath = resolve(snapshotDirectory, basename(archivePath));
   try {
-    writeFileSync(snapshotArchivePath, captured.archiveBytes);
+    writeFileSync(snapshotArchivePath, archiveBytes);
     runChecks(snapshotArchivePath);
-    // Fail if the live archive or report changed during runChecks. This message is
-    // reserved for post-verification drift; captureArchive uses a different error.
-    if (
-      sha256Hex(readFileSync(inputs.reportPath)) !== captured.reportSha256 ||
-      sha256Hex(readFileSync(inputs.archivePath)) !== captured.archiveSha256
-    ) {
+    if (!archiveBytes.equals(readFileSync(archivePath))) {
       throw new Error(`${packageName}: archive changed since verification`);
     }
-    writePassReceipt(inputs.receiptPath, captured.version, captured.reportSha256);
   } finally {
     rmSync(snapshotDirectory, { recursive: true, force: true });
   }

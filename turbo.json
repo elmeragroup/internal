@@ -9,6 +9,7 @@
       "dependsOn": ["@elmeragroup/internal#build"]
     },
     "//#test:repo-policy": {
+      "dependsOn": ["@elmeragroup/release#build"],
       "inputs": [
         "test/**",
         ".oxlintrc.json",
@@ -62,9 +63,11 @@
       ]
     },
     "//#type-check:scripts": {
+      "dependsOn": ["@elmeragroup/release#build"],
       "inputs": ["scripts/**", "packages/release/**", "tooling/typescript/**"]
     },
     "//#type-check:tests": {
+      "dependsOn": ["@elmeragroup/release#build"],
       "inputs": ["test/**", "scripts/**", "packages/release/**", "tooling/typescript/**"]
     },
     "@elmeragroup/internal#build": {

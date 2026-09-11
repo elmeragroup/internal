@@ -12,27 +12,35 @@ import { ProjectExtractor } from "@elmeragroup/internal/api-extractor";
 import elmera from "@elmeragroup/internal/oxlint";
 import antiSlop from "@elmeragroup/internal/oxlint/anti-slop";
 import {
+  assertCanaryReleaseVersion,
+  assertReleaseVersion,
   checkReleasePr,
-  parseReleaseCommand,
+  readManifestVersion,
   releaseCheckedCommit,
+  releaseEnvironment,
   resolveReleasePackage,
   retryRelease,
-  verifiedBundleName,
   ReleaseError,
 } from "@elmeragroup/internal/release";
-import type { PackAndVerify, ReleaseCommand, ReleaseIntent, ReleasePackage } from "@elmeragroup/internal/release";
+import type {
+  PackAndVerify,
+  ReleaseEnvironment,
+  ReleaseIntent,
+  ReleasePackage,
+} from "@elmeragroup/internal/release";
 void ProjectExtractor;
 void elmera;
 void antiSlop;
 void ReleaseError;
-void verifiedBundleName;
+void assertCanaryReleaseVersion;
+void assertReleaseVersion;
+void readManifestVersion;
+const environment: ReleaseEnvironment = releaseEnvironment();
 const releasePackage: ReleasePackage = resolveReleasePackage(".", ".", "canary-consumer");
 const adapter: PackAndVerify = { pack: (_intent: ReleaseIntent) => new Uint8Array() };
 void checkReleasePr(releasePackage);
-void releaseCheckedCommit(releasePackage, adapter, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
-void retryRelease(releasePackage, "v0.2.0");
-const command: ReleaseCommand = parseReleaseCommand(["main", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]);
-void command;
+void releaseCheckedCommit(releasePackage, adapter, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", environment);
+void retryRelease(releasePackage, "v0.2.0", environment);
 const options: GenerateApiArtifactsOptions = { projectRoot: ".", tsconfigPath: "tsconfig.json", components: [] };
 const result = await generateApiArtifacts(options);
 const parts: readonly ApiPart[] = result.components.flatMap(component => component.parts);

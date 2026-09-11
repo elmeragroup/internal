@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -19,7 +20,6 @@ type CheckoutOptions = {
   version?: string;
   changelog?: string;
   pendingChangeset?: boolean;
-  baseBranch?: string;
 };
 
 /** A disposable stand-in for the release checkout the gate reads. */
@@ -38,10 +38,6 @@ function withCheckout(
     `# changelog\n\n## ${options.changelog ?? version}\n`
   );
   writeFileSync(resolve(root, ".changeset/README.md"), "ignored\n");
-  writeFileSync(
-    resolve(root, ".changeset/config.json"),
-    `${JSON.stringify({ baseBranch: options.baseBranch ?? "origin/main" })}\n`
-  );
   if (options.pendingChangeset === true) writeFileSync(resolve(root, ".changeset/pending.md"), "pending\n");
   return run(root, packageDirectory).finally(() => {
     rmSync(root, { recursive: true, force: true });
@@ -51,11 +47,15 @@ function withCheckout(
 /** Records every GitHub URL the gate reaches for, so unreached checks are visible. */
 function gitHub(pulls: readonly unknown[]) {
   const requested: string[] = [];
-  const client = createGitHubClient("example/package", "test", (url) => {
-    const path = url instanceof URL ? url.href : url instanceof Request ? url.url : url;
-    requested.push(path);
-    if (path.includes("/pulls")) return Promise.resolve(Response.json(pulls));
-    return Promise.resolve(new Response("", { status: 500 }));
+  const client = createGitHubClient({
+    repository: "example/package",
+    token: "test",
+    fetch: (url) => {
+      const path = url instanceof URL ? url.href : url instanceof Request ? url.url : url;
+      requested.push(path);
+      if (path.includes("/pulls")) return Promise.resolve(Response.json(pulls));
+      return Promise.resolve(new Response("", { status: 500 }));
+    },
   });
   return { client, requested };
 }
@@ -64,12 +64,12 @@ describe("stable release gate", () => {
   it("reports the canary line when the manifest still matches the previous commit", async () => {
     await withCheckout({ version: "0.2.0" }, async (root, packageDirectory) => {
       const { client, requested } = gitHub([mergedReleasePull]);
-      await expect(createStableReleaseGate(client, root, packageDirectory)(commit, "0.2.0")).resolves.toEqual(
-        {
-          channel: "canary",
-          current: "0.2.0",
-        }
-      );
+      await expect(
+        Effect.runPromise(createStableReleaseGate(client, root, packageDirectory, "main")(commit, "0.2.0"))
+      ).resolves.toEqual({
+        channel: "canary",
+        current: "0.2.0",
+      });
       expect(requested).toEqual([]);
     });
   });
@@ -77,12 +77,12 @@ describe("stable release gate", () => {
   it("reports the stable line once the files and the merged PR both check out", async () => {
     await withCheckout({ version: "0.2.0" }, async (root, packageDirectory) => {
       const { client, requested } = gitHub([mergedReleasePull]);
-      await expect(createStableReleaseGate(client, root, packageDirectory)(commit, "0.1.9")).resolves.toEqual(
-        {
-          channel: "stable",
-          version: "0.2.0",
-        }
-      );
+      await expect(
+        Effect.runPromise(createStableReleaseGate(client, root, packageDirectory, "main")(commit, "0.1.9"))
+      ).resolves.toEqual({
+        channel: "stable",
+        version: "0.2.0",
+      });
       expect(requested).toHaveLength(1);
     });
   });
@@ -90,9 +90,9 @@ describe("stable release gate", () => {
   it("checks the release files before asking GitHub about the pull request", async () => {
     await withCheckout({ version: "0.2.0", pendingChangeset: true }, async (root, packageDirectory) => {
       const { client, requested } = gitHub([mergedReleasePull]);
-      await expect(createStableReleaseGate(client, root, packageDirectory)(commit, "0.1.9")).rejects.toThrow(
-        "did not consume all changesets"
-      );
+      await expect(
+        Effect.runPromise(createStableReleaseGate(client, root, packageDirectory, "main")(commit, "0.1.9"))
+      ).rejects.toThrow("did not consume all changesets");
       expect(requested).toEqual([]);
     });
   });
@@ -100,9 +100,9 @@ describe("stable release gate", () => {
   it("refuses a manifest version that is missing from the changelog", async () => {
     await withCheckout({ version: "0.2.0", changelog: "0.1.9" }, async (root, packageDirectory) => {
       const { client, requested } = gitHub([mergedReleasePull]);
-      await expect(createStableReleaseGate(client, root, packageDirectory)(commit, "0.1.9")).rejects.toThrow(
-        "missing from the changelog"
-      );
+      await expect(
+        Effect.runPromise(createStableReleaseGate(client, root, packageDirectory, "main")(commit, "0.1.9"))
+      ).rejects.toThrow("missing from the changelog");
       expect(requested).toEqual([]);
     });
   });
@@ -110,18 +110,18 @@ describe("stable release gate", () => {
   it("refuses a manifest version that moves backward", async () => {
     await withCheckout({ version: "0.1.8" }, async (root, packageDirectory) => {
       const { client } = gitHub([mergedReleasePull]);
-      await expect(createStableReleaseGate(client, root, packageDirectory)(commit, "0.1.9")).rejects.toThrow(
-        "Stable version must increase"
-      );
+      await expect(
+        Effect.runPromise(createStableReleaseGate(client, root, packageDirectory, "main")(commit, "0.1.9"))
+      ).rejects.toThrow("Stable version must increase");
     });
   });
 
   it("refuses a manifest version that is not a stable release version", async () => {
     await withCheckout({ version: "0.2.0-canary.3" }, async (root, packageDirectory) => {
       const { client } = gitHub([mergedReleasePull]);
-      await expect(createStableReleaseGate(client, root, packageDirectory)(commit, "0.1.9")).rejects.toThrow(
-        "Expected a stable version"
-      );
+      await expect(
+        Effect.runPromise(createStableReleaseGate(client, root, packageDirectory, "main")(commit, "0.1.9"))
+      ).rejects.toThrow("Expected a stable version");
     });
   });
 
@@ -134,32 +134,32 @@ describe("stable release gate", () => {
   ])("rejects a version change without the approved release PR", async (override) => {
     await withCheckout({ version: "0.2.0" }, async (root, packageDirectory) => {
       const { client } = gitHub([{ ...mergedReleasePull, ...override }]);
-      await expect(createStableReleaseGate(client, root, packageDirectory)(commit, "0.1.9")).rejects.toThrow(
-        "merged changeset-release/main PR"
-      );
+      await expect(
+        Effect.runPromise(createStableReleaseGate(client, root, packageDirectory, "main")(commit, "0.1.9"))
+      ).rejects.toThrow("merged changeset-release/main PR");
     });
   });
 
-  it("uses the Changesets tracked branch for the release PR", async () => {
+  it("uses the tracked branch for the release PR", async () => {
     const pull = {
       ...mergedReleasePull,
       head: { ref: "changeset-release/develop", repo: { full_name: "example/package" } },
       base: { ref: "develop" },
     };
-    await withCheckout({ version: "0.2.0", baseBranch: "origin/develop" }, async (root, packageDirectory) => {
+    await withCheckout({ version: "0.2.0" }, async (root, packageDirectory) => {
       const { client } = gitHub([pull]);
-      await expect(createStableReleaseGate(client, root, packageDirectory)(commit, "0.1.9")).resolves.toEqual(
-        {
-          channel: "stable",
-          version: "0.2.0",
-        }
-      );
+      await expect(
+        Effect.runPromise(createStableReleaseGate(client, root, packageDirectory, "develop")(commit, "0.1.9"))
+      ).resolves.toEqual({
+        channel: "stable",
+        version: "0.2.0",
+      });
     });
-    await withCheckout({ version: "0.2.0", baseBranch: "origin/develop" }, async (root, packageDirectory) => {
+    await withCheckout({ version: "0.2.0" }, async (root, packageDirectory) => {
       const { client } = gitHub([mergedReleasePull]);
-      await expect(createStableReleaseGate(client, root, packageDirectory)(commit, "0.1.9")).rejects.toThrow(
-        "merged changeset-release/develop PR"
-      );
+      await expect(
+        Effect.runPromise(createStableReleaseGate(client, root, packageDirectory, "develop")(commit, "0.1.9"))
+      ).rejects.toThrow("merged changeset-release/develop PR");
     });
   });
 });

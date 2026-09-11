@@ -1,70 +1,76 @@
-import { Effect, Result } from "effect";
+import { Effect, Result, Schedule } from "effect";
+import type { Duration } from "effect";
 
-import { attempt, attemptPromise, ReleaseError } from "./errors.ts";
+import { lift, ReleaseError } from "./errors.ts";
 import type { VerifiedRelease } from "./intent.ts";
-import { distTagFor, npmIdentity, planPublication } from "./policy.ts";
+import type { NpmPublisher, Registry } from "./npm.ts";
+import { distTagFor, npmIdentity, planPublication, shouldPromote } from "./policy.ts";
 import type { CommitAncestry } from "./policy.ts";
-import type { Registry } from "./registry.ts";
 
-export type PublicationServices = {
-  registry: () => Promise<Registry>;
-  publish: (archive: string) => void;
-  promote: (version: string, tag: string) => void;
-  isAncestor: CommitAncestry;
-  wait: () => Promise<void>;
+/** Everything publication reads from the engine; `EngineDeps` is a superset. */
+export type PublicationDeps = {
+  readRegistry: () => Effect.Effect<Registry, ReleaseError>;
+  npm: NpmPublisher;
+  ancestry: CommitAncestry;
+  confirmationInterval: Duration.Input;
 };
 
 const propagationAttempts = 6;
 
 const unverifiedPublication = "Publication could not be verified; retry the recorded release";
 
-/** Polls `registry()` until `isVisible` holds or `propagationAttempts` is exhausted. */
+function confirmationSchedule(interval: Duration.Input) {
+  return Schedule.recurs(propagationAttempts - 1).pipe(Schedule.addDelay(() => Effect.succeed(interval)));
+}
+
+/** Polls the registry until `isVisible` holds or `propagationAttempts` is exhausted. */
 function confirmRegistry(
-  services: PublicationServices,
+  deps: PublicationDeps,
   isVisible: (registry: Registry) => boolean
 ): Effect.Effect<Registry | undefined, ReleaseError> {
   return Effect.gen(function* () {
-    for (let attemptNumber = 1; attemptNumber <= propagationAttempts; attemptNumber += 1) {
-      const registry = yield* attemptPromise(() => services.registry());
-      if (yield* attempt(() => isVisible(registry))) return registry;
-      if (attemptNumber < propagationAttempts) yield* attemptPromise(() => services.wait());
-    }
-  });
+    const registry = yield* deps.readRegistry();
+    const visible = yield* lift("publication", () => isVisible(registry));
+    return visible ? registry : undefined;
+  }).pipe(
+    Effect.repeat({
+      schedule: confirmationSchedule(deps.confirmationInterval),
+      until: (registry) => registry !== undefined,
+    })
+  );
 }
 
 /** Uploads the archive and returns the first registry read that shows those exact bytes. */
 function uploadAndConfirm(
   release: VerifiedRelease,
-  services: PublicationServices
+  deps: PublicationDeps
 ): Effect.Effect<Registry, ReleaseError> {
   return Effect.gen(function* () {
-    const published = yield* Effect.result(attempt(() => services.publish(release.archive)));
-    const publishFailure = Result.isFailure(published) ? published.failure.message : undefined;
-    const confirmed = yield* confirmRegistry(
-      services,
-      (registry) => npmIdentity(release, registry) === "match"
-    );
+    const published = yield* Effect.result(deps.npm.publish(release.archive));
+    const confirmed = yield* confirmRegistry(deps, (registry) => npmIdentity(release, registry) === "match");
     if (confirmed !== undefined) return confirmed;
-    if (publishFailure === undefined) {
-      return yield* new ReleaseError({ message: unverifiedPublication });
+    if (Result.isFailure(published)) {
+      return yield* new ReleaseError({
+        port: "publication",
+        message: unverifiedPublication,
+        cause: published.failure.cause ?? published.failure.message,
+      });
     }
-    return yield* new ReleaseError({ message: unverifiedPublication, cause: publishFailure });
+    return yield* new ReleaseError({ port: "publication", message: unverifiedPublication });
   });
 }
 
 function promoteAndConfirm(
   release: VerifiedRelease,
-  services: PublicationServices
+  deps: PublicationDeps
 ): Effect.Effect<void, ReleaseError> {
   return Effect.gen(function* () {
     const tag = distTagFor(release.channel);
-    yield* attempt(() => services.promote(release.version, tag));
-    const confirmed = yield* confirmRegistry(
-      services,
-      (registry) => registry.tags.get(tag) === release.version
-    );
+    yield* deps.npm.promote(release.version, tag);
+    const confirmed = yield* confirmRegistry(deps, (registry) => registry.tags.get(tag) === release.version);
     if (confirmed === undefined) {
       return yield* new ReleaseError({
+        port: "publication",
         message: `npm ${tag} update is not visible; retry the recorded release`,
       });
     }
@@ -73,16 +79,15 @@ function promoteAndConfirm(
 
 export function publishVerifiedRelease(
   release: VerifiedRelease,
-  services: PublicationServices
+  deps: PublicationDeps
 ): Effect.Effect<"published" | "superseded", ReleaseError> {
   return Effect.gen(function* () {
-    const registry = yield* attemptPromise(() => services.registry());
-    const intended = yield* attempt(() => planPublication(release, registry, services.isAncestor));
+    const registry = yield* deps.readRegistry();
+    const intended = yield* lift("publication", () => planPublication(release, registry, deps.ancestry));
     if (intended.kind === "superseded") return "superseded";
-    const confirmed = intended.upload ? yield* uploadAndConfirm(release, services) : registry;
-    const planned = yield* attempt(() => planPublication(release, confirmed, services.isAncestor));
-    if (planned.kind === "superseded") return "superseded";
-    if (planned.promote) yield* promoteAndConfirm(release, services);
+    const confirmed = intended.upload ? yield* uploadAndConfirm(release, deps) : registry;
+    const promote = yield* lift("publication", () => shouldPromote(release, confirmed, deps.ancestry));
+    if (promote) yield* promoteAndConfirm(release, deps);
     return "published";
   });
 }

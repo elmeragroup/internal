@@ -81,12 +81,19 @@ The operations return Effect:
 
 ```ts
 checkReleasePr(pkg: ReleasePackage): Effect<void, ReleaseError>
-releaseCheckedCommit(pkg: ReleasePackage, adapter: PackAndVerify, commit: string): Effect<void, ReleaseError>
-retryRelease(pkg: ReleasePackage, recordTag: string): Effect<void, ReleaseError>
+releaseCheckedCommit(
+  pkg: ReleasePackage,
+  adapter: PackAndVerify,
+  commit: string,
+  environment?: ReleaseEnvironment
+): Effect<void, ReleaseError>
+retryRelease(pkg: ReleasePackage, recordTag: string, environment?: ReleaseEnvironment): Effect<void, ReleaseError>
 ```
 
 `checkReleasePr` does not need GitHub credentials. `releaseCheckedCommit` takes a pack-and-verify
-adapter; Git, GitHub, and npm use production defaults inside the engine.
+adapter; Git, GitHub, and npm use production defaults inside the engine. `ReleaseEnvironment`
+(`repository`, `token`, `fetch`) defaults to `GH_TOKEN`, `GITHUB_REPOSITORY`, and the global fetch at
+operation time, so callers can inject a fixture transport.
 
 ```ts
 type PackAndVerify = {
@@ -94,9 +101,10 @@ type PackAndVerify = {
 };
 ```
 
-The adapter stamps packed identity, builds, packs, verifies, and returns the durable
-`verified-release.tgz` bytes. Callers pass checkout root, package directory, and package name;
-the module does not derive the repository from its own path.
+The adapter stamps packed identity, builds, packs, verifies, and returns the package archive bytes.
+The engine records those bytes and re-verifies them against the intent before publication or retry.
+Callers pass checkout root, package directory, and package name; the module does not derive the
+repository from its own path.
 
 The package is ESM-only. Installation includes the pinned compiler and Effect runtime, while
 consumer bundlers can remove unused exports. Browser-safe helpers must have separate entries;

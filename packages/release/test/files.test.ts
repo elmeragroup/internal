@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { packageManifestGitPath, resolveReleasePackage } from "../src/config.ts";
+import { packageManifestGitPath, resolveReleasePackage } from "../src/files.ts";
 
 function withCheckout(run: (root: string) => void): void {
   const parent = mkdtempSync(join(tmpdir(), "elmera-release-config-"));
@@ -21,7 +21,7 @@ function writePackage(directory: string, name: string): void {
   writeFileSync(join(directory, "package.json"), `${JSON.stringify({ name, version: "0.0.0" })}\n`);
 }
 
-describe("release package config", () => {
+describe("release package resolution", () => {
   it("accepts a package that is not Internal", () => {
     withCheckout((root) => {
       const directory = join(root, "packages/app");

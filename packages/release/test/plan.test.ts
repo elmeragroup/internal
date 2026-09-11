@@ -1,4 +1,4 @@
-import { Schema } from "effect";
+import { Effect, Schema } from "effect";
 import { existsSync, mkdirSync, readFileSync, readdirSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -155,7 +155,7 @@ describe("canary base planning in the publisher's checkout", () => {
         expect(existsSync(join(workspace, ".git/refs/heads/main"))).toBe(false);
         writeChangeset(workspace, "minor-internal", packageName, "minor");
         const planned = plannedVersion(plannedPublicReleases(workspace));
-        expect(plannedCanaryBase("0.0.1", packageName, workspace)).toBe(planned);
+        expect(Effect.runSync(plannedCanaryBase("0.0.1", packageName, workspace))).toBe(planned);
       }, "detached");
     },
     workspaceTimeout
@@ -165,7 +165,7 @@ describe("canary base planning in the publisher's checkout", () => {
     "falls back to the next patch when no changeset is pending",
     () => {
       withPlannerWorkspace((workspace) => {
-        expect(plannedCanaryBase("0.2.9", packageName, workspace)).toBe("0.2.10");
+        expect(Effect.runSync(plannedCanaryBase("0.2.9", packageName, workspace))).toBe("0.2.10");
       }, "detached");
     },
     workspaceTimeout

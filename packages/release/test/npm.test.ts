@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
 
 import { readRegistry } from "../src/npm.ts";
@@ -8,54 +9,62 @@ const packageName = "@elmeragroup/internal";
 describe("registry failures", () => {
   it("looks up the requested package name", async () => {
     const requested: string[] = [];
-    await readRegistry("@acme/app", (url) => {
-      requested.push(url instanceof URL ? url.href : url instanceof Request ? url.url : url);
-      return Promise.resolve(new Response("", { status: 404 }));
-    });
+    await Effect.runPromise(
+      readRegistry("@acme/app", (url) => {
+        requested.push(url instanceof URL ? url.href : url instanceof Request ? url.url : url);
+        return Promise.resolve(new Response("", { status: 404 }));
+      })
+    );
     expect(requested).toEqual(["https://registry.npmjs.org/@acme%2fapp"]);
   });
   it("represents missing dist integrity as absence", async () => {
-    const registry = await readRegistry(packageName, () =>
-      Promise.resolve(
-        Response.json({
-          versions: { "0.1.0": { dist: {}, elmeraRelease: { commit } } },
-          "dist-tags": {},
-        })
+    const registry = await Effect.runPromise(
+      readRegistry(packageName, () =>
+        Promise.resolve(
+          Response.json({
+            versions: { "0.1.0": { dist: {}, elmeraRelease: { commit } } },
+            "dist-tags": {},
+          })
+        )
       )
     );
     expect(registry.versions.get("0.1.0")).toEqual({ integrity: undefined, commit });
   });
   it("treats only a real 404 as a new package", async () => {
-    expect(
-      (await readRegistry(packageName, () => Promise.resolve(new Response("", { status: 404 })))).versions
-        .size
-    ).toBe(0);
+    const registry = await Effect.runPromise(
+      readRegistry(packageName, () => Promise.resolve(new Response("", { status: 404 })))
+    );
+    expect(registry.versions.size).toBe(0);
   });
   it.each([401, 403, 429, 500])("fails closed for HTTP %s", async (status) => {
     await expect(
-      readRegistry(packageName, () => Promise.resolve(new Response("", { status })))
+      Effect.runPromise(readRegistry(packageName, () => Promise.resolve(new Response("", { status }))))
     ).rejects.toThrow("lookup failed");
   });
   it("does not turn network failures or malformed data into an empty registry", async () => {
-    await expect(readRegistry(packageName, () => Promise.reject(new Error("offline")))).rejects.toThrow(
-      "offline"
-    );
     await expect(
-      readRegistry(packageName, () => Promise.resolve(Response.json({ error: "invalid" })))
+      Effect.runPromise(readRegistry(packageName, () => Promise.reject(new Error("offline"))))
+    ).rejects.toThrow("offline");
+    await expect(
+      Effect.runPromise(readRegistry(packageName, () => Promise.resolve(Response.json({ error: "invalid" }))))
     ).rejects.toThrow();
   });
   it("names the malformed version in the decode cause", async () => {
-    const failure = await readRegistry(packageName, () =>
-      Promise.resolve(
-        Response.json({
-          versions: { "0.1.0": { dist: "not-an-object" } },
-          "dist-tags": {},
-        })
+    const failure = await Effect.runPromise(
+      Effect.flip(
+        readRegistry(packageName, () =>
+          Promise.resolve(
+            Response.json({
+              versions: { "0.1.0": { dist: "not-an-object" } },
+              "dist-tags": {},
+            })
+          )
+        )
       )
-    ).catch((error: Error) => error);
-    if (!(failure instanceof Error)) throw new Error("expected the registry read to fail");
+    );
+    expect(failure._tag).toBe("ReleaseError");
+    expect(failure.port).toBe("registry");
     expect(failure.message).toBe("npm registry is invalid");
-    if (!(failure.cause instanceof Error)) throw new Error("expected a decode cause");
-    expect(failure.cause.message).toContain('["versions"]["0.1.0"]["dist"]');
+    expect(failure.cause).toContain('["versions"]["0.1.0"]["dist"]');
   });
 });

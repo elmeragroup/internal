@@ -1,9 +1,12 @@
 import { Schema } from "effect";
+import type { Effect } from "effect";
 import { execFileSync } from "node:child_process";
 import { mkdirSync, rmSync } from "node:fs";
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
 
+import { lift } from "./errors.ts";
+import type { ReleaseError } from "./errors.ts";
 import { readJson } from "./json.ts";
 import { assertStableReleaseVersion, nextPatchVersion } from "./version.ts";
 
@@ -40,8 +43,8 @@ export function changesetBaseBranch(checkoutRoot: string): string {
 }
 
 /** The branch Changesets tracks, without the `origin/` prefix. */
-export function changesetTrackedBranch(checkoutRoot: string): string {
-  return changesetBaseBranch(checkoutRoot).slice("origin/".length);
+export function trackedBranchOf(baseBranch: string): string {
+  return baseBranch.slice("origin/".length);
 }
 
 /**
@@ -77,12 +80,18 @@ export function readReleasePlan(checkoutRoot: string): readonly PlannedRelease[]
 }
 
 /** The stable version a fresh canary counts up from: the planned release, else the next patch. */
-export function plannedCanaryBase(current: string, packageName: string, checkoutRoot: string): string {
-  const planned = readReleasePlan(checkoutRoot).filter(
-    (release) => release.name === packageName && release.type !== "none"
-  );
-  if (planned.length > 1) throw new Error("Multiple release plans for the public package");
-  const release = planned[0];
-  if (release === undefined) return nextPatchVersion(current);
-  return assertStableReleaseVersion(release.newVersion);
+export function plannedCanaryBase(
+  current: string,
+  packageName: string,
+  checkoutRoot: string
+): Effect.Effect<string, ReleaseError> {
+  return lift("plan", () => {
+    const planned = readReleasePlan(checkoutRoot).filter(
+      (release) => release.name === packageName && release.type !== "none"
+    );
+    if (planned.length > 1) throw new Error("Multiple release plans for the public package");
+    const release = planned[0];
+    if (release === undefined) return nextPatchVersion(current);
+    return assertStableReleaseVersion(release.newVersion);
+  });
 }

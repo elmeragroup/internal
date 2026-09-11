@@ -1,17 +1,19 @@
+import type { Effect } from "effect";
 import { execFileSync, spawnSync } from "node:child_process";
 
-import { PackageManifest } from "./config.ts";
+import { lift } from "./errors.ts";
+import type { ReleaseError } from "./errors.ts";
+import { PackageManifest } from "./files.ts";
 import { assertCommit } from "./intent.ts";
 import { decodeJson } from "./json.ts";
 import type { CommitAncestry } from "./policy.ts";
 import { assertStableReleaseVersion } from "./version.ts";
 
 export type GitPort = {
-  head: () => string;
-  originMain: () => string;
-  isClean: () => boolean;
-  stableVersionAt: (revision: string) => string;
-  isAncestor: CommitAncestry;
+  head: () => Effect.Effect<string, ReleaseError>;
+  originMain: () => Effect.Effect<string, ReleaseError>;
+  isClean: () => Effect.Effect<boolean, ReleaseError>;
+  stableVersionAt: (revision: string) => Effect.Effect<string, ReleaseError>;
 };
 
 function git(cwd: string, args: readonly string[]): string {
@@ -30,7 +32,7 @@ function isAncestor(cwd: string, ancestor: string, descendant: string): boolean 
   return result.status === 0;
 }
 
-/** Ancestry used by publication planning; does not need a remote-tracking ref. */
+/** Ancestry used by the engine's preconditions and by publication planning. */
 export function createCommitAncestry(cwd: string): CommitAncestry {
   return (ancestor, descendant) => isAncestor(cwd, ancestor, descendant);
 }
@@ -43,17 +45,17 @@ export function createCommitAncestry(cwd: string): CommitAncestry {
 export function createGitPort(cwd: string, packageManifest: string, remoteTrackingRef: string): GitPort {
   const manifest = packageManifest.replaceAll("\\", "/");
   return {
-    head: () => git(cwd, ["rev-parse", "HEAD"]),
-    originMain: () => git(cwd, ["rev-parse", remoteTrackingRef]),
-    isClean: () => git(cwd, ["status", "--porcelain", "--untracked-files=no"]) === "",
-    stableVersionAt: (revision) => {
-      const recorded = decodeJson(
-        git(cwd, ["show", `${revision}:${manifest}`]),
-        PackageManifest,
-        "recorded manifest"
-      );
-      return assertStableReleaseVersion(recorded.version);
-    },
-    isAncestor: createCommitAncestry(cwd),
+    head: () => lift("git", () => git(cwd, ["rev-parse", "HEAD"])),
+    originMain: () => lift("git", () => git(cwd, ["rev-parse", remoteTrackingRef])),
+    isClean: () => lift("git", () => git(cwd, ["status", "--porcelain", "--untracked-files=no"]) === ""),
+    stableVersionAt: (revision) =>
+      lift("git", () => {
+        const recorded = decodeJson(
+          git(cwd, ["show", `${revision}:${manifest}`]),
+          PackageManifest,
+          "recorded manifest"
+        );
+        return assertStableReleaseVersion(recorded.version);
+      }),
   };
 }

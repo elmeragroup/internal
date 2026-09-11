@@ -1,7 +1,9 @@
 import { Effect } from "effect";
 
-import { parseReleaseCommand, releaseCheckedCommit, retryRelease } from "../packages/release/src/index.ts";
+import { releaseCheckedCommit, retryRelease } from "@elmeragroup/release";
+
 import { createInternalPackAndVerify } from "./internal-pack-adapter.ts";
+import { parseReleaseCommand } from "./lib/release-command.ts";
 import { releasePackage } from "./release.ts";
 
 const command = parseReleaseCommand(process.argv.slice(2));

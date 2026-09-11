@@ -15,7 +15,11 @@ export type VerifiedRelease = ReleaseIntent & {
 };
 
 export const releaseRecordOwner = "elmera-release";
-export const verifiedBundleName = "verified-release.tgz";
+
+/** Asset name of the recorded archive on its GitHub draft release. */
+export const releaseArchiveName = "release.tgz";
+
+const canaryRecordPrefix = "canary-";
 
 const IntentDocument = Schema.Struct({
   schema: Schema.Literal(1),
@@ -34,13 +38,18 @@ export function assertCommit(commit: string): string {
   return commit;
 }
 
+/** Record tag for a canary release of `commit`. */
+export function canaryRecordTag(commit: string): string {
+  return `${canaryRecordPrefix}${commit}`;
+}
+
 export function releaseTag(intent: ReleaseIntent): string {
-  return intent.channel === "stable" ? `v${intent.version}` : `canary-${intent.commit}`;
+  return intent.channel === "stable" ? `v${intent.version}` : canaryRecordTag(intent.commit);
 }
 
 export function isReleaseTag(tag: string): boolean {
   if (tag.startsWith("v")) return isStableReleaseVersion(tag.slice(1));
-  return tag.startsWith("canary-") && isCommit(tag.slice("canary-".length));
+  return tag.startsWith(canaryRecordPrefix) && isCommit(tag.slice(canaryRecordPrefix.length));
 }
 
 export function assertReleaseTag(tag: string): string {

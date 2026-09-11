@@ -18,8 +18,13 @@ engine module does not call it at top level.
 
 ```ts
 checkReleasePr(pkg: ReleasePackage): Effect<void, ReleaseError>
-releaseCheckedCommit(pkg: ReleasePackage, adapter: PackAndVerify, commit: string): Effect<void, ReleaseError>
-retryRelease(pkg: ReleasePackage, recordTag: string): Effect<void, ReleaseError>
+releaseCheckedCommit(
+  pkg: ReleasePackage,
+  adapter: PackAndVerify,
+  commit: string,
+  environment?: ReleaseEnvironment
+): Effect<void, ReleaseError>
+retryRelease(pkg: ReleasePackage, recordTag: string, environment?: ReleaseEnvironment): Effect<void, ReleaseError>
 ```
 
 - `checkReleasePr` asserts a stable version bump against the remote-tracking base
@@ -27,10 +32,23 @@ retryRelease(pkg: ReleasePackage, recordTag: string): Effect<void, ReleaseError>
 - `releaseCheckedCommit` publishes the checked main-branch commit. Pack-and-verify is an argument,
   used only on this path. Git, GitHub, npm, and Changesets adapters are production defaults inside
   the engine.
-- `retryRelease` finishes a prepared record from its saved bundle bytes. It does not pack. A missing
-  or incomplete bundle keeps the current error: rerun the original Merge job.
+- `retryRelease` finishes a prepared record from its recorded archive. It does not pack. A missing
+  or incomplete record keeps the current error: rerun the original Merge job.
 
-Callers do not assemble production adapters for git, store, registry, or changesets.
+`ReleaseEnvironment` carries `repository`, `token`, and `fetch`. The default reads
+`GITHUB_REPOSITORY`, `GH_TOKEN`, and the global fetch when the operation runs, so tests and consumers
+can inject a fixture transport without patching globals.
+
+## Ports and errors
+
+Ports are `Effect`-native at the seam: git, the stable gate, the npm registry, Changesets planning,
+archive verification, and publication each return `Effect`. The GitHub record store and the npm CLI
+run promise- and process-based code lifted into that channel with `liftPromise` and `lift`. Every
+failure — wherever it is raised — surfaces as one `ReleaseError` (`Schema.TaggedError`,
+`_tag: "ReleaseError"`) carrying the `port` that raised it (`engine`, `pack`, `git`, `store`,
+`gate`, `registry`, `plan`, `archive`, or `publication`), its `message`, and an optional `cause`.
+Integrity and source mismatches are fatal: they are never retried as transient and never accepted
+as success. Registry confirmation polls on a `Schedule`; tests inject a zero interval.
 
 ## Pack-and-verify adapter
 
@@ -40,19 +58,13 @@ type PackAndVerify = {
 };
 ```
 
-The consumer stamps packed identity, builds, packs, verifies, and returns the durable bundle bytes.
-The engine uploads those bytes and restores them on retry. The shared engine does not hardcode
-`pnpm packages:pack` or Internal archive names.
+The consumer stamps packed identity, builds, packs, verifies, and returns the package archive bytes.
+The engine verifies those bytes against the intent, uploads them to the record, and re-verifies the
+same bytes on retry. The shared engine does not hardcode `pnpm packages:pack` or Internal archive
+names.
 
-`pack` may return a path's bytes; those bytes must remain valid until the engine copies them into
-the GitHub upload. Returning a `Uint8Array` is the supported contract.
-
-## Errors
-
-Expected failures are `ReleaseError` (`Schema.TaggedError`, `_tag: "ReleaseError"`, `message`, and
-optional `cause`). Integrity and source mismatches are fatal: they are never retried as transient
-and never accepted as success. Upload-then-reported-failure is reconciled from npm identity after
-the publish command. If that identity never appears, `cause` keeps the original npm error.
+`pack` must return bytes that remain valid until the engine copies them into the GitHub upload.
+Returning a `Uint8Array` is the supported contract.
 
 ## Tool prerequisites
 
@@ -69,13 +81,13 @@ Needed when operations run, not at import:
 
 ## Recovery and cleanup
 
-Scratch directories used to unpack a restored bundle are acquired with Effect `Scope` /
-`acquireRelease` and removed when the operation finishes or fails. **Process kill is not covered**
-by scoped cleanup; a killed process can leave temp directories and, for a consumer pack adapter that
+Archive verification materializes the bytes in a scratch directory acquired with Effect `Scope` /
+`acquireRelease`, removed when the operation finishes or fails. **Process kill is not covered** by
+scoped cleanup; a killed process can leave temp directories and, for a consumer pack adapter that
 rewrites the working tree, rewritten manifests.
 
-Retry restores the saved bundle bytes and verifies those exact bytes. If preparation never uploaded
-the bundle, retry refuses and the original Merge job must be rerun.
+Retry restores the recorded archive bytes and verifies those exact bytes. If preparation never
+uploaded the archive, retry refuses and the original Merge job must be rerun.
 
 New GitHub record bodies include `"owner": "elmera-release"`. Ownership is recognized before intent
 validation. An owned record with an invalid payload, unsupported schema, or mismatched tag is an

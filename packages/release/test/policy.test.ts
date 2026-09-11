@@ -1,9 +1,15 @@
 import { describe, expect, it } from "vitest";
 
 import type { ReleaseIntent, VerifiedRelease } from "../src/intent.ts";
-import { allocateCanary, canaryEligibility, distTagFor, planPublication } from "../src/policy.ts";
+import type { Registry } from "../src/npm.ts";
+import {
+  allocateCanary,
+  canaryEligibility,
+  distTagFor,
+  planPublication,
+  shouldPromote,
+} from "../src/policy.ts";
 import type { CommitAncestry } from "../src/policy.ts";
-import type { Registry } from "../src/registry.ts";
 
 const commit = "a".repeat(40);
 const newerCommit = "b".repeat(40);
@@ -310,6 +316,44 @@ describe("publication plan", () => {
   it("maps channel names onto npm dist-tags", () => {
     expect(distTagFor("canary")).toBe("canary");
     expect(distTagFor("stable")).toBe("latest");
+  });
+});
+
+describe("promotion decision", () => {
+  it("promotes a new release that takes its channel tag", () => {
+    expect(shouldPromote(canary, registry(), isAncestor)).toBe(true);
+    expect(shouldPromote(stable, registry(), isAncestor)).toBe(true);
+  });
+
+  it("does not promote an already-published canary that no longer owns the channel", () => {
+    const descendantStable = registry();
+    descendantStable.versions.set(canary.version, { commit, integrity: canary.integrity });
+    descendantStable.versions.set("0.2.0", { commit: newerCommit, integrity: "stable" });
+    const higherStable = registry();
+    higherStable.versions.set(canary.version, { commit, integrity: canary.integrity });
+    higherStable.versions.set("0.3.0", { integrity: "stable" });
+    for (const published of [descendantStable, higherStable]) {
+      expect(planPublication(canary, published, isAncestor)).toEqual({
+        kind: "publish",
+        upload: false,
+        promote: false,
+      });
+      expect(shouldPromote(canary, published, isAncestor)).toBe(false);
+    }
+  });
+
+  it("does not promote a canary that is superseded and absent from npm", () => {
+    const published = registry();
+    published.versions.set("0.2.0-canary.12", { commit: newerCommit, integrity: "newer" });
+    expect(planPublication(canary, published, isAncestor)).toEqual({ kind: "superseded" });
+    expect(shouldPromote(canary, published, isAncestor)).toBe(false);
+  });
+
+  it("does not promote a stable that already owns latest", () => {
+    const published = registry();
+    published.versions.set(stable.version, { commit, integrity: stable.integrity });
+    published.tags.set("latest", stable.version);
+    expect(shouldPromote(stable, published, isAncestor)).toBe(false);
   });
 });
 

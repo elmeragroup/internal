@@ -3,8 +3,8 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { resolveReleasePackage } from "../src/config.ts";
 import { checkReleasePr } from "../src/engine.ts";
+import { resolveReleasePackage } from "../src/files.ts";
 import { commitBaseline, withGitWorkspaceAsync, workspaceTimeout } from "./lib/git-workspace.ts";
 
 function writeStableCheckout(root: string, version: string, baseBranch = "origin/main"): void {

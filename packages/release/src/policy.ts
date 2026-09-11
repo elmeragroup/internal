@@ -1,5 +1,5 @@
 import type { ReleaseIntent, VerifiedRelease } from "./intent.ts";
-import type { Registry } from "./registry.ts";
+import type { Registry } from "./npm.ts";
 import {
   compareCanaryVersions,
   compareStableVersions,
@@ -177,4 +177,14 @@ export function planPublication(
     return published ? { kind: "publish", upload: false, promote: false } : { kind: "superseded" };
   }
   return { kind: "publish", upload: !published, promote: canaryTakesTag(release, registry) };
+}
+
+/** Promotion is re-decided against the registry read that confirmed the upload. */
+export function shouldPromote(
+  release: VerifiedRelease,
+  registry: Registry,
+  isAncestor: CommitAncestry
+): boolean {
+  const plan = planPublication(release, registry, isAncestor);
+  return plan.kind === "publish" && plan.promote;
 }

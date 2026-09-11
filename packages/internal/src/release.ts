@@ -1,10 +1,12 @@
 export {
+  assertCanaryReleaseVersion,
+  assertReleaseVersion,
   checkReleasePr,
-  parseReleaseCommand,
+  readManifestVersion,
   releaseCheckedCommit,
+  releaseEnvironment,
   resolveReleasePackage,
   retryRelease,
-  verifiedBundleName,
   ReleaseError,
 } from "@elmeragroup/release";
-export type { PackAndVerify, ReleaseCommand, ReleaseIntent, ReleasePackage } from "@elmeragroup/release";
+export type { PackAndVerify, ReleaseEnvironment, ReleaseIntent, ReleasePackage } from "@elmeragroup/release";

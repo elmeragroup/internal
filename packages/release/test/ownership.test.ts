@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseIntent, releaseRecordOwner, serializeIntent, verifiedBundleName } from "../src/intent.ts";
+import { parseIntent, releaseArchiveName, releaseRecordOwner, serializeIntent } from "../src/intent.ts";
 import type { ReleaseIntent } from "../src/intent.ts";
 import { classifyReleaseRecord } from "../src/ownership.ts";
 
@@ -45,13 +45,13 @@ describe("release record ownership", () => {
     );
   });
 
-  it("fails malformed unmarked schema-1 candidates and incomplete bundle records", () => {
+  it("fails malformed unmarked schema-1 candidates and incomplete archive records", () => {
     expect(() =>
       classifyReleaseRecord("v0.2.0", JSON.stringify({ schema: 1, channel: "stable", version: "0.2.0" }), [])
     ).toThrow("release intent is invalid");
-    expect(() => classifyReleaseRecord("v0.2.0", "not json", [verifiedBundleName])).toThrow(/JSON/);
+    expect(() => classifyReleaseRecord("v0.2.0", "not json", [releaseArchiveName])).toThrow(/JSON/);
     expect(() =>
-      classifyReleaseRecord("v0.2.0", JSON.stringify({ notes: "human" }), [verifiedBundleName])
+      classifyReleaseRecord("v0.2.0", JSON.stringify({ notes: "human" }), [releaseArchiveName])
     ).toThrow("release intent is invalid");
   });
 
@@ -59,7 +59,7 @@ describe("release record ownership", () => {
     expect(classifyReleaseRecord("v0.2.0", "Human release notes.", [])).toEqual({ kind: "foreign" });
     expect(
       classifyReleaseRecord("v0.2.0", JSON.stringify({ schema: 1, owner: "other-release", ...stable }), [
-        verifiedBundleName,
+        releaseArchiveName,
       ])
     ).toEqual({ kind: "foreign" });
   });
