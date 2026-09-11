@@ -6,10 +6,12 @@ import { extractStrings } from "../extract-strings.js";
 const RULE_NAME = "no-tailwind-dark-variant";
 
 /**
+ * Tailwind names the built-in dark axis `dark`; `not-dark` is its compound negation. Other
+ * `-dark` segments are named or custom variants (`data-dark:`, `theme-dark:`) and stay valid.
  * @param {string} segment
  */
 function isDarkSegment(segment) {
-  return segment === "dark" || segment.endsWith("-dark");
+  return segment === "dark" || segment === "not-dark";
 }
 
 /**

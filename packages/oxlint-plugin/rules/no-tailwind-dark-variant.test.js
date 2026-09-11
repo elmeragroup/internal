@@ -39,6 +39,18 @@ tester.run("elmera/no-tailwind-dark-variant", noTailwindDarkVariant, {
       code: `const el = <div className="dark-mode" />;\n`,
     },
     {
+      name: `"data-dark:bg-red-500" named data variant is not the dark axis`,
+      code: `const x = "data-dark:bg-red-500";\n`,
+    },
+    {
+      name: `"theme-dark:bg-red-500" custom named variant is not the dark axis`,
+      code: `const x = "theme-dark:bg-red-500";\n`,
+    },
+    {
+      name: `"hover:data-dark:bg-red-500" named data variant after another variant`,
+      code: `const x = "hover:data-dark:bg-red-500";\n`,
+    },
+    {
       name: `\`dark-\${tone}\` template is not a variant`,
       code: "const x = `dark-${tone}`;\n",
     },
