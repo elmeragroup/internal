@@ -24,7 +24,7 @@ const PackedManifest = Schema.Struct({
 /** Temporary directory removed when the surrounding Effect scope closes. Process kill is not covered. */
 function scratchDirectory(): Effect.Effect<string, ReleaseError, Scope.Scope> {
   return Effect.acquireRelease(
-    lift("archive", () => mkdtempSync(resolve(tmpdir(), "elmera-release-"))),
+    lift(() => mkdtempSync(resolve(tmpdir(), "elmera-release-"))),
     (directory) => Effect.sync(() => rmSync(directory, { recursive: true, force: true }))
   );
 }
@@ -40,7 +40,7 @@ export function verifyReleaseArchive(
 ): Effect.Effect<VerifiedRelease, ReleaseError, Scope.Scope> {
   return Effect.gen(function* () {
     const directory = yield* scratchDirectory();
-    return yield* lift("archive", () => {
+    return yield* lift(() => {
       const archive = resolve(directory, releaseArchiveName);
       writeFileSync(archive, bytes);
       const manifest = decodeJson(

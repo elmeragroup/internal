@@ -26,7 +26,10 @@ export type ReleaseStore = {
   reservedCanaryVersions: () => Effect.Effect<string[], ReleaseError>;
 };
 
-type CatalogEntry = { kind: "saved"; release: SavedRelease } | { kind: "foreign" };
+type CatalogEntry =
+  | { kind: "saved"; release: SavedRelease }
+  | { kind: "foreign" }
+  | { kind: "broken"; reason: string };
 type ReleaseCatalog = Map<string, CatalogEntry>;
 
 function assertSameIntent(saved: ReleaseIntent, intended: ReleaseIntent): void {
@@ -71,24 +74,36 @@ function savedReleaseFrom(value: GitHubRelease, intent: ReleaseIntent): SavedRel
   };
 }
 
-/** One record's catalog entry; ignored tags produce no entry. */
+/**
+ * One record's catalog entry. Ignored tags produce no entry; a record this owner cannot read
+ * becomes `broken` so one damaged release does not fail the whole catalog listing.
+ */
 function classifyCatalogEntry(value: GitHubRelease): CatalogEntry | undefined {
-  const classification = classifyReleaseRecord(value.tag_name, releaseBodyText(value), assetNames(value));
-  switch (classification.kind) {
-    case "ignored":
-      return undefined;
-    case "foreign":
-      return { kind: "foreign" };
-    case "owned":
-    case "legacy":
-      return { kind: "saved", release: savedReleaseFrom(value, classification.intent) };
+  try {
+    const classification = classifyReleaseRecord(value.tag_name, releaseBodyText(value), assetNames(value));
+    switch (classification.kind) {
+      case "ignored":
+        return undefined;
+      case "foreign":
+        return { kind: "foreign" };
+      case "owned":
+      case "legacy":
+        return { kind: "saved", release: savedReleaseFrom(value, classification.intent) };
+    }
+  } catch (cause) {
+    return {
+      kind: "broken",
+      reason: cause instanceof Error ? cause.message : "Unreadable release record",
+    };
   }
 }
 
-function recordIntent(value: GitHubRelease): ReleaseIntent {
+/** Builds a saved release from a response that must be a readable record of this owner. */
+function savedFromRecord(value: GitHubRelease): SavedRelease {
   const entry = classifyCatalogEntry(value);
-  if (entry?.kind !== "saved") throw new Error("A foreign GitHub release occupies the record tag");
-  return entry.release.intent;
+  if (entry?.kind === "saved") return entry.release;
+  if (entry?.kind === "broken") throw new Error(entry.reason);
+  throw new Error("A foreign GitHub release occupies the record tag");
 }
 
 export function createReleaseStore(client: GitHubClient, packageName: string): ReleaseStore {
@@ -105,9 +120,9 @@ export function createReleaseStore(client: GitHubClient, packageName: string): R
     return object.sha;
   }
 
-  async function assertTagMatchesCommit(saved: SavedRelease): Promise<void> {
-    const sha = await readTagSha(releaseTag(saved.intent));
-    if (sha !== saved.intent.commit) throw new Error("Release tag was moved from the release commit");
+  async function assertTagMatchesCommit(tag: string, saved: SavedRelease): Promise<void> {
+    const sha = await readTagSha(tag);
+    if (sha !== saved.intent.commit) throw new Error(`Release tag ${tag} was moved from the release commit`);
   }
 
   async function listReleases(): Promise<ReleaseCatalog> {
@@ -140,11 +155,14 @@ export function createReleaseStore(client: GitHubClient, packageName: string): R
   async function find(tag: string): Promise<SavedRelease | undefined> {
     // Listing with push access includes drafts, unlike the published-release-by-tag endpoint.
     const entry = (await releaseCatalog()).get(tag);
+    if (entry?.kind === "broken") {
+      throw new Error(`Release record ${tag} is damaged: ${entry.reason}`);
+    }
     if (entry?.kind === "foreign") {
-      throw new Error("A foreign GitHub release occupies the record tag");
+      throw new Error(`A foreign GitHub release occupies release record ${tag}`);
     }
     if (entry?.kind === "saved") {
-      await assertTagMatchesCommit(entry.release);
+      await assertTagMatchesCommit(tag, entry.release);
       return entry.release;
     }
     return undefined;
@@ -152,8 +170,8 @@ export function createReleaseStore(client: GitHubClient, packageName: string): R
 
   async function readSaved(id: number): Promise<SavedRelease> {
     const value = await client.jsonFrom(`${root}/releases/${String(id)}`, GitHubRelease, "GitHub release");
-    const saved = savedReleaseFrom(value, recordIntent(value));
-    await assertTagMatchesCommit(saved);
+    const saved = savedFromRecord(value);
+    await assertTagMatchesCommit(releaseTag(saved.intent), saved);
     await remember(saved);
     return saved;
   }
@@ -176,7 +194,7 @@ export function createReleaseStore(client: GitHubClient, packageName: string): R
         "created tag"
       );
     } else if (sha !== intent.commit) {
-      throw new Error("Existing release tag points to a different commit");
+      throw new Error(`Existing release tag ${tag} points to a different commit`);
     }
     const value = await client.json(
       await request(`${root}/releases`, {
@@ -193,7 +211,7 @@ export function createReleaseStore(client: GitHubClient, packageName: string): R
       GitHubRelease,
       "GitHub release"
     );
-    const created = savedReleaseFrom(value, recordIntent(value));
+    const created = savedFromRecord(value);
     assertSameIntent(created.intent, intent);
     await remember(created);
     return created;
@@ -260,11 +278,11 @@ export function createReleaseStore(client: GitHubClient, packageName: string): R
   }
 
   return {
-    find: (tag) => liftPromise("store", () => find(tag)),
-    create: (intent) => liftPromise("store", () => create(intent)),
-    upload: (release, bytes) => liftPromise("store", () => upload(release, bytes)),
-    download: (release) => liftPromise("store", () => download(release)),
-    complete: (release) => liftPromise("store", () => complete(release)),
-    reservedCanaryVersions: () => liftPromise("store", () => reservedCanaryVersions()),
+    find: (tag) => liftPromise(() => find(tag)),
+    create: (intent) => liftPromise(() => create(intent)),
+    upload: (release, bytes) => liftPromise(() => upload(release, bytes)),
+    download: (release) => liftPromise(() => download(release)),
+    complete: (release) => liftPromise(() => complete(release)),
+    reservedCanaryVersions: () => liftPromise(() => reservedCanaryVersions()),
   };
 }

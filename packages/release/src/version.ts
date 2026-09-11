@@ -93,7 +93,7 @@ function formatStableVersion(version: ParsedStableVersion): string {
   return `${version.major}.${version.minor}.${version.patch}`;
 }
 
-function formatCanaryVersion(version: ParsedCanaryVersion): string {
+export function formatCanaryVersion(version: ParsedCanaryVersion): string {
   return `${version.base}-canary.${version.n}`;
 }
 
@@ -119,16 +119,4 @@ export function compareCanaryVersions(left: string, right: string): number {
   const baseOrder = compareStableVersions(parsedLeft.base, parsedRight.base);
   if (baseOrder !== 0) return baseOrder;
   return parsedLeft.n === parsedRight.n ? 0 : parsedLeft.n > parsedRight.n ? 1 : -1;
-}
-
-export function nextCanaryVersion(base: string, published: readonly string[]): string {
-  parseStableVersion(base);
-  let highest = -1n;
-  for (const version of published) {
-    if (!isCanaryReleaseVersion(version)) continue;
-    const candidate = parseCanaryVersion(version);
-    if (candidate.base !== base) continue;
-    if (candidate.n > highest) highest = candidate.n;
-  }
-  return formatCanaryVersion({ base, n: highest + 1n });
 }

@@ -81,7 +81,7 @@ describe("verified publication", () => {
     const { registry, deps } = publication();
     deps.npm.publish.mockImplementation(() => {
       registry.versions.set(release.version, { commit, integrity: release.integrity });
-      return Effect.fail(new ReleaseError({ port: "publication", message: "connection lost" }));
+      return Effect.fail(new ReleaseError({ message: "connection lost" }));
     });
     await publish(release, deps);
     expect(deps.npm.publish).toHaveBeenCalledTimes(1);
@@ -109,15 +109,14 @@ describe("verified publication", () => {
 
   it("does not promote an unverified upload and retains the npm error", async () => {
     const { deps } = publication();
-    deps.npm.publish.mockImplementation(() =>
-      Effect.fail(new ReleaseError({ port: "publication", message: "connection lost" }))
-    );
-    await expect(publish(release, deps)).rejects.toMatchObject({
+    const npmError = new ReleaseError({ message: "connection lost" });
+    deps.npm.publish.mockImplementation(() => Effect.fail(npmError));
+    const failure = await Effect.runPromise(Effect.flip(publishVerifiedRelease(release, deps)));
+    expect(failure).toMatchObject({
       _tag: "ReleaseError",
-      port: "publication",
       message: "Publication could not be verified; retry the recorded release",
-      cause: "connection lost",
     });
+    expect(failure.cause).toBe(npmError);
     expect(deps.npm.publish).toHaveBeenCalledTimes(1);
     expect(deps.npm.promote).not.toHaveBeenCalled();
   });

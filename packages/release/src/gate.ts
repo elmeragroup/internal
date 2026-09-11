@@ -14,7 +14,7 @@ export type ReleaseLine = { channel: "stable"; version: string } | { channel: "c
 
 /** Reads the checked-out manifest's version and requires it to be a stable release version. */
 export function readStableVersion(packageDirectory: string): Effect.Effect<string, ReleaseError> {
-  return lift("gate", () => assertStableReleaseVersion(readManifestVersion(packageDirectory)));
+  return lift(() => assertStableReleaseVersion(readManifestVersion(packageDirectory)));
 }
 
 /** The release PR is complete only when its stable bump, changelog, and consumed changesets agree. */
@@ -24,7 +24,7 @@ export function assertStableBump(
   root: string,
   packageDirectory: string
 ): Effect.Effect<void, ReleaseError> {
-  return lift("gate", () => {
+  return lift(() => {
     assertStableReleaseVersion(previous);
     assertStableReleaseVersion(current);
     if (compareStableVersions(current, previous) <= 0) throw new Error("Stable version must increase");
@@ -84,7 +84,7 @@ export function createStableReleaseGate(
       const current = yield* readStableVersion(packageDirectory);
       if (current === previous) return { channel: "canary", current } as const;
       yield* assertStableBump(previous, current, root, packageDirectory);
-      yield* liftPromise("gate", () => assertMergedReleasePullRequest(client, commit, trackedBranch));
+      yield* liftPromise(() => assertMergedReleasePullRequest(client, commit, trackedBranch));
       return { channel: "stable", version: current } as const;
     });
 }

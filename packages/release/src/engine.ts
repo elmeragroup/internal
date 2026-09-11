@@ -16,7 +16,7 @@ import type { ReleaseIntent, VerifiedRelease } from "./intent.ts";
 import { createNpmPublisher, readRegistry } from "./npm.ts";
 import { changesetBaseBranch, plannedCanaryBase, trackedBranchOf } from "./plan.ts";
 import { allocateCanary, canaryEligibility } from "./policy.ts";
-import type { CanaryEligibility } from "./policy.ts";
+import type { CanarySupersession } from "./policy.ts";
 import { publishVerifiedRelease } from "./publication.ts";
 import type { PublicationDeps } from "./publication.ts";
 import { createReleaseStore } from "./store.ts";
@@ -43,11 +43,13 @@ export type EngineDeps = PublicationDeps & {
   log: (message: string) => void;
 };
 
-function skipReason(eligibility: Exclude<CanaryEligibility, "eligible">): string {
-  return eligibility === "canary-superseded"
+function skipReason(status: Exclude<CanarySupersession, "owned">): string {
+  return status === "canary-superseded"
     ? "Skipping a commit superseded by a published canary"
     : "Skipping a commit superseded by a stable release";
 }
+
+const regressedBaseSkip = "Skipping a commit superseded by a canary on a newer base";
 
 type RecordedRelease = {
   saved: SavedRelease;
@@ -67,7 +69,7 @@ function recordRelease(
       const release = yield* deps.verifyArchive(intent, bytes);
       return { saved, release };
     }
-    const bytes = yield* lift("pack", () => adapter.pack(intent));
+    const bytes = yield* lift(() => adapter.pack(intent));
     const release = yield* deps.verifyArchive(intent, bytes);
     const uploaded = yield* deps.store.upload(saved, bytes);
     return { saved: uploaded, release };
@@ -105,17 +107,19 @@ function mainReleaseIntent(
     if (recorded !== undefined) return recorded.intent;
     const base = yield* deps.plannedCanaryBase(line.current);
     const registry = yield* deps.readRegistry();
-    const eligibility = yield* lift("engine", () =>
+    const status = yield* lift(() =>
       canaryEligibility({ commit, current: line.current, base }, registry, deps.ancestry)
     );
-    if (eligibility !== "eligible") {
-      deps.log(skipReason(eligibility));
+    if (status !== "owned") {
+      deps.log(skipReason(status));
       return undefined;
     }
     const reserved = yield* deps.store.reservedCanaryVersions();
-    const version = yield* lift("engine", () =>
-      allocateCanary(base, [...registry.versions.keys(), ...reserved])
-    );
+    const version = yield* lift(() => allocateCanary(base, [...registry.versions.keys(), ...reserved]));
+    if (version === undefined) {
+      deps.log(regressedBaseSkip);
+      return undefined;
+    }
     return { channel: "canary", version, commit } as const;
   });
 }
@@ -124,13 +128,13 @@ function assertCheckedCommit(commit: string, deps: EngineDeps): Effect.Effect<vo
   return Effect.gen(function* () {
     const main = yield* deps.git.originMain();
     if ((yield* deps.git.head()) !== commit) {
-      return yield* new ReleaseError({ port: "engine", message: "Checkout differs from the checked commit" });
+      return yield* new ReleaseError({ message: "Checkout differs from the checked commit" });
     }
-    if (!(yield* lift("git", () => deps.ancestry(commit, main)))) {
-      return yield* new ReleaseError({ port: "engine", message: "Release source is not on main" });
+    if (!(yield* lift(() => deps.ancestry(commit, main)))) {
+      return yield* new ReleaseError({ message: "Release source is not on main" });
     }
     if (!(yield* deps.git.isClean())) {
-      return yield* new ReleaseError({ port: "engine", message: "Release requires a clean checkout" });
+      return yield* new ReleaseError({ message: "Release requires a clean checkout" });
     }
   });
 }
@@ -143,7 +147,7 @@ export function executeCheckedCommit(
   deps: EngineDeps
 ): Effect.Effect<void, ReleaseError, Scope.Scope> {
   return Effect.gen(function* () {
-    const checked = yield* lift("engine", () => assertCommit(commit));
+    const checked = yield* lift(() => assertCommit(commit));
     yield* assertCheckedCommit(checked, deps);
     const intent = yield* mainReleaseIntent(checked, deps);
     if (intent === undefined) return;
@@ -159,10 +163,10 @@ export function executeRetry(
   deps: EngineDeps
 ): Effect.Effect<void, ReleaseError, Scope.Scope> {
   return Effect.gen(function* () {
-    const tag = yield* lift("engine", () => assertReleaseTag(recordTag));
+    const tag = yield* lift(() => assertReleaseTag(recordTag));
     const saved = yield* deps.store.find(tag);
     if (saved === undefined) {
-      return yield* new ReleaseError({ port: "engine", message: "No prepared release exists for that tag" });
+      return yield* new ReleaseError({ message: "No prepared release exists for that tag" });
     }
     const bytes = yield* deps.store.download(saved);
     const release = yield* deps.verifyArchive(saved.intent, bytes);
@@ -210,34 +214,45 @@ function liveDeps(pkg: ReleasePackage, environment: ReleaseEnvironment): EngineD
   };
 }
 
-export function checkReleasePr(pkg: ReleasePackage): Effect.Effect<void, ReleaseError> {
-  return Effect.gen(function* () {
-    const baseBranch = yield* lift("plan", () => changesetBaseBranch(pkg.checkoutRoot));
-    yield* executeCheckReleasePr(pkg, liveGit(pkg, baseBranch), baseBranch);
-  });
-}
-
-export function releaseCheckedCommit(
+function withLiveDeps<A>(
   pkg: ReleasePackage,
-  adapter: PackAndVerify,
-  commit: string,
-  environment?: ReleaseEnvironment
-): Effect.Effect<void, ReleaseError> {
+  environment: () => ReleaseEnvironment,
+  run: (deps: EngineDeps) => Effect.Effect<A, ReleaseError, Scope.Scope>
+): Effect.Effect<A, ReleaseError> {
   return Effect.gen(function* () {
-    const resolved = environment ?? releaseEnvironment();
-    const deps = yield* lift("engine", () => liveDeps(pkg, resolved));
-    yield* executeCheckedCommit(pkg, adapter, commit, deps);
+    const deps = yield* lift(() => liveDeps(pkg, environment()));
+    return yield* run(deps);
   }).pipe(Effect.scoped);
 }
 
-export function retryRelease(
-  pkg: ReleasePackage,
-  recordTag: string,
-  environment?: ReleaseEnvironment
-): Effect.Effect<void, ReleaseError> {
-  return Effect.gen(function* () {
-    const resolved = environment ?? releaseEnvironment();
-    const deps = yield* lift("engine", () => liveDeps(pkg, resolved));
-    yield* executeRetry(pkg, recordTag, deps);
-  }).pipe(Effect.scoped);
+/** The shipped operations with a transport seam that is not part of the public package surface. */
+export type ReleaseOperations = {
+  checkReleasePr: (pkg: ReleasePackage) => Effect.Effect<void, ReleaseError>;
+  releaseCheckedCommit: (
+    pkg: ReleasePackage,
+    adapter: PackAndVerify,
+    commit: string
+  ) => Effect.Effect<void, ReleaseError>;
+  retryRelease: (pkg: ReleasePackage, recordTag: string) => Effect.Effect<void, ReleaseError>;
+};
+
+/** Builds the operations against an injectable transport; production callers get `releaseEnvironment`. */
+export function createReleaseOperations(environment: () => ReleaseEnvironment): ReleaseOperations {
+  return {
+    checkReleasePr: (pkg) =>
+      Effect.gen(function* () {
+        const baseBranch = yield* lift(() => changesetBaseBranch(pkg.checkoutRoot));
+        yield* executeCheckReleasePr(pkg, liveGit(pkg, baseBranch), baseBranch);
+      }),
+    releaseCheckedCommit: (pkg, adapter, commit) =>
+      withLiveDeps(pkg, environment, (deps) => executeCheckedCommit(pkg, adapter, commit, deps)),
+    retryRelease: (pkg, recordTag) =>
+      withLiveDeps(pkg, environment, (deps) => executeRetry(pkg, recordTag, deps)),
+  };
 }
+
+const production = createReleaseOperations(releaseEnvironment);
+
+export const checkReleasePr = production.checkReleasePr;
+export const releaseCheckedCommit = production.releaseCheckedCommit;
+export const retryRelease = production.retryRelease;

@@ -1,5 +1,4 @@
-import { Effect, Result, Schedule } from "effect";
-import type { Duration } from "effect";
+import { Duration, Effect, Result, Schedule } from "effect";
 
 import { lift, ReleaseError } from "./errors.ts";
 import type { VerifiedRelease } from "./intent.ts";
@@ -15,12 +14,19 @@ export type PublicationDeps = {
   confirmationInterval: Duration.Input;
 };
 
-const propagationAttempts = 6;
+const propagationAttempts = 10;
+/** Each retry doubles `confirmationInterval`, capped so a slow packument gets minutes, not seconds. */
+const maxConfirmationDelay = Duration.seconds(30);
 
 const unverifiedPublication = "Publication could not be verified; retry the recorded release";
 
 function confirmationSchedule(interval: Duration.Input) {
-  return Schedule.recurs(propagationAttempts - 1).pipe(Schedule.addDelay(() => Effect.succeed(interval)));
+  const base = Duration.fromInputUnsafe(interval);
+  return Schedule.recurs(propagationAttempts - 1).pipe(
+    Schedule.addDelay((metadata) =>
+      Effect.succeed(Duration.min(Duration.times(base, 2 ** metadata.output), maxConfirmationDelay))
+    )
+  );
 }
 
 /** Polls the registry until `isVisible` holds or `propagationAttempts` is exhausted. */
@@ -30,7 +36,7 @@ function confirmRegistry(
 ): Effect.Effect<Registry | undefined, ReleaseError> {
   return Effect.gen(function* () {
     const registry = yield* deps.readRegistry();
-    const visible = yield* lift("publication", () => isVisible(registry));
+    const visible = yield* lift(() => isVisible(registry));
     return visible ? registry : undefined;
   }).pipe(
     Effect.repeat({
@@ -51,12 +57,11 @@ function uploadAndConfirm(
     if (confirmed !== undefined) return confirmed;
     if (Result.isFailure(published)) {
       return yield* new ReleaseError({
-        port: "publication",
         message: unverifiedPublication,
-        cause: published.failure.cause ?? published.failure.message,
+        cause: published.failure,
       });
     }
-    return yield* new ReleaseError({ port: "publication", message: unverifiedPublication });
+    return yield* new ReleaseError({ message: unverifiedPublication });
   });
 }
 
@@ -70,7 +75,6 @@ function promoteAndConfirm(
     const confirmed = yield* confirmRegistry(deps, (registry) => registry.tags.get(tag) === release.version);
     if (confirmed === undefined) {
       return yield* new ReleaseError({
-        port: "publication",
         message: `npm ${tag} update is not visible; retry the recorded release`,
       });
     }
@@ -83,10 +87,10 @@ export function publishVerifiedRelease(
 ): Effect.Effect<"published" | "superseded", ReleaseError> {
   return Effect.gen(function* () {
     const registry = yield* deps.readRegistry();
-    const intended = yield* lift("publication", () => planPublication(release, registry, deps.ancestry));
+    const intended = yield* lift(() => planPublication(release, registry, deps.ancestry));
     if (intended.kind === "superseded") return "superseded";
     const confirmed = intended.upload ? yield* uploadAndConfirm(release, deps) : registry;
-    const promote = yield* lift("publication", () => shouldPromote(release, confirmed, deps.ancestry));
+    const promote = yield* lift(() => shouldPromote(release, confirmed, deps.ancestry));
     if (promote) yield* promoteAndConfirm(release, deps);
     return "published";
   });

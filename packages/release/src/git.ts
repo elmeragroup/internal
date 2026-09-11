@@ -45,11 +45,11 @@ export function createCommitAncestry(cwd: string): CommitAncestry {
 export function createGitPort(cwd: string, packageManifest: string, remoteTrackingRef: string): GitPort {
   const manifest = packageManifest.replaceAll("\\", "/");
   return {
-    head: () => lift("git", () => git(cwd, ["rev-parse", "HEAD"])),
-    originMain: () => lift("git", () => git(cwd, ["rev-parse", remoteTrackingRef])),
-    isClean: () => lift("git", () => git(cwd, ["status", "--porcelain", "--untracked-files=no"]) === ""),
+    head: () => lift(() => git(cwd, ["rev-parse", "HEAD"])),
+    originMain: () => lift(() => git(cwd, ["rev-parse", remoteTrackingRef])),
+    isClean: () => lift(() => git(cwd, ["status", "--porcelain", "--untracked-files=no"]) === ""),
     stableVersionAt: (revision) =>
-      lift("git", () => {
+      lift(() => {
         const recorded = decodeJson(
           git(cwd, ["show", `${revision}:${manifest}`]),
           PackageManifest,

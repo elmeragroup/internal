@@ -81,19 +81,14 @@ The operations return Effect:
 
 ```ts
 checkReleasePr(pkg: ReleasePackage): Effect<void, ReleaseError>
-releaseCheckedCommit(
-  pkg: ReleasePackage,
-  adapter: PackAndVerify,
-  commit: string,
-  environment?: ReleaseEnvironment
-): Effect<void, ReleaseError>
-retryRelease(pkg: ReleasePackage, recordTag: string, environment?: ReleaseEnvironment): Effect<void, ReleaseError>
+releaseCheckedCommit(pkg: ReleasePackage, adapter: PackAndVerify, commit: string): Effect<void, ReleaseError>
+retryRelease(pkg: ReleasePackage, recordTag: string): Effect<void, ReleaseError>
 ```
 
 `checkReleasePr` does not need GitHub credentials. `releaseCheckedCommit` takes a pack-and-verify
-adapter; Git, GitHub, and npm use production defaults inside the engine. `ReleaseEnvironment`
-(`repository`, `token`, `fetch`) defaults to `GH_TOKEN`, `GITHUB_REPOSITORY`, and the global fetch at
-operation time, so callers can inject a fixture transport.
+adapter; Git, GitHub, and npm use production defaults inside the engine, reading `GH_TOKEN` and
+`GITHUB_REPOSITORY` when an operation runs. The transport seam used by tests stays internal to the
+private release package.
 
 ```ts
 type PackAndVerify = {

@@ -43,7 +43,6 @@ assert.ok(release.releaseCheckedCommit);
 assert.ok(release.checkReleasePr);
 assert.ok(release.retryRelease);
 assert.ok(release.resolveReleasePackage);
-assert.ok(release.releaseEnvironment);
 assert.ok(release.readManifestVersion);
 assert.ok(release.assertReleaseVersion);
 assert.ok(release.assertCanaryReleaseVersion);

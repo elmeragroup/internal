@@ -3,16 +3,17 @@ import type { Registry } from "./npm.ts";
 import {
   compareCanaryVersions,
   compareStableVersions,
+  formatCanaryVersion,
   isCanaryReleaseVersion,
   isStableReleaseVersion,
-  nextCanaryVersion,
   parseCanaryVersion,
   parseStableVersion,
 } from "./version.ts";
 
 export type CommitAncestry = (ancestor: string, descendant: string) => boolean;
 
-export type CanaryEligibility = "eligible" | "canary-superseded" | "stable-superseded";
+/** Whether a commit still owns its canary channel, or which published release already covers it. */
+export type CanarySupersession = "owned" | "canary-superseded" | "stable-superseded";
 
 export type PublicationPlan = { kind: "superseded" } | { kind: "publish"; upload: boolean; promote: boolean };
 
@@ -74,38 +75,58 @@ export type CanaryTarget = {
   base: string;
 };
 
+/**
+ * Whether `commit` still owns the canary channel at `base`. Ancestry covers published canaries and
+ * published stables from descendant commits; the base comparison covers stables at or above the base.
+ * Callers pass the version of their durable record so a published canary for the same commit and
+ * version is owned rather than a conflict.
+ */
+export function canarySupersession(
+  commit: string,
+  base: string,
+  registry: Registry,
+  isAncestor: CommitAncestry,
+  recordedVersion?: string
+): CanarySupersession {
+  const history = canaryHistory(commit, registry, isAncestor);
+  if (history.publishedVersion !== undefined && history.publishedVersion !== recordedVersion) {
+    throw new Error(conflictingCanaryVersion);
+  }
+  if (history.superseded) return "canary-superseded";
+  if (descendantStableSupersedes(commit, registry, isAncestor)) return "stable-superseded";
+  const highestStable = highestStableVersion(registry);
+  if (highestStable !== undefined && compareStableVersions(highestStable, base) >= 0) {
+    return "stable-superseded";
+  }
+  return "owned";
+}
+
 /** Whether a fresh canary may be cut for this commit, or which published release already covers it. */
 export function canaryEligibility(
   target: CanaryTarget,
   registry: Registry,
   isAncestor: CommitAncestry
-): CanaryEligibility {
+): CanarySupersession {
   if (compareStableVersions(target.base, target.current) <= 0) {
     throw new Error("The planned version must advance the stable version");
   }
-  const history = canaryHistory(target.commit, registry, isAncestor);
-  if (history.publishedVersion !== undefined) throw new Error(conflictingCanaryVersion);
-  if (history.superseded) return "canary-superseded";
-  const highestStable = highestStableVersion(registry);
-  // The base advances past the checked-out version, so this one comparison also covers
-  // "a stable release already reaches the base" — the test `canaryOwnsChannel` makes when
-  // republishing a recorded canary, and the reason `allocateCanary` need not repeat it.
-  if (highestStable !== undefined && compareStableVersions(highestStable, target.current) > 0) {
-    return "stable-superseded";
-  }
-  return "eligible";
+  return canarySupersession(target.commit, target.base, registry, isAncestor);
 }
 
-export function allocateCanary(base: string, versions: readonly string[]): string {
+/**
+ * Allocates the next canary number for `base`, or reports `undefined` when a published or reserved
+ * canary already belongs to a newer base. A regressed base skips; it never blocks publication.
+ */
+export function allocateCanary(base: string, versions: readonly string[]): string | undefined {
   parseStableVersion(base);
+  let highest = -1n;
   for (const version of versions) {
     if (!isCanaryReleaseVersion(version)) continue;
     const candidate = parseCanaryVersion(version);
-    if (compareStableVersions(candidate.base, base) > 0) {
-      throw new Error(`Canary base ${base} is older than ${version}`);
-    }
+    if (compareStableVersions(candidate.base, base) > 0) return undefined;
+    if (candidate.base === base && candidate.n > highest) highest = candidate.n;
   }
-  return nextCanaryVersion(base, versions);
+  return formatCanaryVersion({ base, n: highest + 1n });
 }
 
 /** Whether npm already carries this exact archive; a same-version mismatch is fatal. */
@@ -129,21 +150,6 @@ function descendantStableSupersedes(commit: string, registry: Registry, isAncest
   return false;
 }
 
-function canaryOwnsChannel(release: ReleaseIntent, registry: Registry, isAncestor: CommitAncestry): boolean {
-  const history = canaryHistory(release.commit, registry, isAncestor);
-  if (history.publishedVersion !== undefined && history.publishedVersion !== release.version) {
-    throw new Error(conflictingCanaryVersion);
-  }
-  if (history.superseded) return false;
-  // A descendant published stable supersedes this recorded canary even when that stable
-  // version is below the canary's planned base. Stables without commit metadata stay on
-  // the version comparison below.
-  if (descendantStableSupersedes(release.commit, registry, isAncestor)) return false;
-  const { base } = parseCanaryVersion(release.version);
-  const highestStable = highestStableVersion(registry);
-  return highestStable === undefined || compareStableVersions(highestStable, base) < 0;
-}
-
 function stableTakesLatest(release: ReleaseIntent, registry: Registry): boolean {
   const current = registry.tags.get(distTagFor(release.channel));
   if (current === undefined) return true;
@@ -158,7 +164,7 @@ function canaryTakesTag(release: ReleaseIntent, registry: Registry): boolean {
   const current = registry.tags.get(distTagFor(release.channel));
   if (current === undefined) return true;
   if (current === release.version) return false;
-  // Reachable only once canaryOwnsChannel accepted this commit's ancestry, so a tagged canary that
+  // Reachable only once canarySupersession accepted this commit's ancestry, so a tagged canary that
   // records its source commit is behind us. Versions predating that metadata fall back to suffix order.
   if (registry.versions.get(current)?.commit !== undefined) return true;
   return compareCanaryVersions(release.version, current) > 0;
@@ -173,7 +179,15 @@ export function planPublication(
   if (release.channel === "stable") {
     return { kind: "publish", upload: !published, promote: stableTakesLatest(release, registry) };
   }
-  if (!canaryOwnsChannel(release, registry, isAncestor)) {
+  const ownsChannel =
+    canarySupersession(
+      release.commit,
+      parseCanaryVersion(release.version).base,
+      registry,
+      isAncestor,
+      release.version
+    ) === "owned";
+  if (!ownsChannel) {
     return published ? { kind: "publish", upload: false, promote: false } : { kind: "superseded" };
   }
   return { kind: "publish", upload: !published, promote: canaryTakesTag(release, registry) };

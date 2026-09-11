@@ -63,8 +63,11 @@ describe("registry failures", () => {
       )
     );
     expect(failure._tag).toBe("ReleaseError");
-    expect(failure.port).toBe("registry");
     expect(failure.message).toBe("npm registry is invalid");
-    expect(failure.cause).toContain('["versions"]["0.1.0"]["dist"]');
+    const decodeError = failure.cause;
+    if (!(decodeError instanceof Error)) throw new Error("expected a wrapped decode error");
+    const schemaError = decodeError.cause;
+    if (!(schemaError instanceof Error)) throw new Error("expected a wrapped schema error");
+    expect(schemaError.message).toContain('["versions"]["0.1.0"]["dist"]');
   });
 });

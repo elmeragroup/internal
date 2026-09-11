@@ -5,7 +5,13 @@ import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 
 import type { EngineDeps, PackAndVerify } from "../src/engine.ts";
-import { executeCheckedCommit, executeRetry, releaseCheckedCommit, retryRelease } from "../src/engine.ts";
+import {
+  createReleaseOperations,
+  executeCheckedCommit,
+  executeRetry,
+  releaseCheckedCommit,
+  retryRelease,
+} from "../src/engine.ts";
 import { ReleaseError } from "../src/errors.ts";
 import type { ReleasePackage } from "../src/files.ts";
 import type { ReleaseLine } from "../src/gate.ts";
@@ -28,346 +34,323 @@ const pkg: ReleasePackage = {
   packageName: "@acme/app",
 };
 
-function memoryStore(seed: readonly SavedRelease[] = []) {
-  const byTag = new Map<string, SavedRelease>(seed.map((saved) => [releaseTag(saved.intent), saved]));
-  const uploaded: Uint8Array[] = [];
-  const store: ReleaseStore & { uploaded: Uint8Array[] } = {
-    uploaded,
-    find: vi.fn((tag: string) => Effect.succeed(byTag.get(tag))),
-    create: vi.fn((intent: ReleaseIntent) =>
+const stableLine: ReleaseLine = { channel: "stable", version: "0.2.0" };
+const canaryLine: ReleaseLine = { channel: "canary", current: "0.1.9" };
+
+const linearHistory: CommitAncestry = (ancestor, descendant) =>
+  ancestor === descendant || (ancestor === commit && descendant === newerCommit);
+
+const emptyRegistry = (): Registry => ({ versions: new Map(), tags: new Map() });
+
+type Outcome = {
+  created: ReleaseIntent[];
+  verified: { intent: ReleaseIntent; bytes: Uint8Array }[];
+  uploaded: Uint8Array[];
+  completed: number[];
+  published: string[];
+  promoted: { version: string; tag: string }[];
+  logs: string[];
+};
+
+type HarnessOptions = {
+  line?: ReleaseLine;
+  base?: string;
+  registry?: Registry;
+  seed?: readonly SavedRelease[];
+  isAncestor?: CommitAncestry;
+  git?: Partial<GitPort>;
+};
+
+function harness(options: HarnessOptions = {}) {
+  const registry = options.registry ?? emptyRegistry();
+  const byTag = new Map<string, SavedRelease>(
+    (options.seed ?? []).map((saved) => [releaseTag(saved.intent), saved])
+  );
+  const outcome: Outcome = {
+    created: [],
+    verified: [],
+    uploaded: [],
+    completed: [],
+    published: [],
+    promoted: [],
+    logs: [],
+  };
+  let verified: VerifiedRelease | undefined;
+
+  const store: ReleaseStore = {
+    find: (tag) => Effect.succeed(byTag.get(tag)),
+    create: (intent) =>
       Effect.sync(() => {
-        const tag = releaseTag(intent);
-        const existing = byTag.get(tag);
+        const existing = byTag.get(releaseTag(intent));
         if (existing !== undefined) return existing;
+        outcome.created.push(intent);
         const saved: SavedRelease = { id: byTag.size + 1, intent, asset: { state: "missing" } };
-        byTag.set(tag, saved);
+        byTag.set(releaseTag(intent), saved);
         return saved;
-      })
-    ),
-    upload: vi.fn((release: SavedRelease, bytes: Uint8Array) =>
+      }),
+    upload: (release, bytes) =>
       Effect.sync(() => {
-        uploaded.push(bytes);
+        outcome.uploaded.push(bytes);
         const saved: SavedRelease = {
           id: release.id,
           intent: release.intent,
           asset: { state: "uploaded", id: 9 },
         };
-        byTag.set(releaseTag(release.intent), saved);
+        byTag.set(releaseTag(saved.intent), saved);
         return saved;
-      })
-    ),
-    download: vi.fn((release: SavedRelease) =>
+      }),
+    download: (release) =>
       release.asset.state === "uploaded"
         ? Effect.succeed(storedArchive)
         : Effect.fail(
             new ReleaseError({
-              port: "store",
               message:
                 "Release preparation is incomplete; rerun its original Merge job before retrying publication",
             })
-          )
-    ),
-    complete: vi.fn(() => Effect.void),
-    reservedCanaryVersions: vi.fn(() =>
+          ),
+    complete: (release) =>
+      Effect.sync(() => {
+        outcome.completed.push(release.id);
+      }),
+    reservedCanaryVersions: () =>
       Effect.succeed(
         [...byTag.values()]
           .filter((saved) => saved.intent.channel === "canary")
           .map((saved) => saved.intent.version)
-      )
-    ),
+      ),
   };
-  return store;
-}
 
-type PipelineOptions = {
-  current?: string;
-  previous?: string;
-  seed?: readonly SavedRelease[];
-  registry?: Registry;
-  isAncestor?: CommitAncestry;
-  git?: Partial<GitPort>;
-};
+  const npm = {
+    publish: (_archive: string) =>
+      Effect.sync(() => {
+        if (verified === undefined) throw new Error("expected a verified release");
+        outcome.published.push(verified.version);
+        registry.versions.set(verified.version, { commit: verified.commit, integrity: verified.integrity });
+      }),
+    promote: (version: string, tag: string) =>
+      Effect.sync(() => {
+        outcome.promoted.push({ version, tag });
+        registry.tags.set(tag, version);
+      }),
+  };
 
-const emptyRegistry = (): Registry => ({ versions: new Map(), tags: new Map() });
-
-const linearHistory: CommitAncestry = (ancestor, descendant) =>
-  ancestor === descendant || (ancestor === commit && descendant === newerCommit);
-
-function pipeline(options: PipelineOptions = {}) {
-  const store = memoryStore(options.seed);
-  const current = options.current ?? "0.1.9";
-  const previous = options.previous ?? current;
-  const registry = options.registry ?? emptyRegistry();
-  let verified: VerifiedRelease | undefined;
-  const stableVersionAt = vi.fn((revision: string) =>
-    revision === `${commit}^1`
-      ? Effect.succeed(previous)
-      : Effect.fail(
-          new ReleaseError({ port: "git", message: `No recorded manifest version for ${revision}` })
-        )
-  );
   const git: GitPort = {
     head: () => Effect.succeed(commit),
     originMain: () => Effect.succeed(commit),
     isClean: () => Effect.succeed(true),
-    stableVersionAt,
+    stableVersionAt: () => Effect.succeed("0.1.9"),
     ...options.git,
   };
-  const adapter: PackAndVerify = {
-    pack: vi.fn(() => packedArchive),
-  };
-  const verifyArchive = vi.fn((intent: ReleaseIntent, _bytes: Uint8Array) => {
-    verified = { ...intent, archive: "/verified/release.tgz", integrity: "sha512-test" };
-    return Effect.succeed(verified);
-  });
-  const publish = vi.fn(
-    (_archive: string): Effect.Effect<void, ReleaseError> =>
-      Effect.sync(() => {
-        if (verified !== undefined) {
-          registry.versions.set(verified.version, { commit: verified.commit, integrity: verified.integrity });
-        }
-      })
-  );
-  const promote = vi.fn(
-    (version: string, tag: string): Effect.Effect<void, ReleaseError> =>
-      Effect.sync(() => {
-        registry.tags.set(tag, version);
-      })
-  );
-  const stableGate = vi.fn((_commit: string, seen: string) =>
-    Effect.succeed<ReleaseLine>(
-      current === seen ? { channel: "canary", current } : { channel: "stable", version: current }
-    )
-  );
-  const plannedCanaryBase = vi.fn(() => Effect.succeed("0.2.0"));
-  const readRegistry = vi.fn(() => Effect.succeed(registry));
-  const bindings = {
+
+  const deps: EngineDeps = {
     git,
     ancestry: options.isAncestor ?? linearHistory,
     store,
-    readRegistry,
-    npm: { publish, promote },
+    readRegistry: () => Effect.succeed(registry),
+    npm,
     confirmationInterval: 0,
-    stableGate,
-    plannedCanaryBase,
-    verifyArchive,
-    log: vi.fn(),
-  } satisfies EngineDeps;
-  return {
-    bindings,
-    store,
-    adapter,
-    verifyArchive,
-    readRegistry,
-    publish,
-    promote,
-    stableGate,
-    plannedCanaryBase,
-    stableVersionAt,
+    stableGate: () => Effect.succeed(options.line ?? canaryLine),
+    plannedCanaryBase: () => Effect.succeed(options.base ?? "0.2.0"),
+    verifyArchive: (intent, bytes) => {
+      outcome.verified.push({ intent, bytes });
+      verified = { ...intent, archive: "/verified/release.tgz", integrity: "sha512-test" };
+      return Effect.succeed(verified);
+    },
+    log: (message) => {
+      outcome.logs.push(message);
+    },
   };
+
+  const adapter: PackAndVerify = { pack: vi.fn(() => packedArchive) };
+  return { deps, adapter, outcome, store, registry };
 }
 
-function runMain(commitSha: string, bindings: EngineDeps, adapter: PackAndVerify): Promise<void> {
-  return Effect.runPromise(executeCheckedCommit(pkg, adapter, commitSha, bindings).pipe(Effect.scoped));
+function runMain(commitSha: string, deps: EngineDeps, adapter: PackAndVerify): Promise<void> {
+  return Effect.runPromise(executeCheckedCommit(pkg, adapter, commitSha, deps).pipe(Effect.scoped));
 }
 
-function runRetry(tag: string, bindings: EngineDeps): Promise<void> {
-  return Effect.runPromise(executeRetry(pkg, tag, bindings).pipe(Effect.scoped));
+function runRetry(tag: string, deps: EngineDeps): Promise<void> {
+  return Effect.runPromise(executeRetry(pkg, tag, deps).pipe(Effect.scoped));
+}
+
+function canaryIntent(version: string): ReleaseIntent {
+  return { channel: "canary", version, commit };
 }
 
 describe("main release preconditions", () => {
   it("refuses a checkout that is not the checked commit", async () => {
-    const { bindings, store, adapter } = pipeline({ git: { head: () => Effect.succeed(newerCommit) } });
-    await expect(runMain(commit, bindings, adapter)).rejects.toThrow(
-      "Checkout differs from the checked commit"
-    );
-    expect(store.create).not.toHaveBeenCalled();
+    const { deps, adapter, outcome } = harness({ git: { head: () => Effect.succeed(newerCommit) } });
+    await expect(runMain(commit, deps, adapter)).rejects.toThrow("Checkout differs from the checked commit");
+    expect(outcome.created).toEqual([]);
   });
 
   it("refuses a commit that is not on main", async () => {
-    const { bindings, store, adapter } = pipeline({
-      git: { originMain: () => Effect.succeed(newerCommit) },
-      isAncestor: () => false,
-    });
-    await expect(runMain(commit, bindings, adapter)).rejects.toThrow("Release source is not on main");
-    expect(store.create).not.toHaveBeenCalled();
+    const { deps, adapter, outcome } = harness({ isAncestor: () => false });
+    await expect(runMain(commit, deps, adapter)).rejects.toThrow("Release source is not on main");
+    expect(outcome.created).toEqual([]);
   });
 
   it("refuses a dirty checkout", async () => {
-    const { bindings, store, adapter } = pipeline({ git: { isClean: () => Effect.succeed(false) } });
-    await expect(runMain(commit, bindings, adapter)).rejects.toThrow("Release requires a clean checkout");
-    expect(store.create).not.toHaveBeenCalled();
-  });
-
-  it("compares the manifest against the parent of the released commit", async () => {
-    const { bindings, adapter, stableVersionAt, stableGate } = pipeline({
-      current: "0.2.0",
-      previous: "0.1.9",
-    });
-    await runMain(commit, bindings, adapter);
-    expect(stableVersionAt).toHaveBeenCalledWith(`${commit}^1`);
-    expect(stableGate).toHaveBeenCalledWith(commit, "0.1.9");
+    const { deps, adapter, outcome } = harness({ git: { isClean: () => Effect.succeed(false) } });
+    await expect(runMain(commit, deps, adapter)).rejects.toThrow("Release requires a clean checkout");
+    expect(outcome.created).toEqual([]);
   });
 });
 
 describe("main release plan execution", () => {
-  it("records and finishes a stable version bump from the freshly packed bytes", async () => {
-    const { bindings, store, adapter, verifyArchive, plannedCanaryBase, publish, promote } = pipeline({
-      current: "0.2.0",
-      previous: "0.1.9",
-    });
-    await runMain(commit, bindings, adapter);
-    expect(store.create).toHaveBeenCalledWith({ channel: "stable", version: "0.2.0", commit });
-    expect(adapter.pack).toHaveBeenCalled();
-    expect(verifyArchive).toHaveBeenCalledWith(
-      { channel: "stable", version: "0.2.0", commit },
-      packedArchive
-    );
-    expect(store.uploaded).toEqual([packedArchive]);
-    expect(store.download).not.toHaveBeenCalled();
-    expect(publish).toHaveBeenCalledWith("/verified/release.tgz");
-    expect(promote).toHaveBeenCalledWith("0.2.0", "latest");
-    expect(store.complete).toHaveBeenCalled();
-    expect(plannedCanaryBase).not.toHaveBeenCalled();
+  it("records, uploads, publishes, and promotes a stable release", async () => {
+    const { deps, adapter, outcome } = harness({ line: stableLine });
+    await runMain(commit, deps, adapter);
+    expect(outcome.created).toEqual([{ channel: "stable", version: "0.2.0", commit }]);
+    expect(outcome.uploaded).toEqual([packedArchive]);
+    expect(outcome.published).toEqual(["0.2.0"]);
+    expect(outcome.promoted).toEqual([{ version: "0.2.0", tag: "latest" }]);
+    expect(outcome.completed).toEqual([1]);
   });
 
   it("prefers a stable version bump over a canary record for the same commit", async () => {
     const canary: ReleaseIntent = { channel: "canary", version: "0.2.0-canary.11", commit };
-    const { bindings, store, adapter } = pipeline({
-      current: "0.2.0",
-      previous: "0.1.9",
+    const { deps, adapter, outcome } = harness({
+      line: stableLine,
       seed: [{ id: 4, intent: canary, asset: { state: "uploaded", id: 2 } }],
     });
-    await runMain(commit, bindings, adapter);
-    expect(store.create).toHaveBeenCalledWith({ channel: "stable", version: "0.2.0", commit });
-    expect(store.find).not.toHaveBeenCalled();
+    await runMain(commit, deps, adapter);
+    expect(outcome.created).toEqual([{ channel: "stable", version: "0.2.0", commit }]);
+    expect(outcome.published).toEqual(["0.2.0"]);
+    expect(outcome.uploaded).toEqual([packedArchive]);
   });
 
   it("resumes a saved canary record from its downloaded archive", async () => {
     const intent: ReleaseIntent = { channel: "canary", version: "0.2.0-canary.11", commit };
-    const { bindings, store, adapter, verifyArchive, plannedCanaryBase, publish } = pipeline({
+    const { deps, adapter, outcome } = harness({
       seed: [{ id: 4, intent, asset: { state: "uploaded", id: 2 } }],
     });
-    await runMain(commit, bindings, adapter);
-    expect(store.create).toHaveBeenCalledWith(intent);
-    expect(adapter.pack).not.toHaveBeenCalled();
-    expect(store.upload).not.toHaveBeenCalled();
-    expect(verifyArchive).toHaveBeenCalledWith(intent, storedArchive);
-    expect(publish).toHaveBeenCalledWith("/verified/release.tgz");
-    expect(store.complete).toHaveBeenCalled();
-    expect(plannedCanaryBase).not.toHaveBeenCalled();
+    await runMain(commit, deps, adapter);
+    expect(outcome.created).toEqual([]);
+    expect(outcome.verified).toEqual([{ intent, bytes: storedArchive }]);
+    expect(outcome.uploaded).toEqual([]);
+    expect(outcome.published).toEqual(["0.2.0-canary.11"]);
+    expect(outcome.completed).toEqual([4]);
   });
 
   it("skips a commit superseded by a published canary", async () => {
-    const { bindings, store, adapter } = pipeline({
+    const { deps, adapter, outcome } = harness({
       registry: {
         versions: new Map([["0.2.0-canary.12", { commit: newerCommit, integrity: "newer" }]]),
         tags: new Map(),
       },
     });
-    await runMain(commit, bindings, adapter);
-    expect(adapter.pack).not.toHaveBeenCalled();
-    expect(store.create).not.toHaveBeenCalled();
-    expect(store.complete).not.toHaveBeenCalled();
-    expect(bindings.log).toHaveBeenCalledWith("Skipping a commit superseded by a published canary");
+    await runMain(commit, deps, adapter);
+    expect(outcome.created).toEqual([]);
+    expect(outcome.published).toEqual([]);
+    expect(outcome.logs).toContain("Skipping a commit superseded by a published canary");
   });
 
   it("skips a commit superseded by a stable release", async () => {
-    const { bindings, store, adapter } = pipeline({
+    const { deps, adapter, outcome } = harness({
       registry: {
         versions: new Map([["0.2.0", { commit: newerCommit, integrity: "stable" }]]),
         tags: new Map(),
       },
     });
-    await runMain(commit, bindings, adapter);
-    expect(adapter.pack).not.toHaveBeenCalled();
-    expect(store.create).not.toHaveBeenCalled();
-    expect(store.complete).not.toHaveBeenCalled();
-    expect(bindings.log).toHaveBeenCalledWith("Skipping a commit superseded by a stable release");
+    await runMain(commit, deps, adapter);
+    expect(outcome.created).toEqual([]);
+    expect(outcome.published).toEqual([]);
+    expect(outcome.logs).toContain("Skipping a commit superseded by a stable release");
   });
 
-  it("allocates against the planned base after reserved canary versions", async () => {
+  it("skips a planned base older than a canary on a newer base", async () => {
+    const { deps, adapter, outcome } = harness({
+      registry: {
+        versions: new Map([["0.3.0-canary.0", { integrity: "published" }]]),
+        tags: new Map(),
+      },
+    });
+    await runMain(commit, deps, adapter);
+    expect(outcome.created).toEqual([]);
+    expect(outcome.published).toEqual([]);
+    expect(outcome.logs).toContain("Skipping a commit superseded by a canary on a newer base");
+  });
+
+  it("allocates after reserved canary versions", async () => {
     const reserved: SavedRelease = {
       id: 8,
       intent: { channel: "canary", version: "0.2.0-canary.13", commit: "d".repeat(40) },
       asset: { state: "missing" },
     };
-    const { bindings, store, adapter, plannedCanaryBase } = pipeline({
+    const { deps, adapter, outcome } = harness({
       seed: [reserved],
       registry: {
         versions: new Map([["0.2.0-canary.12", { integrity: "legacy" }]]),
         tags: new Map(),
       },
     });
-    await runMain(commit, bindings, adapter);
-    expect(plannedCanaryBase).toHaveBeenCalledWith("0.1.9");
-    expect(store.create).toHaveBeenCalledWith({ channel: "canary", version: "0.2.0-canary.14", commit });
-    expect(adapter.pack).toHaveBeenCalled();
-    expect(store.complete).toHaveBeenCalled();
+    await runMain(commit, deps, adapter);
+    expect(outcome.created).toEqual([canaryIntent("0.2.0-canary.14")]);
+    expect(outcome.uploaded).toEqual([packedArchive]);
+    expect(outcome.published).toEqual(["0.2.0-canary.14"]);
   });
 
-  it("blames the consumer pack adapter when packing fails", async () => {
-    const { bindings, adapter } = pipeline({ current: "0.2.0", previous: "0.1.9" });
+  it("surfaces a pack failure without publishing", async () => {
+    const { deps, adapter, outcome } = harness({ line: stableLine });
+    const failure = new Error("build failed");
     adapter.pack = vi.fn(() => {
-      throw new Error("build failed");
+      throw failure;
     });
-    await expect(runMain(commit, bindings, adapter)).rejects.toMatchObject({
-      _tag: "ReleaseError",
-      port: "pack",
-      message: "build failed",
-    });
-    expect(bindings.npm.publish).not.toHaveBeenCalled();
+    const error = await Effect.runPromise(
+      Effect.flip(executeCheckedCommit(pkg, adapter, commit, deps).pipe(Effect.scoped))
+    );
+    expect(error).toMatchObject({ _tag: "ReleaseError", message: "build failed" });
+    expect(error.cause).toBe(failure);
+    expect(outcome.published).toEqual([]);
   });
 });
 
 describe("retry and finish", () => {
   it("refuses retry of an incomplete record", async () => {
     const intent: ReleaseIntent = { channel: "stable", version: "0.2.0", commit };
-    const { bindings, store, verifyArchive } = pipeline({
+    const { deps, outcome } = harness({
       seed: [{ id: 1, intent, asset: { state: "missing" } }],
     });
-    await expect(runRetry("v0.2.0", bindings)).rejects.toThrow("original Merge job");
-    expect(verifyArchive).not.toHaveBeenCalled();
-    expect(store.complete).not.toHaveBeenCalled();
-    expect(bindings.npm.publish).not.toHaveBeenCalled();
+    await expect(runRetry("v0.2.0", deps)).rejects.toThrow("original Merge job");
+    expect(outcome.verified).toEqual([]);
+    expect(outcome.published).toEqual([]);
+    expect(outcome.completed).toEqual([]);
   });
 
-  it("verifies the bytes it downloaded rather than the ones it packed", async () => {
+  it("finishes a prepared record from its downloaded archive", async () => {
     const intent: ReleaseIntent = { channel: "canary", version: "0.2.0-canary.11", commit };
-    const { bindings, store, adapter, verifyArchive, publish } = pipeline({
+    const { deps, outcome } = harness({
       seed: [{ id: 4, intent, asset: { state: "uploaded", id: 2 } }],
     });
-    await runRetry(canaryRecordTag(commit), bindings);
-    expect(store.download).toHaveBeenCalled();
-    expect(adapter.pack).not.toHaveBeenCalled();
-    expect(verifyArchive).toHaveBeenCalledWith(intent, storedArchive);
-    expect(publish).toHaveBeenCalled();
+    await runRetry(canaryRecordTag(commit), deps);
+    expect(outcome.verified).toEqual([{ intent, bytes: storedArchive }]);
+    expect(outcome.uploaded).toEqual([]);
+    expect(outcome.published).toEqual(["0.2.0-canary.11"]);
+    expect(outcome.completed).toEqual([4]);
   });
 
   it("does not complete a superseded canary", async () => {
     const intent: ReleaseIntent = { channel: "canary", version: "0.2.0-canary.11", commit };
-    const { bindings, store } = pipeline({
+    const { deps, outcome } = harness({
       seed: [{ id: 4, intent, asset: { state: "uploaded", id: 2 } }],
       registry: {
         versions: new Map([["0.2.0-canary.12", { commit: newerCommit, integrity: "newer" }]]),
         tags: new Map(),
       },
     });
-    await runRetry(canaryRecordTag(commit), bindings);
-    expect(bindings.npm.publish).not.toHaveBeenCalled();
-    expect(store.complete).not.toHaveBeenCalled();
-    expect(bindings.log).toHaveBeenCalledWith(
+    await runRetry(canaryRecordTag(commit), deps);
+    expect(outcome.published).toEqual([]);
+    expect(outcome.completed).toEqual([]);
+    expect(outcome.logs).toContain(
       "Skipping superseded canary 0.2.0-canary.11; its draft record remains reserved"
     );
   });
 
-  it("does not construct a pack adapter on retry", async () => {
-    const intent: ReleaseIntent = { channel: "stable", version: "0.2.0", commit };
-    const { bindings, adapter } = pipeline({
-      seed: [{ id: 1, intent, asset: { state: "uploaded", id: 2 } }],
-    });
-    await runRetry("v0.2.0", bindings);
-    expect(adapter.pack).not.toHaveBeenCalled();
+  it("refuses a record tag that has no prepared release", async () => {
+    const { deps, outcome } = harness();
+    await expect(runRetry("v9.9.9", deps)).rejects.toThrow("No prepared release exists for that tag");
+    expect(outcome.verified).toEqual([]);
   });
 });
 
@@ -400,7 +383,6 @@ describe("shipped live operations", () => {
       const effect = retryRelease(missingCheckout, "v0.2.0");
       await expect(Effect.runPromise(effect)).rejects.toMatchObject({
         _tag: "ReleaseError",
-        port: "engine",
         message: "GitHub repository and token are required",
       });
     });
@@ -411,7 +393,6 @@ describe("shipped live operations", () => {
       const effect = releaseCheckedCommit(missingCheckout, { pack: () => packedArchive }, commit);
       await expect(Effect.runPromise(effect)).rejects.toMatchObject({
         _tag: "ReleaseError",
-        port: "engine",
         message: "GitHub repository and token are required",
       });
     });
@@ -436,7 +417,8 @@ describe("shipped live operations", () => {
         packageDirectory: root,
         packageName: "@acme/app",
       };
-      await expect(Effect.runPromise(retryRelease(pkg, "v0.2.0", environment))).rejects.toThrow(
+      const operations = createReleaseOperations(() => environment);
+      await expect(Effect.runPromise(operations.retryRelease(pkg, "v0.2.0"))).rejects.toThrow(
         "GitHub GET failed: 404"
       );
       expect(requested[0]).toContain("/releases?per_page=100");

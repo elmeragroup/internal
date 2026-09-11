@@ -4,7 +4,6 @@ import {
   assertCanaryReleaseVersion,
   assertReleaseVersion,
   compareCanaryVersions,
-  nextCanaryVersion,
   nextPatchVersion,
   parseCanaryVersion,
   parseStableVersion,
@@ -43,23 +42,7 @@ describe("parsed release versions", () => {
   it("parses a canary as a stable base plus suffix", () => {
     expect(parseCanaryVersion("0.2.0-canary.11")).toEqual({ base: "0.2.0", n: 11n });
   });
-  it("increments only matching canary suffixes", () => {
-    expect(
-      nextCanaryVersion("0.2.0", [
-        "0.1.9",
-        "0.2.0-canary.9",
-        "0.2.0-canary.10",
-        "0.2.0-canary.2",
-        "0.2.0-canary.12",
-      ])
-    ).toBe("0.2.0-canary.13");
-    expect(nextCanaryVersion("0.3.0", ["0.2.0", "0.2.0-canary.99"])).toBe("0.3.0-canary.0");
-    expect(nextCanaryVersion("0.2.0", ["0.2.0", "0.3.0-canary.0", "0.2.0-canary.4"])).toBe("0.2.0-canary.5");
-  });
-  it("does not round large counters", () => {
-    expect(nextCanaryVersion("1.0.0", ["1.0.0-canary.9007199254740993"])).toBe(
-      "1.0.0-canary.9007199254740994"
-    );
+  it("compares large canary counters without rounding", () => {
     expect(compareCanaryVersions("1.0.0-canary.10", "1.0.0-canary.9")).toBe(1);
   });
   it("starts a new patch base from the previous stable", () => {

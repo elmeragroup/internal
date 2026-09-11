@@ -85,7 +85,7 @@ export function plannedCanaryBase(
   packageName: string,
   checkoutRoot: string
 ): Effect.Effect<string, ReleaseError> {
-  return lift("plan", () => {
+  return lift(() => {
     const planned = readReleasePlan(checkoutRoot).filter(
       (release) => release.name === packageName && release.type !== "none"
     );

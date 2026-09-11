@@ -17,14 +17,12 @@ import {
   checkReleasePr,
   readManifestVersion,
   releaseCheckedCommit,
-  releaseEnvironment,
   resolveReleasePackage,
   retryRelease,
   ReleaseError,
 } from "@elmeragroup/internal/release";
 import type {
   PackAndVerify,
-  ReleaseEnvironment,
   ReleaseIntent,
   ReleasePackage,
 } from "@elmeragroup/internal/release";
@@ -35,12 +33,11 @@ void ReleaseError;
 void assertCanaryReleaseVersion;
 void assertReleaseVersion;
 void readManifestVersion;
-const environment: ReleaseEnvironment = releaseEnvironment();
 const releasePackage: ReleasePackage = resolveReleasePackage(".", ".", "canary-consumer");
 const adapter: PackAndVerify = { pack: (_intent: ReleaseIntent) => new Uint8Array() };
 void checkReleasePr(releasePackage);
-void releaseCheckedCommit(releasePackage, adapter, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", environment);
-void retryRelease(releasePackage, "v0.2.0", environment);
+void releaseCheckedCommit(releasePackage, adapter, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+void retryRelease(releasePackage, "v0.2.0");
 const options: GenerateApiArtifactsOptions = { projectRoot: ".", tsconfigPath: "tsconfig.json", components: [] };
 const result = await generateApiArtifacts(options);
 const parts: readonly ApiPart[] = result.components.flatMap(component => component.parts);

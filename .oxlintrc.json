@@ -153,6 +153,17 @@
   },
   "overrides": [
     {
+      "files": ["packages/release/**", "test/packed-consumer/**"],
+      "rules": {
+        "turbo/no-undeclared-env-vars": [
+          "error",
+          {
+            "allowList": ["GH_TOKEN"]
+          }
+        ]
+      }
+    },
+    {
       "files": ["packages/oxlint-plugin/**"],
       "rules": {
         "typescript/no-unsafe-assignment": "off",

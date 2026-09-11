@@ -13,6 +13,8 @@ describe("engine import-time inertness", () => {
       expect(mod.checkReleasePr).toBeDefined();
       expect(mod.releaseCheckedCommit).toBeDefined();
       expect(mod.retryRelease).toBeDefined();
+      expect(mod).not.toHaveProperty("releaseEnvironment");
+      expect(mod).not.toHaveProperty("createReleaseOperations");
     } finally {
       if (previous.GITHUB_REPOSITORY === undefined) delete process.env.GITHUB_REPOSITORY;
       else process.env.GITHUB_REPOSITORY = previous.GITHUB_REPOSITORY;

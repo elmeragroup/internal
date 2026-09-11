@@ -71,7 +71,7 @@ async function fetchRegistry(packageName: string, fetcher: typeof fetch): Promis
 /** Live npm CLI port for one package. Publications publish to `pending`; promotion moves the tag. */
 export function createNpmPublisher(pkg: ReleasePackage): NpmPublisher {
   function runNpm(args: readonly string[]): Effect.Effect<void, ReleaseError> {
-    return lift("publication", () => {
+    return lift(() => {
       const result = spawnSync("npm", args, { cwd: pkg.checkoutRoot, stdio: "inherit" });
       if (result.error !== undefined) throw result.error;
       if (result.status !== 0) throw new Error(`npm failed with status ${String(result.status)}`);
@@ -88,5 +88,5 @@ export function readRegistry(
   packageName: string,
   fetcher: typeof fetch
 ): Effect.Effect<Registry, ReleaseError> {
-  return liftPromise("registry", () => fetchRegistry(packageName, fetcher));
+  return liftPromise(() => fetchRegistry(packageName, fetcher));
 }

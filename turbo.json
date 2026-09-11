@@ -2,7 +2,7 @@
   "$schema": "https://turbo.build/schema.json",
   "ui": "stream",
   "globalEnv": ["NODE_ENV"],
-  "globalPassThroughEnv": ["GH_TOKEN", "GITHUB_REPOSITORY"],
+  "globalPassThroughEnv": ["GITHUB_REPOSITORY"],
   "tasks": {
     "//#lint": {
       "inputs": ["$TURBO_DEFAULT$", "packages/oxlint-plugin/**", "packages/oxlint-anti-slop/**"],

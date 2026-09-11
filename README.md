@@ -97,13 +97,16 @@ pending changesets. Changesets resolves that plan against the `origin/main` base
 publisher checks out full history rather than a shallow copy. The publisher reads all npm versions
 and reserved GitHub release records, then increments the largest matching `canary.N` suffix. A new
 base starts at zero. For example, `0.1.2-canary.9` becomes `0.1.2-canary.10`; a new minor target
-starts at `0.2.0-canary.0`.
+starts at `0.2.0-canary.0`. A planned base that regresses behind an existing canary version is
+skipped and keeps that reservation, so a removed or downgraded changeset cannot block main.
 Canary versions and source metadata are written only in the disposable release checkout.
 
 Publication uses one shared queue with cancellation disabled. Already superseded commits are
-skipped. Each new package records its source commit, which prevents delayed runs from replacing
-newer code on the `canary` tag. Fresh releases and retries check all published canary commits,
-including uploads that have not advanced beyond `pending`, before publishing or promoting. Existing packages without source metadata use increasing version
+skipped: a published canary or stable from a descendant commit, a stable at or above the planned
+base, or an existing canary on a newer base. Each new package records its source commit, which
+prevents delayed runs from replacing newer code on the `canary` tag. Fresh releases and retries
+check all published canary commits, including uploads that have not advanced beyond `pending`,
+before publishing or promoting. Existing packages without source metadata use increasing version
 order for the initial migration. Registry errors stop publication; only an actual package-not-found
 response is treated as an empty history.
 
@@ -127,7 +130,9 @@ archive. A stable retry may publish an older version without moving `latest` bac
 Before npm publication, the workflow creates a draft GitHub release tied to the source commit and
 uploads `release.tgz`, the verified package archive. Stable records use `v<version>` tags. Canary records use
 `canary-<full-commit-SHA>` tags. Automation never moves these tags or replaces an uploaded archive.
-Do not edit release-record bodies or delete their assets; they are used for retries and version reservations.
+Do not edit healthy release-record bodies or delete their assets; they are used for retries and version
+reservations. A damaged record fails only lookup of its own tag; repair or delete that release and tag
+to recover, as described in the release package README.
 
 The publisher re-verifies the recorded archive's packed manifest and integrity against the record's
 intent, then uploads to npm under `pending`. It verifies the registry's archive integrity and source

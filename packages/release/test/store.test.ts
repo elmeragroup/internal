@@ -120,7 +120,7 @@ describe("durable GitHub release records", () => {
   });
   it("rejects a moved tag before downloading an archive", async () => {
     const { store } = githubStore([releaseRecord({ assets: [uploadedAsset] })], { tagSha: "b".repeat(40) });
-    await expect(Effect.runPromise(store.find("v0.2.0"))).rejects.toThrow("tag was moved");
+    await expect(Effect.runPromise(store.find("v0.2.0"))).rejects.toThrow("v0.2.0 was moved");
   });
   it("recovers an uploaded asset from a still-draft release", async () => {
     const { store, state } = githubStore([releaseRecord({ assets: [uploadedAsset] })]);
@@ -285,12 +285,8 @@ describe("release record ownership in the GitHub store", () => {
         assets: [],
       },
     ]);
-    await expect(Effect.runPromise(store.find("v0.2.0"))).rejects.toThrow(
-      "foreign GitHub release occupies the record tag"
-    );
-    await expect(Effect.runPromise(store.create(intent))).rejects.toThrow(
-      "foreign GitHub release occupies the record tag"
-    );
+    await expect(Effect.runPromise(store.find("v0.2.0"))).rejects.toThrow("foreign GitHub release occupies");
+    await expect(Effect.runPromise(store.create(intent))).rejects.toThrow("foreign GitHub release occupies");
     expect(mutations.filter((entry) => /POST|PATCH|DELETE/.test(entry))).toEqual([]);
   });
 
@@ -308,7 +304,7 @@ describe("release record ownership in the GitHub store", () => {
     await expect(Effect.runPromise(store.create(intent))).rejects.toThrow("release intent is invalid");
   });
 
-  it("fails a marked owned record whose tag does not match its intent", async () => {
+  it("fails a marked owned record whose tag does not match its intent, naming the tag", async () => {
     const { store } = githubStore([
       {
         tag_name: "v0.2.0",
@@ -319,14 +315,13 @@ describe("release record ownership in the GitHub store", () => {
       },
     ]);
     await expect(Effect.runPromise(store.find("v0.2.0"))).rejects.toThrow(
-      "Release tag does not match its intent"
+      "Release record v0.2.0 is damaged: Release tag does not match its intent"
     );
-    await expect(Effect.runPromise(store.reservedCanaryVersions())).rejects.toThrow(
-      "Release tag does not match its intent"
-    );
+    await expect(Effect.runPromise(store.reservedCanaryVersions())).resolves.toEqual([]);
   });
 
-  it("fails a marked owned record that cannot be decoded instead of dropping it", async () => {
+  it("names a marked owned record that cannot be decoded without blocking the catalog", async () => {
+    const otherCommit = "b".repeat(40);
     const { store } = githubStore([
       {
         tag_name: `canary-${commit}`,
@@ -341,12 +336,28 @@ describe("release record ownership in the GitHub store", () => {
         }),
         assets: [],
       },
+      {
+        tag_name: `canary-${otherCommit}`,
+        id: 5,
+        draft: true,
+        body: serializeIntent({ channel: "canary", version: "0.2.0-canary.12", commit: otherCommit }),
+        assets: [],
+      },
+      releaseRecord({
+        tag_name: "v0.1.9",
+        id: 6,
+        body: JSON.stringify({ schema: 1, channel: "stable", version: "0.1.9", commit }),
+        assets: [],
+      }),
     ]);
-    await expect(Effect.runPromise(store.reservedCanaryVersions())).rejects.toThrow(
-      "release intent is invalid"
-    );
+    expect(await Effect.runPromise(store.reservedCanaryVersions())).toEqual(["0.2.0-canary.12"]);
+    expect(await Effect.runPromise(store.find("v0.1.9"))).toEqual({
+      id: 6,
+      intent: { channel: "stable", version: "0.1.9", commit },
+      asset: { state: "missing" },
+    });
     await expect(Effect.runPromise(store.find(`canary-${commit}`))).rejects.toThrow(
-      "release intent is invalid"
+      `Release record canary-${commit} is damaged: release intent is invalid`
     );
   });
 

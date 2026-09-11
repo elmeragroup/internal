@@ -4,52 +4,48 @@ import { describe, expect, it } from "vitest";
 import { lift, liftPromise, ReleaseError } from "../src/errors.ts";
 
 describe("ReleaseError", () => {
-  it("carries the raising port and message", async () => {
+  it("carries the failure message and the original cause", async () => {
+    const original = new Error("Checkout differs from the checked commit");
     const failure = await Effect.runPromise(
       Effect.flip(
-        lift("git", () => {
-          throw new Error("Checkout differs from the checked commit");
+        lift(() => {
+          throw original;
         })
       )
     );
     expect(failure).toMatchObject({
       _tag: "ReleaseError",
-      port: "git",
       message: "Checkout differs from the checked commit",
     });
+    expect(failure.cause).toBe(original);
   });
 
-  it("keeps the deepest diagnostic cause for wrapped decode failures", async () => {
+  it("keeps the original error chain instead of flattening it", async () => {
     const wrapped = new Error("release intent is invalid", {
       cause: new Error('Missing key\n  at ["commit"]'),
     });
     const failure = await Effect.runPromise(
       Effect.flip(
-        lift("store", () => {
+        lift(() => {
           throw wrapped;
         })
       )
     );
-    expect(failure).toMatchObject({
-      message: "release intent is invalid",
-      cause: 'Missing key\n  at ["commit"]',
-    });
+    expect(failure.message).toBe("release intent is invalid");
+    expect(failure.cause).toBe(wrapped);
   });
 
   it("normalizes a non-Error rejection", async () => {
-    const failure = await Effect.runPromise(
-      Effect.flip(liftPromise("registry", () => Promise.reject("offline")))
-    );
+    const failure = await Effect.runPromise(Effect.flip(liftPromise(() => Promise.reject("offline"))));
     expect(failure).toMatchObject({
       _tag: "ReleaseError",
-      port: "registry",
       message: "Release operation failed",
+      cause: "offline",
     });
   });
 
-  it("preserves an explicit diagnostic cause", () => {
+  it("preserves an explicit cause", () => {
     const error = new ReleaseError({
-      port: "publication",
       message: "Publication could not be verified; retry the recorded release",
       cause: "connection lost",
     });

@@ -59,7 +59,7 @@ function eligibility(options: CanaryPlanOptions = {}) {
 /** The whole canary decision the pipeline makes: eligibility first, then version allocation. */
 function canaryPlan(options: CanaryPlanOptions = {}) {
   const decision = eligibility(options);
-  if (decision !== "eligible") return decision;
+  if (decision !== "owned") return decision;
   const published = options.registry ?? registry();
   return allocateCanary(options.plannedBase ?? "0.2.0", [
     ...published.versions.keys(),
@@ -210,16 +210,16 @@ describe("descendant stable supersession", () => {
     });
   });
 
-  it("keeps a fresh cut eligible on the registry that supersedes a recorded retry", () => {
+  it("supersedes fresh cuts and recorded retries from an ancestor of a published stable", () => {
     const published = registry();
     published.versions.set("0.2.0", { commit: newerCommit, integrity: "stable" });
     expect(planPublication(recorded, published, isAncestor)).toEqual({ kind: "superseded" });
     expect(canaryEligibility({ commit, current: "0.2.0", base: "0.3.0" }, published, isAncestor)).toBe(
-      "eligible"
+      "stable-superseded"
     );
     expect(
       canaryEligibility({ commit: newerCommit, current: "0.2.0", base: "0.3.0" }, published, isAncestor)
-    ).toBe("eligible");
+    ).toBe("owned");
   });
 });
 
@@ -364,10 +364,10 @@ describe("canary numbering policy", () => {
     );
   });
 
-  it("refuses a canary base that is older than an already published canary", () => {
+  it("skips a planned base that is older than an already published canary", () => {
     const published = registry();
     published.versions.set("0.3.0-canary.0", { integrity: "published" });
-    expect(() => canaryPlan({ registry: published })).toThrow("older than");
+    expect(canaryPlan({ registry: published })).toBeUndefined();
   });
 
   it("skips a stable release that already reaches the planned base", () => {
@@ -389,5 +389,23 @@ describe("canary numbering policy", () => {
     published.versions.set("0.1.9", { integrity: "stable" });
     published.versions.set("0.2.0-canary.12", { integrity: "canary" });
     expect(canaryPlan({ registry: published, reserved: ["0.2.0-canary.13"] })).toBe("0.2.0-canary.14");
+  });
+
+  it("increments only matching canary suffixes and skips larger bases", () => {
+    expect(
+      allocateCanary("0.2.0", [
+        "0.1.9",
+        "0.2.0-canary.9",
+        "0.2.0-canary.10",
+        "0.2.0-canary.2",
+        "0.2.0-canary.12",
+      ])
+    ).toBe("0.2.0-canary.13");
+    expect(allocateCanary("0.3.0", ["0.2.0", "0.2.0-canary.99"])).toBe("0.3.0-canary.0");
+    expect(allocateCanary("0.2.0", ["0.2.0", "0.3.0-canary.0", "0.2.0-canary.4"])).toBeUndefined();
+  });
+
+  it("does not round large canary counters", () => {
+    expect(allocateCanary("1.0.0", ["1.0.0-canary.9007199254740993"])).toBe("1.0.0-canary.9007199254740994");
   });
 });
