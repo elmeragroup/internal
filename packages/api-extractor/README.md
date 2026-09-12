@@ -219,7 +219,10 @@ catalog ceilings: per fixture in the Issue 02 and external-selection plans, and 
 fixtures in the Issue 14 plan, so a dense walk cannot trade one for a megabyte dump. `test/fixtures/timing-boundary.json`
 is the immutable pre-optimization baseline the Issue 14 plan measures against; only its ceiling
 metadata moves with the catalog. Refresh the Issue 14 report (`report:timing:issue14`) only after
-reviewing the semantic output and the reason for a timing change.
+reviewing the semantic output and the reason for a timing change. Fixtures resolve third-party
+type definitions from the installed tree, such as `@types/react` for `base-ui-component`, so a
+dependency bump that moves a deterministic counter is an input change, not an extractor regression.
+Record the cause in the commit or pull request that refreshes the evidence.
 
 ## Common maintenance
 
@@ -249,10 +252,10 @@ From `packages/api-extractor`, create the ignored development references with:
 git clone https://github.com/michaldudak/typescript-api-extractor.git ../../.ref/typescript-api-extractor
 git -C ../../.ref/typescript-api-extractor checkout --detach e145350
 git clone https://github.com/Effect-TS/effect.git ../../.ref/effect
-git -C ../../.ref/effect checkout --detach effect@4.0.0-rc.111
+git -C ../../.ref/effect checkout --detach effect@4.0.0-rc.115
 ```
 
-The Effect reference resolves to commit `648f566dd259898e7697c7fcb796183ccbc474ab`. Runtime
+The Effect reference resolves to commit `4a05d4914fa2327a42bd75fe77c22c188becf3b4`. Runtime
 `effect` remains pinned to that RC in `pnpm-workspace.yaml`. Timing evidence gates on Node
 major 24 and records the exact patch as an observation, so any `>=24.13.0 <25` runtime can
 run the package tests.

@@ -22,17 +22,15 @@ function publication() {
   const deps = {
     readRegistry: (): Effect.Effect<Registry, ReleaseError> => Effect.succeed(registry),
     npm: {
-      publish: vi.fn(
-        (_archive: string): Effect.Effect<void, ReleaseError> =>
-          Effect.sync(() => {
-            registry.versions.set(release.version, { commit, integrity: release.integrity });
-          })
+      publish: vi.fn((_archive: string): Effect.Effect<void, ReleaseError> =>
+        Effect.sync(() => {
+          registry.versions.set(release.version, { commit, integrity: release.integrity });
+        })
       ),
-      promote: vi.fn(
-        (version: string, tag: string): Effect.Effect<void, ReleaseError> =>
-          Effect.sync(() => {
-            registry.tags.set(tag, version);
-          })
+      promote: vi.fn((version: string, tag: string): Effect.Effect<void, ReleaseError> =>
+        Effect.sync(() => {
+          registry.tags.set(tag, version);
+        })
       ),
     },
     confirmationInterval: 0,
