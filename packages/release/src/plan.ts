@@ -50,10 +50,10 @@ export function trackedBranchOf(baseBranch: string): string {
 /**
  * Asks Changesets which releases the pending changesets in `checkoutRoot` would produce.
  *
- * Two properties of the pinned CLI are load-bearing here. It writes `--output` with
- * `path.join(cwd, output)`, so the path must stay relative to the directory the CLI runs in; an
- * absolute path is concatenated onto that directory instead. It also resolves the configured
- * `baseBranch` through `git merge-base`, which is why `.changeset/config.json` names
+ * Two properties of the pinned CLI are load-bearing here. It resolves `--output` against the
+ * directory the CLI runs in (`path.resolve(cwd, output)`), so the relative `planFileName` lands in
+ * `checkoutRoot`; an absolute path would be honored as-is rather than concatenated. It also resolves
+ * the configured `baseBranch` through `git merge-base`, which is why `.changeset/config.json` names
  * `origin/<branch>` — the publisher runs in a detached checkout of one commit, where a bare branch
  * name does not resolve. Passing `--since` is not a substitute: it also filters out every changeset
  * added before that ref, which would silently plan the wrong version.
