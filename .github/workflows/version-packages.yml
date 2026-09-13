@@ -45,16 +45,18 @@ jobs:
       - name: Version Packages PR
         if: steps.current.outputs.current == 'true'
         id: changesets
-        uses: changesets/action@v1
+        # Keep the root action: it skips `version-script` entirely when there are no changesets, so
+        # Changesets CLI v3 is never asked to version an empty release (which exits 1). Do not switch
+        # to `changesets/action/version@v2` without an equivalent guard.
+        uses: changesets/action@v2
         with:
-          version: pnpm release:version
-          title: Version Packages
-          commit: "chore: version packages"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          version-script: pnpm release:version
+          pr-title: Version Packages
+          commit-message: "chore: version packages"
+          github-token: ${{ github.token }}
 
       - name: Run checks on the bot-created release PR
-        if: steps.changesets.outputs.pullRequestNumber
+        if: steps.changesets.outputs.pr-number
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh workflow run merge.yml --ref changeset-release/main

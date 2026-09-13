@@ -67,9 +67,9 @@ describe("release workflow gates", () => {
   it("explicitly dispatches checks for the generated release PR", () => {
     const version = job("version-packages", "version");
     expect(asRecord(version.permissions, "permissions").actions).toBe("write");
-    expect(
-      asString(step("version-packages", "version", "Run checks on the bot-created release PR").run, "run")
-    ).toBe("gh workflow run merge.yml --ref changeset-release/main");
+    const dispatch = step("version-packages", "version", "Run checks on the bot-created release PR");
+    expect(asString(dispatch.run, "run")).toBe("gh workflow run merge.yml --ref changeset-release/main");
+    expect(dispatch.if).toBe("steps.changesets.outputs.pr-number");
     expect(asRecord(workflow("merge").on, "triggers")).toHaveProperty("workflow_dispatch");
     expect(asString(step("merge", "checks", "Validate stable release PR").run, "run")).toBe(
       "pnpm release:check-pr"
@@ -78,7 +78,14 @@ describe("release workflow gates", () => {
 
   it("runs the version bump through the release script", () => {
     const versionStep = step("version-packages", "version", "Version Packages PR");
-    expect(asRecord(versionStep.with, "inputs").version).toBe("pnpm release:version");
+    expect(versionStep.uses).toBe("changesets/action@v2");
+    expect(versionStep.id).toBe("changesets");
+    const inputs = asRecord(versionStep.with, "inputs");
+    expect(inputs["version-script"]).toBe("pnpm release:version");
+    expect(inputs["pr-title"]).toBe("Version Packages");
+    expect(inputs["commit-message"]).toBe("chore: version packages");
+    expect(inputs["github-token"]).toBe("${{ github.token }}");
+    expect(versionStep).not.toHaveProperty("env");
   });
 
   it("keeps packed consumer verification on Version Packages PRs", () => {
