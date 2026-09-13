@@ -53,7 +53,7 @@ jobs:
           version-script: pnpm release:version
           pr-title: Version Packages
           commit-message: "chore: version packages"
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ github.token }}
 
       - name: Run checks on the bot-created release PR
         if: steps.changesets.outputs.pr-number

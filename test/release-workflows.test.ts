@@ -84,8 +84,8 @@ describe("release workflow gates", () => {
     expect(inputs["version-script"]).toBe("pnpm release:version");
     expect(inputs["pr-title"]).toBe("Version Packages");
     expect(inputs["commit-message"]).toBe("chore: version packages");
-    expect(inputs["github-token"]).toBe("${{ secrets.GITHUB_TOKEN }}");
-    expect(asRecord(versionStep.env ?? {}, "env")).not.toHaveProperty("GITHUB_TOKEN");
+    expect(inputs["github-token"]).toBe("${{ github.token }}");
+    expect(versionStep).not.toHaveProperty("env");
   });
 
   it("keeps packed consumer verification on Version Packages PRs", () => {

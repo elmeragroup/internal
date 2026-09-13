@@ -3,14 +3,14 @@ import type { Effect } from "effect";
 import { execFileSync } from "node:child_process";
 import { mkdirSync, rmSync } from "node:fs";
 import { createRequire } from "node:module";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 
 import { lift } from "./errors.ts";
 import type { ReleaseError } from "./errors.ts";
 import { readJson } from "./json.ts";
 import { assertStableReleaseVersion, nextPatchVersion } from "./version.ts";
 
-// Relative to the directory the CLI runs in, and inside the ignored scratch directory.
+// The plan file lives inside the ignored scratch directory.
 const planFileName = ".artifacts/changeset-release-plan.json";
 
 const ChangesetConfig = Schema.Struct({
@@ -50,21 +50,19 @@ export function trackedBranchOf(baseBranch: string): string {
 /**
  * Asks Changesets which releases the pending changesets in `checkoutRoot` would produce.
  *
- * Two properties of the pinned CLI are load-bearing here. It resolves `--output` against the
- * directory the CLI runs in (`path.resolve(cwd, output)`), so the relative `planFileName` lands in
- * `checkoutRoot`; an absolute path would be honored as-is rather than concatenated. It also resolves
- * the configured `baseBranch` through `git merge-base`, which is why `.changeset/config.json` names
- * `origin/<branch>` — the publisher runs in a detached checkout of one commit, where a bare branch
- * name does not resolve. Passing `--since` is not a substitute: it also filters out every changeset
- * added before that ref, which would silently plan the wrong version.
+ * The load-bearing property of the pinned CLI is that it resolves the configured `baseBranch`
+ * through `git merge-base`, which is why `.changeset/config.json` names `origin/<branch>` — the
+ * publisher runs in a detached checkout of one commit, where a bare branch name does not resolve.
+ * Passing `--since` is not a substitute: it also filters out every changeset added before that ref,
+ * which would silently plan the wrong version.
  *
  * The CLI binary is resolved from the consuming checkout, never from this package's location.
  */
 export function readReleasePlan(checkoutRoot: string): readonly PlannedRelease[] {
   const planPath = resolve(checkoutRoot, planFileName);
-  mkdirSync(resolve(checkoutRoot, ".artifacts"), { recursive: true });
+  mkdirSync(dirname(planPath), { recursive: true });
   try {
-    execFileSync(process.execPath, [changesetBin(checkoutRoot), "status", "--output", planFileName], {
+    execFileSync(process.execPath, [changesetBin(checkoutRoot), "status", "--output", planPath], {
       cwd: checkoutRoot,
       stdio: "pipe",
     });
