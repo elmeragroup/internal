@@ -1,15 +1,17 @@
 import { describe, expect, it } from "vitest";
 
+import { assertCommit } from "../src/intent.ts";
+import type { ReleaseIntent } from "../src/intent.ts";
 import {
-  assertCommit,
   assertReleaseTag,
+  classifyReleaseRecord,
   isReleaseTag,
   parseIntent,
+  releaseArchiveName,
   releaseRecordOwner,
   releaseTag,
   serializeIntent,
-} from "../src/intent.ts";
-import type { ReleaseIntent } from "../src/intent.ts";
+} from "../src/record.ts";
 
 const commit = "a".repeat(40);
 const stable: ReleaseIntent = { channel: "stable", version: "0.2.0", commit };
@@ -60,5 +62,40 @@ describe("release record identity", () => {
     expect(() => assertReleaseTag("v1")).toThrow("record tag");
     expect(assertCommit(commit)).toBe(commit);
     expect(() => assertCommit("HEAD")).toThrow("full commit SHA");
+  });
+});
+
+describe("release record classification", () => {
+  // Cases the store suite does not reach through fixture fetch responses. Every other ownership rule
+  // is proven through ReleaseStore.find/create/reservedCanaryVersions in store.test.ts.
+  it("ignores a valid intent body whose tag is not a record tag", () => {
+    expect(classifyReleaseRecord("v1", JSON.stringify({ schema: 1, ...stable }), [])).toEqual({
+      kind: "ignored",
+    });
+  });
+
+  it("fails an owned record whose payload is missing a field", () => {
+    expect(() =>
+      classifyReleaseRecord(
+        "v0.2.0",
+        JSON.stringify({ schema: 1, owner: releaseRecordOwner, channel: "stable", version: "0.2.0" }),
+        []
+      )
+    ).toThrow("release intent is invalid");
+  });
+
+  it("fails an archive-carrying record whose body is not readable intent", () => {
+    expect(() => classifyReleaseRecord("v0.2.0", "not json", [releaseArchiveName])).toThrow(/JSON/);
+    expect(() =>
+      classifyReleaseRecord("v0.2.0", JSON.stringify({ notes: "human" }), [releaseArchiveName])
+    ).toThrow("release intent is invalid");
+  });
+
+  it("treats an archive-carrying record with another owner marker as foreign", () => {
+    expect(
+      classifyReleaseRecord("v0.2.0", JSON.stringify({ schema: 1, owner: "other-release", ...stable }), [
+        releaseArchiveName,
+      ])
+    ).toEqual({ kind: "foreign" });
   });
 });

@@ -11,14 +11,14 @@ import { createCommitAncestry, createGitPort } from "./git.ts";
 import type { GitPort } from "./git.ts";
 import { createGitHubClient, releaseEnvironment } from "./github.ts";
 import type { ReleaseEnvironment } from "./github.ts";
-import { assertCommit, assertReleaseTag, canaryRecordTag, releaseTag } from "./intent.ts";
+import { assertCommit } from "./intent.ts";
 import type { ReleaseIntent, VerifiedRelease } from "./intent.ts";
 import { createNpmPublisher, readRegistry } from "./npm.ts";
 import { changesetBaseBranch, plannedCanaryBase, trackedBranchOf } from "./plan.ts";
-import { allocateCanary, canaryEligibility } from "./policy.ts";
-import type { CanarySupersession } from "./policy.ts";
+import { decideCanary } from "./policy.ts";
 import { publishVerifiedRelease } from "./publication.ts";
 import type { PublicationDeps } from "./publication.ts";
+import { assertReleaseTag, canaryRecordTag, releaseTag } from "./record.ts";
 import { createReleaseStore } from "./store.ts";
 import type { ReleaseStore, SavedRelease } from "./store.ts";
 
@@ -42,14 +42,6 @@ export type EngineDeps = PublicationDeps & {
   ) => Effect.Effect<VerifiedRelease, ReleaseError, Scope.Scope>;
   log: (message: string) => void;
 };
-
-function skipReason(status: Exclude<CanarySupersession, "owned">): string {
-  return status === "canary-superseded"
-    ? "Skipping a commit superseded by a published canary"
-    : "Skipping a commit superseded by a stable release";
-}
-
-const regressedBaseSkip = "Skipping a commit superseded by a canary on a newer base";
 
 type RecordedRelease = {
   saved: SavedRelease;
@@ -107,20 +99,15 @@ function mainReleaseIntent(
     if (recorded !== undefined) return recorded.intent;
     const base = yield* deps.plannedCanaryBase(line.current);
     const registry = yield* deps.readRegistry();
-    const status = yield* lift(() =>
-      canaryEligibility({ commit, current: line.current, base }, registry, deps.ancestry)
-    );
-    if (status !== "owned") {
-      deps.log(skipReason(status));
-      return undefined;
-    }
     const reserved = yield* deps.store.reservedCanaryVersions();
-    const version = yield* lift(() => allocateCanary(base, [...registry.versions.keys(), ...reserved]));
-    if (version === undefined) {
-      deps.log(regressedBaseSkip);
+    const decision = yield* lift(() =>
+      decideCanary({ commit, current: line.current, base }, registry, reserved, deps.ancestry)
+    );
+    if ("skip" in decision) {
+      deps.log(decision.reason);
       return undefined;
     }
-    return { channel: "canary", version, commit } as const;
+    return { channel: "canary", version: decision.cut, commit } as const;
   });
 }
 

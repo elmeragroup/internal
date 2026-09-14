@@ -263,7 +263,7 @@ writeFileSync(file, JSON.stringify({ releases: [] }));
       );
 
       expect(packedBytes).toBeDefined();
-      expect(publishedArchivePath).toMatch(/release\.tgz$/);
+      expect(publishedArchivePath).toMatch(/archive\.tgz$/);
       expect(uploadedArchive).toEqual(packedBytes);
       expect(patchedRelease).toBe(true);
       expect(distTag).toEqual({ tag: "canary", version: "0.1.1-canary.0" });

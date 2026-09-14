@@ -2,13 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { ReleaseIntent, VerifiedRelease } from "../src/intent.ts";
 import type { Registry } from "../src/npm.ts";
-import {
-  allocateCanary,
-  canaryEligibility,
-  distTagFor,
-  planPublication,
-  shouldPromote,
-} from "../src/policy.ts";
+import { decideCanary, distTagFor, planPublication, shouldPromote } from "../src/policy.ts";
 import type { CommitAncestry } from "../src/policy.ts";
 
 const commit = "a".repeat(40);
@@ -35,7 +29,7 @@ function registry(): Registry {
 const isAncestor: CommitAncestry = (ancestor, descendant) =>
   ancestor === commit && descendant === newerCommit;
 
-type CanaryPlanOptions = {
+type CanaryDecisionOptions = {
   current?: string;
   commit?: string;
   registry?: Registry;
@@ -44,44 +38,44 @@ type CanaryPlanOptions = {
   ancestry?: CommitAncestry;
 };
 
-function eligibility(options: CanaryPlanOptions = {}) {
-  return canaryEligibility(
+function decision(options: CanaryDecisionOptions = {}) {
+  return decideCanary(
     {
       commit: options.commit ?? commit,
       current: options.current ?? "0.1.9",
       base: options.plannedBase ?? "0.2.0",
     },
     options.registry ?? registry(),
+    options.reserved ?? [],
     options.ancestry ?? isAncestor
   );
 }
 
-/** The whole canary decision the pipeline makes: eligibility first, then version allocation. */
-function canaryPlan(options: CanaryPlanOptions = {}) {
-  const decision = eligibility(options);
-  if (decision !== "owned") return decision;
-  const published = options.registry ?? registry();
-  return allocateCanary(options.plannedBase ?? "0.2.0", [
-    ...published.versions.keys(),
-    ...(options.reserved ?? []),
-  ]);
+function cut(version: string) {
+  return { cut: version };
 }
+
+const skips = {
+  canary: { skip: "canary-superseded", reason: "Skipping a commit superseded by a published canary" },
+  stable: { skip: "stable-superseded", reason: "Skipping a commit superseded by a stable release" },
+  base: { skip: "regressed-base", reason: "Skipping a commit superseded by a canary on a newer base" },
+} as const;
 
 function publicationPlan(release: VerifiedRelease, published: Registry, ancestry = isAncestor) {
   return planPublication(release, published, ancestry);
 }
 
-describe("fresh canary plan", () => {
-  it("allocates a fresh canary when no record exists", () => {
-    expect(canaryPlan()).toBe("0.2.0-canary.0");
+describe("fresh canary decision", () => {
+  it("cuts a fresh canary when no record exists", () => {
+    expect(decision()).toEqual(cut("0.2.0-canary.0"));
   });
 
   it("skips when a published stable is greater than the checked-out manifest version", () => {
     const published = registry();
     published.versions.set("0.1.2", { commit: newerCommit, integrity: "stable" });
-    expect(canaryPlan({ current: "0.1.1", registry: published })).toBe("stable-superseded");
+    expect(decision({ current: "0.1.1", registry: published })).toEqual(skips.stable);
     expect(
-      canaryPlan({
+      decision({
         current: "0.1.1",
         registry: {
           versions: new Map([
@@ -91,26 +85,26 @@ describe("fresh canary plan", () => {
           tags: new Map(),
         },
       })
-    ).toBe("0.2.0-canary.0");
+    ).toEqual(cut("0.2.0-canary.0"));
     expect(
-      canaryPlan({
+      decision({
         current: "0.1.1",
         registry: { versions: new Map([["0.1.0", { integrity: "stable" }]]), tags: new Map() },
       })
-    ).toBe("0.2.0-canary.0");
+    ).toEqual(cut("0.2.0-canary.0"));
   });
 
-  it("reuses the same ancestry skip before allocating a new canary", () => {
+  it("reuses the same ancestry skip before numbering a new canary", () => {
     const published = registry();
     published.versions.set("0.2.0-canary.12", { commit: newerCommit, integrity: "newer" });
-    expect(canaryPlan({ registry: published })).toBe("canary-superseded");
-    expect(() => canaryPlan({ commit: newerCommit, registry: published })).toThrow("record is missing");
+    expect(decision({ registry: published })).toEqual(skips.canary);
+    expect(() => decision({ commit: newerCommit, registry: published })).toThrow("record is missing");
   });
 
   it("ignores published canaries that have no source commit", () => {
     const published = registry();
     published.versions.set("0.2.0-canary.1", { integrity: "legacy" });
-    expect(canaryPlan({ registry: published })).toBe("0.2.0-canary.2");
+    expect(decision({ registry: published })).toEqual(cut("0.2.0-canary.2"));
   });
 
   it("throws on mixed descendant and divergent canaries regardless of map order", () => {
@@ -121,7 +115,7 @@ describe("fresh canary plan", () => {
     divergentFirst.versions.set("0.2.0-canary.13", { commit: unrelatedCommit, integrity: "unrelated" });
     divergentFirst.versions.set("0.2.0-canary.12", { commit: newerCommit, integrity: "newer" });
     for (const published of [descendantFirst, divergentFirst]) {
-      expect(() => canaryPlan({ registry: published })).toThrow("diverged");
+      expect(() => decision({ registry: published })).toThrow("diverged");
       expect(() => publicationPlan(canary, published)).toThrow("diverged");
     }
   });
@@ -130,7 +124,7 @@ describe("fresh canary plan", () => {
     const published = registry();
     published.versions.set("0.2.0-canary.12", { commit: newerCommit, integrity: "newer" });
     published.versions.set("0.2.0-canary.14", { commit: newerCommit, integrity: "also-newer" });
-    expect(canaryPlan({ registry: published })).toBe("canary-superseded");
+    expect(decision({ registry: published })).toEqual(skips.canary);
     expect(publicationPlan(canary, published)).toEqual({ kind: "superseded" });
   });
 });
@@ -214,12 +208,10 @@ describe("descendant stable supersession", () => {
     const published = registry();
     published.versions.set("0.2.0", { commit: newerCommit, integrity: "stable" });
     expect(planPublication(recorded, published, isAncestor)).toEqual({ kind: "superseded" });
-    expect(canaryEligibility({ commit, current: "0.2.0", base: "0.3.0" }, published, isAncestor)).toBe(
-      "stable-superseded"
-    );
+    expect(decision({ current: "0.2.0", plannedBase: "0.3.0", registry: published })).toEqual(skips.stable);
     expect(
-      canaryEligibility({ commit: newerCommit, current: "0.2.0", base: "0.3.0" }, published, isAncestor)
-    ).toBe("owned");
+      decision({ commit: newerCommit, current: "0.2.0", plannedBase: "0.3.0", registry: published })
+    ).toEqual(cut("0.3.0-canary.0"));
   });
 });
 
@@ -359,7 +351,7 @@ describe("promotion decision", () => {
 
 describe("canary numbering policy", () => {
   it("refuses a planned base that does not advance the checked-out version", () => {
-    expect(() => canaryPlan({ current: "0.2.0", plannedBase: "0.2.0" })).toThrow(
+    expect(() => decision({ current: "0.2.0", plannedBase: "0.2.0" })).toThrow(
       "must advance the stable version"
     );
   });
@@ -367,45 +359,53 @@ describe("canary numbering policy", () => {
   it("skips a planned base that is older than an already published canary", () => {
     const published = registry();
     published.versions.set("0.3.0-canary.0", { integrity: "published" });
-    expect(canaryPlan({ registry: published })).toBeUndefined();
+    expect(decision({ registry: published })).toEqual(skips.base);
+  });
+
+  it("skips a planned base that is older than a reserved canary", () => {
+    expect(decision({ reserved: ["0.3.0-canary.0"] })).toEqual(skips.base);
   });
 
   it("skips a stable release that already reaches the planned base", () => {
     const published = registry();
     published.versions.set("0.2.0", { integrity: "published" });
-    expect(canaryPlan({ registry: published })).toBe("stable-superseded");
+    expect(decision({ registry: published })).toEqual(skips.stable);
   });
 
-  it("skips a later published stable instead of allocating against it", () => {
+  it("skips a later published stable instead of numbering against it", () => {
     const published = registry();
     published.versions.set("0.3.0", { integrity: "published" });
-    expect(canaryPlan({ current: "0.2.0", plannedBase: "0.2.1", registry: published })).toBe(
-      "stable-superseded"
-    );
+    expect(decision({ current: "0.2.0", plannedBase: "0.2.1", registry: published })).toEqual(skips.stable);
   });
 
-  it("allocates after the policy accepts the base", () => {
+  it("numbers after the policy accepts the base, counting reservations as taken", () => {
     const published = registry();
     published.versions.set("0.1.9", { integrity: "stable" });
     published.versions.set("0.2.0-canary.12", { integrity: "canary" });
-    expect(canaryPlan({ registry: published, reserved: ["0.2.0-canary.13"] })).toBe("0.2.0-canary.14");
+    expect(decision({ registry: published, reserved: ["0.2.0-canary.13"] })).toEqual(cut("0.2.0-canary.14"));
   });
 
   it("increments only matching canary suffixes and skips larger bases", () => {
-    expect(
-      allocateCanary("0.2.0", [
-        "0.1.9",
-        "0.2.0-canary.9",
-        "0.2.0-canary.10",
-        "0.2.0-canary.2",
-        "0.2.0-canary.12",
-      ])
-    ).toBe("0.2.0-canary.13");
-    expect(allocateCanary("0.3.0", ["0.2.0", "0.2.0-canary.99"])).toBe("0.3.0-canary.0");
-    expect(allocateCanary("0.2.0", ["0.2.0", "0.3.0-canary.0", "0.2.0-canary.4"])).toBeUndefined();
+    const published = registry();
+    for (const version of [
+      "0.1.9",
+      "0.2.0-canary.9",
+      "0.2.0-canary.10",
+      "0.2.0-canary.2",
+      "0.2.0-canary.12",
+    ]) {
+      published.versions.set(version, { integrity: version });
+    }
+    expect(decision({ registry: published })).toEqual(cut("0.2.0-canary.13"));
+    expect(decision({ current: "0.2.0", plannedBase: "0.3.0", reserved: ["0.2.0-canary.99"] })).toEqual(
+      cut("0.3.0-canary.0")
+    );
+    expect(decision({ reserved: ["0.3.0-canary.0", "0.2.0-canary.4"] })).toEqual(skips.base);
   });
 
   it("does not round large canary counters", () => {
-    expect(allocateCanary("1.0.0", ["1.0.0-canary.9007199254740993"])).toBe("1.0.0-canary.9007199254740994");
+    expect(
+      decision({ current: "0.9.0", plannedBase: "1.0.0", reserved: ["1.0.0-canary.9007199254740993"] })
+    ).toEqual(cut("1.0.0-canary.9007199254740994"));
   });
 });

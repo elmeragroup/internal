@@ -9,7 +9,6 @@ import { resolve } from "node:path";
 import { lift } from "./errors.ts";
 import type { ReleaseError } from "./errors.ts";
 import type { ReleaseIntent, VerifiedRelease } from "./intent.ts";
-import { releaseArchiveName } from "./intent.ts";
 import { decodeJson } from "./json.ts";
 
 const PackedManifest = Schema.Struct({
@@ -20,6 +19,9 @@ const PackedManifest = Schema.Struct({
     channel: Schema.Literals(["canary", "stable"] as const),
   }),
 });
+
+/** Scratch filename inside the scoped temp directory; unrelated to the record's asset name. */
+const scratchArchiveName = "archive.tgz";
 
 /** Temporary directory removed when the surrounding Effect scope closes. Process kill is not covered. */
 function scratchDirectory(): Effect.Effect<string, ReleaseError, Scope.Scope> {
@@ -41,7 +43,7 @@ export function verifyReleaseArchive(
   return Effect.gen(function* () {
     const directory = yield* scratchDirectory();
     return yield* lift(() => {
-      const archive = resolve(directory, releaseArchiveName);
+      const archive = resolve(directory, scratchArchiveName);
       writeFileSync(archive, bytes);
       const manifest = decodeJson(
         execFileSync("tar", ["-xOzf", archive, "package/package.json"], { encoding: "utf8" }),

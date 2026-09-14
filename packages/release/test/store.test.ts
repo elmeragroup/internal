@@ -2,10 +2,10 @@ import { Effect, Schema } from "effect";
 import { describe, expect, it } from "vitest";
 
 import { createGitHubClient } from "../src/github.ts";
-import { releaseArchiveName, releaseRecordOwner, serializeIntent } from "../src/intent.ts";
 import type { ReleaseIntent } from "../src/intent.ts";
 import { decodeJson } from "../src/json.ts";
-import { classifyReleaseAsset, createReleaseStore } from "../src/store.ts";
+import { releaseArchiveName, releaseRecordOwner, serializeIntent } from "../src/record.ts";
+import { createReleaseStore } from "../src/store.ts";
 import type { ReleaseStore, SavedRelease } from "../src/store.ts";
 
 const commit = "a".repeat(40);
@@ -107,7 +107,7 @@ function githubStore(releases: readonly ReleasePayload[], options: StoreOptions 
 
 describe("durable GitHub release records", () => {
   it("keeps starter lookup and publication retry read-only", async () => {
-    const { store, state } = githubStore([releaseRecord()]);
+    const { store, state, mutations } = githubStore([releaseRecord()]);
     const found = await savedRelease(store, "v0.2.0");
     await expect(Effect.runPromise(store.download(found))).rejects.toThrow("original Merge job");
     expect(state.removed).toBe(false);
@@ -117,6 +117,7 @@ describe("durable GitHub release records", () => {
     expect(state.removed).toBe(false);
     await Effect.runPromise(store.upload(await Effect.runPromise(store.create(intent)), new Uint8Array()));
     expect(state.removed).toBe(true);
+    expect(mutations.some((entry) => entry.endsWith("/releases/assets/2"))).toBe(true);
   });
   it("rejects a moved tag before downloading an archive", async () => {
     const { store } = githubStore([releaseRecord({ assets: [uploadedAsset] })], { tagSha: "b".repeat(40) });
@@ -167,7 +168,7 @@ describe("durable GitHub release records", () => {
       asset: { state: "missing" },
     });
   });
-  it("includes unfinished canary reservations in version allocation", async () => {
+  it("includes unfinished canary reservations in canary numbering", async () => {
     const canaryIntent = { channel: "canary", version: "0.2.0-canary.12", commit };
     const { store, state } = githubStore([
       {
@@ -221,13 +222,7 @@ describe("durable GitHub release records", () => {
 });
 
 describe("release asset classification", () => {
-  it("classifies a draft starter and a non-zero uploaded asset", () => {
-    expect(classifyReleaseAsset(true, starterAsset)).toEqual({ state: "starter", id: 2 });
-    expect(classifyReleaseAsset(true, uploadedAsset)).toEqual({ state: "uploaded", id: 2 });
-    expect(classifyReleaseAsset(true, undefined)).toEqual({ state: "missing" });
-  });
   it("rejects a non-draft starter asset", async () => {
-    expect(() => classifyReleaseAsset(false, starterAsset)).toThrow("Unsupported starter release asset");
     const { store } = githubStore([releaseRecord({ draft: false })]);
     await expect(Effect.runPromise(store.find("v0.2.0"))).rejects.toThrow(
       "Unsupported starter release asset"
@@ -235,7 +230,6 @@ describe("release asset classification", () => {
   });
   it("rejects an unknown asset state", async () => {
     const unknown = { id: 2, name: releaseArchiveName, state: "open", size: 0 };
-    expect(() => classifyReleaseAsset(true, unknown)).toThrow("Unsupported release asset state open");
     const { store } = githubStore([releaseRecord({ assets: [unknown] })]);
     await expect(Effect.runPromise(store.find("v0.2.0"))).rejects.toThrow(
       "Unsupported release asset state open"
@@ -243,7 +237,6 @@ describe("release asset classification", () => {
   });
   it("rejects a size-zero uploaded asset", async () => {
     const empty = { id: 2, name: releaseArchiveName, state: "uploaded", size: 0 };
-    expect(() => classifyReleaseAsset(true, empty)).toThrow("Uploaded release asset has no bytes");
     const { store } = githubStore([releaseRecord({ assets: [empty] })]);
     await expect(Effect.runPromise(store.find("v0.2.0"))).rejects.toThrow(
       "Uploaded release asset has no bytes"
