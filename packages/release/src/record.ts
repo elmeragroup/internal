@@ -10,8 +10,9 @@ import { assertCanaryReleaseVersion, assertStableReleaseVersion, isStableRelease
  * A Record is a GitHub release that this module owns, created as a draft: its tag is the lookup
  * key, its body carries the intent with an owner marker, and its single asset is the recorded
  * archive. This file holds the record's format rules: tag and owner identity, body parse and
- * serialize, the archive asset name, and record and asset classification. The store keeps transport
- * and the catalog translation.
+ * serialize, the archive asset name, and record and asset classification. Asset classification
+ * reads GitHub's asset state and size because GitHub drafts are the only record store (ADR 0005);
+ * the store keeps transport and the catalog translation.
  */
 
 export const releaseRecordOwner = "elmera-release";

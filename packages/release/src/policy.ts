@@ -118,13 +118,13 @@ function skip(kind: CanarySkip): CanaryDecision {
 }
 
 /**
- * Allocates the next canary number for `base`, or reports `undefined` when a published or reserved
- * canary already belongs to a newer base. A regressed base skips; it never blocks publication.
+ * Numbers the next canary for `base`, or reports `undefined` when a published or reserved canary
+ * already belongs to a newer base. A regressed base skips; it never blocks publication.
  */
-function allocateCanary(base: string, versions: readonly string[]): string | undefined {
+function nextCanaryVersion(base: string, taken: readonly string[]): string | undefined {
   parseStableVersion(base);
   let highest = -1n;
-  for (const version of versions) {
+  for (const version of taken) {
     if (!isCanaryReleaseVersion(version)) continue;
     const candidate = parseCanaryVersion(version);
     if (compareStableVersions(candidate.base, base) > 0) return undefined;
@@ -149,7 +149,7 @@ export function decideCanary(
   }
   const status = canarySupersession(target.commit, target.base, registry, isAncestor);
   if (status !== "owned") return skip(status);
-  const version = allocateCanary(target.base, [...registry.versions.keys(), ...reserved]);
+  const version = nextCanaryVersion(target.base, [...registry.versions.keys(), ...reserved]);
   if (version === undefined) return skip("regressed-base");
   return { cut: version };
 }

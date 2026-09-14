@@ -94,7 +94,7 @@ describe("fresh canary decision", () => {
     ).toEqual(cut("0.2.0-canary.0"));
   });
 
-  it("reuses the same ancestry skip before allocating a new canary", () => {
+  it("reuses the same ancestry skip before numbering a new canary", () => {
     const published = registry();
     published.versions.set("0.2.0-canary.12", { commit: newerCommit, integrity: "newer" });
     expect(decision({ registry: published })).toEqual(skips.canary);
@@ -372,13 +372,13 @@ describe("canary numbering policy", () => {
     expect(decision({ registry: published })).toEqual(skips.stable);
   });
 
-  it("skips a later published stable instead of allocating against it", () => {
+  it("skips a later published stable instead of numbering against it", () => {
     const published = registry();
     published.versions.set("0.3.0", { integrity: "published" });
     expect(decision({ current: "0.2.0", plannedBase: "0.2.1", registry: published })).toEqual(skips.stable);
   });
 
-  it("allocates after the policy accepts the base, counting reservations as taken", () => {
+  it("numbers after the policy accepts the base, counting reservations as taken", () => {
     const published = registry();
     published.versions.set("0.1.9", { integrity: "stable" });
     published.versions.set("0.2.0-canary.12", { integrity: "canary" });

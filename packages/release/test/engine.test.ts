@@ -272,7 +272,7 @@ describe("main release plan execution", () => {
     expect(outcome.logs).toContain("Skipping a commit superseded by a canary on a newer base");
   });
 
-  it("allocates after reserved canary versions", async () => {
+  it("numbers after reserved canary versions", async () => {
     const reserved: SavedRelease = {
       id: 8,
       intent: { channel: "canary", version: "0.2.0-canary.13", commit: "d".repeat(40) },

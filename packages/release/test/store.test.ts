@@ -168,7 +168,7 @@ describe("durable GitHub release records", () => {
       asset: { state: "missing" },
     });
   });
-  it("includes unfinished canary reservations in version allocation", async () => {
+  it("includes unfinished canary reservations in canary numbering", async () => {
     const canaryIntent = { channel: "canary", version: "0.2.0-canary.12", commit };
     const { store, state } = githubStore([
       {
