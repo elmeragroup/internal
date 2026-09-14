@@ -17,10 +17,10 @@ import type { ReleasePackage } from "../src/files.ts";
 import type { ReleaseLine } from "../src/gate.ts";
 import type { GitPort } from "../src/git.ts";
 import type { ReleaseEnvironment } from "../src/github.ts";
-import { canaryRecordTag, releaseTag } from "../src/intent.ts";
 import type { ReleaseIntent, VerifiedRelease } from "../src/intent.ts";
 import type { Registry } from "../src/npm.ts";
 import type { CommitAncestry } from "../src/policy.ts";
+import { canaryRecordTag, releaseTag } from "../src/record.ts";
 import type { ReleaseStore, SavedRelease } from "../src/store.ts";
 
 const commit = "a".repeat(40);

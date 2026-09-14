@@ -11,13 +11,14 @@ import { createCommitAncestry, createGitPort } from "./git.ts";
 import type { GitPort } from "./git.ts";
 import { createGitHubClient, releaseEnvironment } from "./github.ts";
 import type { ReleaseEnvironment } from "./github.ts";
-import { assertCommit, assertReleaseTag, canaryRecordTag, releaseTag } from "./intent.ts";
+import { assertCommit } from "./intent.ts";
 import type { ReleaseIntent, VerifiedRelease } from "./intent.ts";
 import { createNpmPublisher, readRegistry } from "./npm.ts";
 import { changesetBaseBranch, plannedCanaryBase, trackedBranchOf } from "./plan.ts";
 import { decideCanary } from "./policy.ts";
 import { publishVerifiedRelease } from "./publication.ts";
 import type { PublicationDeps } from "./publication.ts";
+import { assertReleaseTag, canaryRecordTag, releaseTag } from "./record.ts";
 import { createReleaseStore } from "./store.ts";
 import type { ReleaseStore, SavedRelease } from "./store.ts";
 

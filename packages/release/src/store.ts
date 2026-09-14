@@ -5,11 +5,15 @@ import { liftPromise } from "./errors.ts";
 import type { ReleaseError } from "./errors.ts";
 import { GitHubRelease, GitHubReleaseAsset, GitHubTagRef } from "./github.ts";
 import type { GitHubClient } from "./github.ts";
-import { releaseArchiveName, releaseTag, serializeIntent } from "./intent.ts";
 import type { ReleaseIntent } from "./intent.ts";
-import { classifyReleaseRecord } from "./ownership.ts";
-
-export type ReleaseAsset = { state: "missing" } | { state: "starter" | "uploaded"; id: number };
+import {
+  classifyReleaseAsset,
+  classifyReleaseRecord,
+  releaseArchiveName,
+  releaseTag,
+  serializeIntent,
+} from "./record.ts";
+import type { ReleaseAsset } from "./record.ts";
 
 export type SavedRelease = {
   id: number;
@@ -47,21 +51,6 @@ function releaseBodyText(value: GitHubRelease): string {
 
 function assetNames(value: GitHubRelease): string[] {
   return value.assets.map((asset) => asset.name);
-}
-
-/** `starterAllowed` records that an empty placeholder is only legal on a draft release. */
-export function classifyReleaseAsset(
-  starterAllowed: boolean,
-  asset: GitHubReleaseAsset | undefined
-): ReleaseAsset {
-  if (asset === undefined) return { state: "missing" };
-  if (asset.state === "starter") {
-    if (!starterAllowed || asset.size !== 0) throw new Error("Unsupported starter release asset");
-    return { state: "starter", id: asset.id };
-  }
-  if (asset.state !== "uploaded") throw new Error(`Unsupported release asset state ${asset.state}`);
-  if (asset.size <= 0) throw new Error("Uploaded release asset has no bytes");
-  return { state: "uploaded", id: asset.id };
 }
 
 function savedReleaseFrom(value: GitHubRelease, intent: ReleaseIntent): SavedRelease {

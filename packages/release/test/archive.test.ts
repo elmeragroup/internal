@@ -62,7 +62,7 @@ describe("release archive verification", () => {
   it("accepts an archive whose manifest matches the recorded intent", async () => {
     const release = await verify(archiveBytes(validManifest()));
     expect(release.integrity).toMatch(/^sha512-/);
-    expect(release.archive).toMatch(/release\.tgz$/);
+    expect(release.archive).toMatch(/archive\.tgz$/);
   });
 
   it("materializes the archive inside the effect scope and removes it afterwards", async () => {
