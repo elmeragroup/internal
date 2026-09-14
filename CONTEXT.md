@@ -50,6 +50,10 @@ Finish a prepared record from its recorded archive. It does not pack again. The 
 **Superseded**:
 A canary that must not be promoted. A later published canary on a descendant commit supersedes it. A published stable whose commit is a descendant of the recorded canary also supersedes it, even when that stable version is below the canary's planned base.
 
+**Canary decision**:
+The outcome of the canary rule for a checked commit: either the canary version to cut, or a skip naming what supersedes the commit (a published canary, a published stable, or a canary already on a newer planned base). Reservations count as taken versions when choosing the number.
+_Avoid_: eligibility, allocation, plan
+
 **Release PR**:
 The single Version Packages pull request whose merge commit is the stable release.
 

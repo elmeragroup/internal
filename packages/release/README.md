@@ -99,6 +99,8 @@ Recover a damaged record by repairing or deleting that GitHub release and its ta
 damaged canary does not contribute to version reservations. Delete only that record, and only after
 confirming its archive is not the only copy of an already published release.
 
-A published stable whose commit is a descendant of a canary supersedes it even when the stable
-version is below the canary's base. A planned canary base older than a published or reserved canary
-version is skipped, keeping the earlier reservation. Same-version identity mismatches stay fatal.
+The canary decision for a checked commit is one policy function: it either names the canary
+version to cut or names what supersedes the commit. A published stable whose commit is a descendant
+of a canary supersedes it even when the stable version is below the canary's base. A planned canary
+base older than a published or reserved canary version is skipped, keeping the earlier reservation.
+Same-version identity mismatches stay fatal.

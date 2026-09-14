@@ -101,23 +101,27 @@ export function canarySupersession(
   return "owned";
 }
 
-/** Whether a fresh canary may be cut for this commit, or which published release already covers it. */
-export function canaryEligibility(
-  target: CanaryTarget,
-  registry: Registry,
-  isAncestor: CommitAncestry
-): CanarySupersession {
-  if (compareStableVersions(target.base, target.current) <= 0) {
-    throw new Error("The planned version must advance the stable version");
-  }
-  return canarySupersession(target.commit, target.base, registry, isAncestor);
+/** Why a checked commit does not cut a canary. Each kind renders one log sentence. */
+export type CanarySkip = "canary-superseded" | "stable-superseded" | "regressed-base";
+
+/** The Canary decision: the version to cut, or the skip and its sentence. */
+export type CanaryDecision = { cut: string } | { skip: CanarySkip; reason: string };
+
+const skipReasons = {
+  "canary-superseded": "Skipping a commit superseded by a published canary",
+  "stable-superseded": "Skipping a commit superseded by a stable release",
+  "regressed-base": "Skipping a commit superseded by a canary on a newer base",
+} satisfies Readonly<Record<CanarySkip, string>>;
+
+function skip(kind: CanarySkip): CanaryDecision {
+  return { skip: kind, reason: skipReasons[kind] };
 }
 
 /**
  * Allocates the next canary number for `base`, or reports `undefined` when a published or reserved
  * canary already belongs to a newer base. A regressed base skips; it never blocks publication.
  */
-export function allocateCanary(base: string, versions: readonly string[]): string | undefined {
+function allocateCanary(base: string, versions: readonly string[]): string | undefined {
   parseStableVersion(base);
   let highest = -1n;
   for (const version of versions) {
@@ -127,6 +131,27 @@ export function allocateCanary(base: string, versions: readonly string[]): strin
     if (candidate.base === base && candidate.n > highest) highest = candidate.n;
   }
   return formatCanaryVersion({ base, n: highest + 1n });
+}
+
+/**
+ * Decides the canary for a checked main commit. Ancestry and the planned base settle whether the
+ * commit still owns the channel; published and reserved versions together settle the number, so a
+ * reservation is taken even when npm has not seen it yet.
+ */
+export function decideCanary(
+  target: CanaryTarget,
+  registry: Registry,
+  reserved: readonly string[],
+  isAncestor: CommitAncestry
+): CanaryDecision {
+  if (compareStableVersions(target.base, target.current) <= 0) {
+    throw new Error("The planned version must advance the stable version");
+  }
+  const status = canarySupersession(target.commit, target.base, registry, isAncestor);
+  if (status !== "owned") return skip(status);
+  const version = allocateCanary(target.base, [...registry.versions.keys(), ...reserved]);
+  if (version === undefined) return skip("regressed-base");
+  return { cut: version };
 }
 
 /** Whether npm already carries this exact archive; a same-version mismatch is fatal. */
