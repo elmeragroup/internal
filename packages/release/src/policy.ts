@@ -102,7 +102,7 @@ export function canarySupersession(
 }
 
 /** Why a checked commit does not cut a canary. Each kind renders one log sentence. */
-export type CanarySkip = "canary-superseded" | "stable-superseded" | "regressed-base";
+export type CanarySkip = Exclude<CanarySupersession, "owned"> | "regressed-base";
 
 /** The Canary decision: the version to cut, or the skip and its sentence. */
 export type CanaryDecision = { cut: string } | { skip: CanarySkip; reason: string };

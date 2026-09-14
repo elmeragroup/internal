@@ -45,7 +45,7 @@
 
 **Files:** none
 
-- [ ] **Step 1: Create the branch from a clean main**
+- [x] **Step 1: Create the branch from a clean main**
 
 ```bash
 git status --short          # expect only CONTEXT.md and docs/superpowers/** modified/untracked
@@ -79,7 +79,7 @@ git checkout -b deepen-release-policy-and-record
 
   Task 2 depends on these exact names.
 
-- [ ] **Step 1: Rewrite the canary parts of `policy.test.ts` to call `decideCanary`**
+- [x] **Step 1: Rewrite the canary parts of `policy.test.ts` to call `decideCanary`**
 
 Replace lines 5-12 (imports) with:
 
@@ -273,12 +273,12 @@ describe("canary numbering policy", () => {
 
 Note on the former `allocateCanary("0.2.0", ["0.2.0", "0.3.0-canary.0", "0.2.0-canary.4"])` case: with a published `0.2.0` stable the decision would be `stable-superseded` before allocation runs, so the migrated case passes the two canaries as reservations instead. That exercises the same allocation branch (a larger base wins) without a stable in the registry.
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `pnpm --filter @elmeragroup/release test -- policy`
 Expected: FAIL. `decideCanary` is not exported from `../src/policy.ts`.
 
-- [ ] **Step 3: Implement `decideCanary` in `policy.ts`**
+- [x] **Step 3: Implement `decideCanary` in `policy.ts`**
 
 Replace lines 104-130 (`canaryEligibility` and `allocateCanary`, both `export`ed) with:
 
@@ -337,7 +337,7 @@ export function decideCanary(
 }
 ```
 
-- [ ] **Step 4: Run the policy tests**
+- [x] **Step 4: Run the policy tests**
 
 Run: `pnpm --filter @elmeragroup/release test -- policy`
 Expected: PASS for every case in `policy.test.ts`.
@@ -359,7 +359,7 @@ Do not run the full package suite yet. `engine.ts` still imports the removed exp
 
 - Consumes: `decideCanary`, `CanaryDecision` from Task 1.
 
-- [ ] **Step 1: Replace the engine imports**
+- [x] **Step 1: Replace the engine imports**
 
 Lines 18-19 of `engine.ts` currently read:
 
@@ -374,7 +374,7 @@ Replace with:
 import { decideCanary } from "./policy.ts";
 ```
 
-- [ ] **Step 2: Delete the skip helpers**
+- [x] **Step 2: Delete the skip helpers**
 
 Remove lines 46-52 entirely:
 
@@ -388,7 +388,7 @@ function skipReason(status: Exclude<CanarySupersession, "owned">): string {
 const regressedBaseSkip = "Skipping a commit superseded by a canary on a newer base";
 ```
 
-- [ ] **Step 3: Replace the tail of `mainReleaseIntent`**
+- [x] **Step 3: Replace the tail of `mainReleaseIntent`**
 
 The body from `const registry = yield* deps.readRegistry();` to the end of the generator currently reads:
 
@@ -426,12 +426,12 @@ return { channel: "canary", version: decision.cut, commit } as const;
 
 Reading reservations before the decision adds no GitHub call: `deps.store.find(canaryRecordTag(commit))` a few lines earlier already loaded the store's memoised catalog.
 
-- [ ] **Step 4: Run the package suite and type-check**
+- [x] **Step 4: Run the package suite and type-check**
 
 Run: `pnpm --filter @elmeragroup/release test && pnpm --filter @elmeragroup/release type-check`
 Expected: PASS. In `engine.test.ts` the cases at lines 236, 249 and 262 still assert the three skip sentences via `outcome.logs`.
 
-- [ ] **Step 5: Update the release README**
+- [x] **Step 5: Update the release README**
 
 In `packages/release/README.md`, the paragraph at lines 102-104 reads:
 
@@ -451,12 +451,12 @@ base older than a published or reserved canary version is skipped, keeping the e
 Same-version identity mismatches stay fatal.
 ```
 
-- [ ] **Step 6: Format and run the workspace checks**
+- [x] **Step 6: Format and run the workspace checks**
 
 Run: `pnpm exec oxfmt packages/release/src/policy.ts packages/release/src/engine.ts packages/release/test/policy.test.ts packages/release/README.md CONTEXT.md && pnpm ci:checks`
 Expected: PASS with no warnings.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add packages/release/src/policy.ts packages/release/src/engine.ts packages/release/test/policy.test.ts packages/release/README.md CONTEXT.md docs/superpowers
@@ -512,7 +512,7 @@ EOF
   ```
 - `intent.ts` keeps and exports `ReleaseIntent`, `VerifiedRelease`, `assertCommit`, and newly exports `isCommit`.
 
-- [ ] **Step 1: Write `record.test.ts`**
+- [x] **Step 1: Write `record.test.ts`**
 
 This merges the four cases of `intent.test.ts` (unchanged behaviour, new import path) with the five `ownership.test.ts` sub-cases the store does not prove.
 
@@ -620,12 +620,12 @@ describe("release record classification", () => {
 });
 ```
 
-- [ ] **Step 2: Run the new test to verify it fails**
+- [x] **Step 2: Run the new test to verify it fails**
 
 Run: `pnpm --filter @elmeragroup/release test -- record`
 Expected: FAIL. Cannot resolve `../src/record.ts`.
 
-- [ ] **Step 3: Create `record.ts`**
+- [x] **Step 3: Create `record.ts`**
 
 ```ts
 import { Schema } from "effect";
@@ -764,7 +764,7 @@ export function classifyReleaseAsset(
 }
 ```
 
-- [ ] **Step 4: Shrink `intent.ts`**
+- [x] **Step 4: Shrink `intent.ts`**
 
 Replace the whole file with:
 
@@ -790,7 +790,7 @@ export function assertCommit(commit: string): string {
 }
 ```
 
-- [ ] **Step 5: Run the record tests**
+- [x] **Step 5: Run the record tests**
 
 Run: `pnpm --filter @elmeragroup/release test -- record`
 Expected: PASS for all eight cases.
@@ -815,7 +815,7 @@ Do not run the full suite yet. `store.ts`, `engine.ts`, `archive.ts`, `ownership
 
 - Consumes everything `record.ts` exports (Task 3).
 
-- [ ] **Step 1: Rewire `store.ts` imports and drop its asset code**
+- [x] **Step 1: Rewire `store.ts` imports and drop its asset code**
 
 Lines 8-10 currently read:
 
@@ -841,7 +841,7 @@ import type { ReleaseAsset } from "./record.ts";
 
 Delete line 12 (`export type ReleaseAsset = ...`) and the exported `classifyReleaseAsset` function with its doc comment (lines 52-65). `SavedRelease` keeps referencing `ReleaseAsset`, now the imported type. `GitHubReleaseAsset` is no longer used in `store.ts`; remove it from the `./github.ts` import on line 6 so the import reads `import { GitHubRelease, GitHubTagRef } from "./github.ts";`.
 
-- [ ] **Step 2: Rewire `engine.ts`**
+- [x] **Step 2: Rewire `engine.ts`**
 
 Lines 14-15 currently read:
 
@@ -858,7 +858,7 @@ import type { ReleaseIntent, VerifiedRelease } from "./intent.ts";
 import { assertReleaseTag, canaryRecordTag, releaseTag } from "./record.ts";
 ```
 
-- [ ] **Step 3: Give `archive.ts` a local filename**
+- [x] **Step 3: Give `archive.ts` a local filename**
 
 Delete line 12 (`import { releaseArchiveName } from "./intent.ts";`). After the `PackedManifest` schema add:
 
@@ -869,13 +869,13 @@ const scratchArchiveName = "archive.tgz";
 
 Change line 44 from `resolve(directory, releaseArchiveName)` to `resolve(directory, scratchArchiveName)`.
 
-- [ ] **Step 4: Delete the folded module and its tests**
+- [x] **Step 4: Delete the folded module and its tests**
 
 ```bash
 git rm packages/release/src/ownership.ts packages/release/test/ownership.test.ts packages/release/test/intent.test.ts
 ```
 
-- [ ] **Step 5: Update `store.test.ts`**
+- [x] **Step 5: Update `store.test.ts`**
 
 Lines 5-9 currently read:
 
@@ -926,7 +926,7 @@ describe("release asset classification", () => {
 
 The removed first case (starter, uploaded, missing classified correctly) is already proven through `store.find` and `store.download` at lines 109-140 and 162-168 of the same file. If `starterAsset` or `uploadedAsset` at lines 15-16 become unused after this edit, lint will flag them; delete whichever is unused.
 
-- [ ] **Step 6: Update `engine.test.ts`**
+- [x] **Step 6: Update `engine.test.ts`**
 
 Lines 20-21 currently read:
 
@@ -942,17 +942,17 @@ import type { ReleaseIntent, VerifiedRelease } from "../src/intent.ts";
 import { canaryRecordTag, releaseTag } from "../src/record.ts";
 ```
 
-- [ ] **Step 7: Run the package suite and type-check**
+- [x] **Step 7: Run the package suite and type-check**
 
 Run: `pnpm --filter @elmeragroup/release test && pnpm --filter @elmeragroup/release type-check`
 Expected: PASS. `import.test.ts` still sees the same `index.ts` surface; `ReleaseIntent` is still exported from `intent.ts`.
 
-- [ ] **Step 8: Format and run the workspace checks**
+- [x] **Step 8: Format and run the workspace checks**
 
 Run: `pnpm exec oxfmt packages/release/src packages/release/test && pnpm ci:checks`
 Expected: PASS with no warnings. If the formatter reorders the new imports, accept its order.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add packages/release/src packages/release/test
@@ -975,12 +975,12 @@ EOF
 
 **Files:** none
 
-- [ ] **Step 1: Verify the packed consumer path**
+- [x] **Step 1: Verify the packed consumer path**
 
 Run: `pnpm packages:pack && pnpm test:packed-consumer`
 Expected: PASS. The release export is bundled into `@elmeragroup/internal/release`; this proves the bundle still builds and the consumer test still imports it.
 
-- [ ] **Step 2: Push and open the PR with the `no-changeset` label**
+- [x] **Step 2: Push and open the PR with the `no-changeset` label**
 
 ```bash
 git push -u origin deepen-release-policy-and-record

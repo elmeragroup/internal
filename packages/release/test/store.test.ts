@@ -107,7 +107,7 @@ function githubStore(releases: readonly ReleasePayload[], options: StoreOptions 
 
 describe("durable GitHub release records", () => {
   it("keeps starter lookup and publication retry read-only", async () => {
-    const { store, state } = githubStore([releaseRecord()]);
+    const { store, state, mutations } = githubStore([releaseRecord()]);
     const found = await savedRelease(store, "v0.2.0");
     await expect(Effect.runPromise(store.download(found))).rejects.toThrow("original Merge job");
     expect(state.removed).toBe(false);
@@ -117,6 +117,7 @@ describe("durable GitHub release records", () => {
     expect(state.removed).toBe(false);
     await Effect.runPromise(store.upload(await Effect.runPromise(store.create(intent)), new Uint8Array()));
     expect(state.removed).toBe(true);
+    expect(mutations.some((entry) => entry.endsWith("/releases/assets/2"))).toBe(true);
   });
   it("rejects a moved tag before downloading an archive", async () => {
     const { store } = githubStore([releaseRecord({ assets: [uploadedAsset] })], { tagSha: "b".repeat(40) });

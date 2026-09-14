@@ -7,9 +7,11 @@ import { decodeJson } from "./json.ts";
 import { assertCanaryReleaseVersion, assertStableReleaseVersion, isStableReleaseVersion } from "./version.ts";
 
 /*
- * A Record is a GitHub draft release that this module owns: its tag is the lookup key, its body
- * carries the intent with an owner marker, and its single asset is the recorded archive. This file
- * holds every format rule for that record; the store holds only transport.
+ * A Record is a GitHub release that this module owns, created as a draft: its tag is the lookup
+ * key, its body carries the intent with an owner marker, and its single asset is the recorded
+ * archive. This file holds the record's format rules: tag and owner identity, body parse and
+ * serialize, the archive asset name, and record and asset classification. The store keeps transport
+ * and the catalog translation.
  */
 
 export const releaseRecordOwner = "elmera-release";
