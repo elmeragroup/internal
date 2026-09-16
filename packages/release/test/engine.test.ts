@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import type { EngineDeps, PackAndVerify } from "../src/engine.ts";
+import type { CheckedCommitDeps, PackAndVerify, ReleaseDeps } from "../src/engine.ts";
 import {
   createReleaseOperations,
   executeCheckedCommit,
@@ -23,7 +23,8 @@ import type { Registry } from "../src/npm.ts";
 import type { CommitAncestry } from "../src/policy.ts";
 import { canaryRecordTag, releaseTag } from "../src/record.ts";
 import type { ReleaseStore, SavedRelease } from "../src/store.ts";
-import { commit, commitSha, newerCommit, releaseIntent, stableVersion } from "./lib/release-fixtures.ts";
+import { assertStableReleaseVersion } from "../src/version.ts";
+import { commit, commitSha, newerCommit, releaseIntent } from "./lib/release-fixtures.ts";
 
 const packedArchive = new Uint8Array([1, 2, 3]);
 const storedArchive = new Uint8Array([7, 8, 9]);
@@ -34,8 +35,8 @@ const pkg: ReleasePackage = {
   packageName: "@acme/app",
 };
 
-const stableLine: ReleaseLine = { channel: "stable", version: stableVersion("0.2.0") };
-const canaryLine: ReleaseLine = { channel: "canary", current: stableVersion("0.1.9") };
+const stableLine: ReleaseLine = { channel: "stable", version: assertStableReleaseVersion("0.2.0") };
+const canaryLine: ReleaseLine = { channel: "canary", current: assertStableReleaseVersion("0.1.9") };
 
 const linearHistory: CommitAncestry = (ancestor, descendant) =>
   ancestor === descendant || (ancestor === commit && descendant === newerCommit);
@@ -118,9 +119,9 @@ function harness(options: HarnessOptions = {}) {
       }),
     reservedCanaryVersions: () =>
       Effect.succeed(
-        [...byTag.values()]
-          .filter((saved) => saved.intent.channel === "canary")
-          .map((saved) => saved.intent.version)
+        [...byTag.values()].flatMap((saved) =>
+          saved.intent.channel === "canary" ? [saved.intent.version] : []
+        )
       ),
   };
 
@@ -142,11 +143,11 @@ function harness(options: HarnessOptions = {}) {
     head: () => Effect.succeed(commit),
     baseBranchTip: () => Effect.succeed(commit),
     isClean: () => Effect.succeed(true),
-    stableVersionAt: () => Effect.succeed(stableVersion("0.1.9")),
+    stableVersionAt: () => Effect.succeed(assertStableReleaseVersion("0.1.9")),
     ...options.git,
   };
 
-  const deps: EngineDeps = {
+  const deps: CheckedCommitDeps = {
     git,
     ancestry: options.isAncestor ?? linearHistory,
     store,
@@ -154,7 +155,7 @@ function harness(options: HarnessOptions = {}) {
     npm,
     confirmationInterval: 0,
     stableGate: () => Effect.succeed(options.line ?? canaryLine),
-    plannedCanaryBase: () => Effect.succeed(stableVersion(options.base ?? "0.2.0")),
+    plannedCanaryBase: () => Effect.succeed(assertStableReleaseVersion(options.base ?? "0.2.0")),
     verifyArchive: (intent, bytes) => {
       outcome.verified.push({ intent, bytes });
       verified = { ...intent, archive: "/verified/release.tgz", integrity: "sha512-test" };
@@ -169,11 +170,11 @@ function harness(options: HarnessOptions = {}) {
   return { deps, adapter, outcome, store, registry };
 }
 
-function runMain(target: CommitSha, deps: EngineDeps, adapter: PackAndVerify): Promise<void> {
+function runMain(target: CommitSha, deps: CheckedCommitDeps, adapter: PackAndVerify): Promise<void> {
   return Effect.runPromise(executeCheckedCommit(pkg, adapter, target, deps).pipe(Effect.scoped));
 }
 
-function runRetry(tag: string, deps: EngineDeps): Promise<void> {
+function runRetry(tag: string, deps: ReleaseDeps): Promise<void> {
   return Effect.runPromise(executeRetry(pkg, tag, deps).pipe(Effect.scoped));
 }
 

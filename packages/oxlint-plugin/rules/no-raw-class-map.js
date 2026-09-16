@@ -4,6 +4,8 @@ import { classTokens } from "../class-tokens.js";
 import { extractStrings } from "../extract-strings.js";
 import { isTestFile, normalizeFilename } from "../filename-normalizer.js";
 
+/** @import { ESTree } from "@oxlint/plugins" */
+
 /**
  * Exact utilities that are legal class tokens without a hyphenated suffix.
  * `z-*` is omitted on purpose: `overlayLayer = "z-50"` is the one-owner keep.
@@ -218,7 +220,7 @@ function isSkippedPath(filename) {
 }
 
 /**
- * @param {import("estree").Node | null | undefined} node
+ * @param {ESTree.Node | null | undefined} node
  */
 function unwrap(node) {
   let current = node;
@@ -254,7 +256,8 @@ function utilityOf(token) {
   let utility = lastColon === -1 ? token : token.slice(lastColon + 1);
   if (utility.startsWith("!")) utility = utility.slice(1);
   if (utility.endsWith("!")) utility = utility.slice(0, -1);
-  if (utility.startsWith("-") && utility.length > 1 && /[a-z@]/i.test(utility[1])) {
+  const secondChar = utility[1];
+  if (utility.startsWith("-") && secondChar !== undefined && /[a-z@]/i.test(secondChar)) {
     utility = utility.slice(1);
   }
   return utility;
@@ -317,7 +320,7 @@ function looksLikeClassIdentifier(name) {
 }
 
 /**
- * @param {import("estree").Node | null | undefined} node
+ * @param {ESTree.Node | null | undefined} node
  * @param {string[]} out
  */
 function collectValueStrings(node, out) {
@@ -350,7 +353,7 @@ function collectValueStrings(node, out) {
 }
 
 /**
- * @param {import("estree").ObjectExpression} node
+ * @param {ESTree.ObjectExpression} node
  */
 function objectLooksLikeClassMap(node) {
   /** @type {string[]} */
@@ -360,7 +363,7 @@ function objectLooksLikeClassMap(node) {
 }
 
 /**
- * @param {import("estree").TemplateLiteral} node
+ * @param {ESTree.TemplateLiteral} node
  */
 function templateLooksLikeClassString(node) {
   const staticText = node.quasis.map((quasi) => quasi.value.cooked ?? "").join(" ");
@@ -384,12 +387,11 @@ export default defineRule({
     },
     schema: [],
   },
-  defaultOptions: [],
   createOnce(context) {
     let skipFile = false;
 
     /**
-     * @param {import("estree").Node} node
+     * @param {ESTree.Node} node
      */
     function report(node) {
       context.report({ node, messageId: "rawClassMap" });

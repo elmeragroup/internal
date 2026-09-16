@@ -52,12 +52,12 @@ export type ApiPart = {
   rsc: RscStatus;
   /** Repo-relative path of that module. */
   sourcePath: string;
-  /** Published props in codepoint order; forwarded props are omitted. */
+  /** Published props in UTF-16 code unit order; forwarded props are omitted. */
   props: readonly ApiProp[];
   /**
    * Packages that declare the part's forwarded props, plus the forwarded value's own
-   * declaring package when the part forwards a dependency value. Sorted in codepoint
-   * order.
+   * declaring package when the part forwards a dependency value. Sorted in UTF-16
+   * code unit order.
    */
   forwardedFrom: readonly string[];
   /** Number of accepted props omitted from `props` because they are forwarded. */

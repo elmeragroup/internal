@@ -3,6 +3,8 @@ import { defineRule } from "@oxlint/plugins";
 import { extractStrings } from "../extract-strings.js";
 import { normalizeFilename } from "../filename-normalizer.js";
 
+/** @import { ESTree } from "@oxlint/plugins" */
+
 const ALLOWED_UTILS_SUFFIX = "/src/styles/utils.ts";
 
 // Focus-state ring utilities. Invalid-state rings (aria-invalid:ring) and static
@@ -23,7 +25,7 @@ function isFocusRingUtils(filename) {
 }
 
 /**
- * @param {import("estree").Node | null | undefined} node
+ * @param {ESTree.Node | null | undefined} node
  */
 function isFocusVisibleIdentifier(node) {
   return node?.type === "Identifier" && node.name === "isFocusVisible";
@@ -49,10 +51,9 @@ export default defineRule({
     },
     schema: [],
   },
-  defaultOptions: [],
   createOnce(context) {
     /**
-     * @param {import("estree").Node} node
+     * @param {ESTree.Node} node
      * @param {string[]} collected
      */
     function reportFocusRingStrings(node, collected) {
@@ -69,7 +70,7 @@ export default defineRule({
     }
 
     /**
-     * @param {import("estree").Node} node
+     * @param {ESTree.Node} node
      */
     function reportRacFocusVisibleRing(node) {
       const strings = extractStrings(node);

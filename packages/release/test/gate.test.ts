@@ -6,12 +6,11 @@ import { describe, expect, it } from "vitest";
 
 import { createStableReleaseGate } from "../src/gate.ts";
 import { createGitHubClient } from "../src/github.ts";
-import { assertCommit } from "../src/intent.ts";
-import { stableVersion } from "./lib/release-fixtures.ts";
+import { assertStableReleaseVersion } from "../src/version.ts";
+import { commit } from "./lib/release-fixtures.ts";
 
-const commit = assertCommit("a".repeat(40));
-const previous = stableVersion("0.1.9");
-const current = stableVersion("0.2.0");
+const previous = assertStableReleaseVersion("0.1.9");
+const current = assertStableReleaseVersion("0.2.0");
 
 const mergedReleasePull = {
   merged_at: "2026-09-09",

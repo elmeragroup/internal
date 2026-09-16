@@ -29,7 +29,6 @@ export default defineRule({
     },
     schema: [],
   },
-  defaultOptions: [],
   createOnce(context) {
     let skipFile = false;
 

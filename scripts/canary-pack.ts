@@ -4,7 +4,7 @@ import { mkdirSync, readFileSync, rmSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { runCommand } from "./lib/run-command.ts";
-import { archiveDirectory, archivePath, packageDirectory, packageName, releaseVersion } from "./release.ts";
+import { archivePath, releaseLayout, releaseVersion } from "./release.ts";
 
 /**
  * The stricter shape of this repository's packed publish manifest. Unlike the package's
@@ -21,11 +21,11 @@ const PublishManifest = Schema.Struct({
 });
 
 const version = releaseVersion();
-const archiveRoot = archiveDirectory();
-const name = packageName();
-rmSync(archiveRoot, { recursive: true, force: true });
-mkdirSync(archiveRoot, { recursive: true });
-runCommand("pnpm", ["pack", "--pack-destination", archiveRoot], packageDirectory());
+const layout = releaseLayout();
+const { archiveDirectory, packageDirectory, packageName: name } = layout;
+rmSync(archiveDirectory, { recursive: true, force: true });
+mkdirSync(archiveDirectory, { recursive: true });
+runCommand("pnpm", ["pack", "--pack-destination", archiveDirectory], packageDirectory);
 const archive = archivePath(version);
 const files = execFileSync("tar", ["-tzf", archive], { encoding: "utf8" }).trim().split("\n");
 if (files.some((file) => !/^package\/(?:dist\/|package\.json$|README\.md$|LICENSE$|NOTICE$)/.test(file)))
@@ -97,7 +97,7 @@ for (const file of files.filter((file) => /\.[cm]?[jt]s$/.test(file))) {
     throw new Error(`${file}: unpublished workspace import`);
 }
 const notice = execFileSync("tar", ["-xOzf", archive, "package/NOTICE"]);
-const expectedNotice = readFileSync(resolve(packageDirectory(), "NOTICE"));
+const expectedNotice = readFileSync(resolve(packageDirectory, "NOTICE"));
 if (!notice.equals(expectedNotice))
   throw new Error(`${name}: NOTICE does not match packages/internal/NOTICE`);
 console.log(JSON.stringify({ version, archive }, null, 2));

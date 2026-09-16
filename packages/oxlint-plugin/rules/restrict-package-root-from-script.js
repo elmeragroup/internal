@@ -3,6 +3,8 @@ import { defineRule } from "@oxlint/plugins";
 import { isNamedCall } from "../extract-strings.js";
 import { normalizeFilename } from "../filename-normalizer.js";
 
+/** @import { ESTree } from "@oxlint/plugins" */
+
 const OWNER_SUFFIX = "/scripts/paths.ts";
 
 /**
@@ -13,21 +15,22 @@ function isOwner(filename) {
 }
 
 /**
- * @param {import("estree").Node | null | undefined} node
+ * @param {ESTree.Node | null | undefined} node
  */
 function isImportMetaUrl(node) {
+  if (node?.type !== "MemberExpression") return false;
+  const { object, property } = node;
   return (
-    node?.type === "MemberExpression" &&
-    node.object?.type === "MetaProperty" &&
-    node.object.meta?.name === "import" &&
-    node.object.property?.name === "meta" &&
-    node.property?.type === "Identifier" &&
-    node.property.name === "url"
+    object.type === "MetaProperty" &&
+    object.meta.name === "import" &&
+    object.property.name === "meta" &&
+    property.type === "Identifier" &&
+    property.name === "url"
   );
 }
 
 /**
- * @param {import("estree").Node | null | undefined} node
+ * @param {ESTree.Node | null | undefined} node
  */
 function isFileUrlToPathOfImportMetaUrl(node) {
   return (
@@ -50,7 +53,6 @@ export default defineRule({
     },
     schema: [],
   },
-  defaultOptions: [],
   createOnce(context) {
     let skipFile = false;
 

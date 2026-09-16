@@ -28,8 +28,9 @@ retryRelease(pkg: ReleasePackage, recordTag: string): Effect<void, ReleaseError>
   used only on this path. Git, GitHub, npm, and Changesets adapters are production defaults inside
   the engine.
 - `retryRelease` finishes a prepared record from its recorded archive. It does not pack, and it
-  does not read the Changesets configuration or the base branch. A missing or incomplete record
-  keeps the current error: rerun the original Merge job.
+  does not read the Changesets configuration or the base branch. A record tag with no prepared
+  release fails naming that tag; an incomplete prepared record fails telling you to rerun the
+  original Merge job.
 
 The engine reads `repository`, `token`, and the global fetch from `GITHUB_REPOSITORY` and `GH_TOKEN`
 inside each operation. Tests build a fixture transport through the internal

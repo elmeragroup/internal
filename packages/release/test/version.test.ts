@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   assertCanaryReleaseVersion,
   assertReleaseVersion,
+  assertStableReleaseVersion,
   compareCanaryVersions,
   nextPatchVersion,
   parseCanaryVersion,
@@ -51,6 +52,6 @@ describe("parsed release versions", () => {
     ).toBe(1);
   });
   it("starts a new patch base from the previous stable", () => {
-    expect(nextPatchVersion("0.2.9")).toBe("0.2.10");
+    expect(nextPatchVersion(assertStableReleaseVersion("0.2.9"))).toBe("0.2.10");
   });
 });

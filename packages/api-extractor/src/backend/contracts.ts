@@ -520,7 +520,8 @@ type BackendTimingRequest = {
  *
  * `totals.nodesMaterialized` counts materialized compiler nodes,
  * `sourceFilesFetched` counts fetched source files, and `nodesFetched` counts nodes fetched over
- * IPC; the ratio between the last two is the boundary evidence the timing plans gate on.
+ * IPC; the fetched-to-materialized ratio is the dense-walk evidence the timing plans gate on,
+ * beside the request-count and byte ceilings.
  */
 export type BackendTiming = {
   readonly enabled: boolean;

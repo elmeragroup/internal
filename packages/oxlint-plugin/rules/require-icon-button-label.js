@@ -1,5 +1,7 @@
 import { defineRule } from "@oxlint/plugins";
 
+/** @import { ESTree } from "@oxlint/plugins" */
+
 const ICON_SIZE_PREFIX = "icon";
 const TEXT_CONTENT_NAMES = new Set(["Span", "Text", "ItemTitle", "Title"]);
 
@@ -7,7 +9,7 @@ const TEXT_CONTENT_NAMES = new Set(["Span", "Text", "ItemTitle", "Title"]);
  * Statically known string from a JSX attribute value or child expression.
  * Identifiers and interpolated templates stay unknown.
  *
- * @param {import("estree").Node | null | undefined} node
+ * @param {ESTree.Node | null | undefined} node
  * @returns {string | null}
  */
 function getStaticString(node) {
@@ -34,7 +36,7 @@ function getStaticString(node) {
  * Known nonempty strings count. Known empty/whitespace, bare, null, and false do not.
  * Unresolved expressions stay permissive.
  *
- * @param {import("estree").JSXOpeningElement} node
+ * @param {ESTree.JSXOpeningElement} node
  */
 function hasUsableAriaLabel(node) {
   return node.attributes.some((attr) => {
@@ -51,6 +53,9 @@ function hasUsableAriaLabel(node) {
   });
 }
 
+/**
+ * @param {ESTree.JSXOpeningElement} node
+ */
 function hasSlot(node) {
   return node.attributes.some((attr) => attr.type === "JSXAttribute" && attr.name.name === "slot");
 }
@@ -59,7 +64,7 @@ function hasSlot(node) {
  * Size/variant may also use an identifier's name as a heuristic (size={icon}).
  * That heuristic is not a known runtime string.
  *
- * @param {import("estree").JSXAttribute} attr
+ * @param {ESTree.JSXAttribute} attr
  * @returns {string | null}
  */
 function getSizeOrVariantValue(attr) {
@@ -73,6 +78,9 @@ function getSizeOrVariantValue(attr) {
   return null;
 }
 
+/**
+ * @param {ESTree.JSXOpeningElement} node
+ */
 function isIconVariant(node) {
   return node.attributes.some((attr) => {
     if (attr.type !== "JSXAttribute" || attr.name.name !== "variant") return false;
@@ -83,6 +91,9 @@ function isIconVariant(node) {
   });
 }
 
+/**
+ * @param {ESTree.JSXOpeningElement} node
+ */
 function isIconSize(node) {
   return node.attributes.some((attr) => {
     if (attr.type !== "JSXAttribute" || attr.name.name !== "size") return false;
@@ -94,6 +105,9 @@ function isIconSize(node) {
   });
 }
 
+/**
+ * @param {ESTree.JSXElementName} nameNode
+ */
 function getElementName(nameNode) {
   if (nameNode.type === "JSXIdentifier") {
     return nameNode.name;
@@ -106,8 +120,12 @@ function getElementName(nameNode) {
   return null;
 }
 
+/**
+ * @param {ESTree.JSXElement | ESTree.JSXFragment} node
+ * @returns {boolean}
+ */
 function hasTextContent(node) {
-  if (!node.children || node.children.length === 0) return false;
+  if (node.children.length === 0) return false;
 
   return node.children.some((child) => {
     if (child.type === "JSXText") {
@@ -141,7 +159,7 @@ function hasTextContent(node) {
 export default defineRule({
   createOnce(context) {
     return {
-      /** @param {import("estree").JSXOpeningElement} node */
+      /** @param {ESTree.JSXOpeningElement} node */
       JSXOpeningElement(node) {
         const name = getElementName(node.name);
 
@@ -178,5 +196,4 @@ export default defineRule({
         'Icon-only <{{component}}> must have an aria-label for accessibility. Add aria-label={t("...")} to provide a screen reader label.',
     },
   },
-  defaultOptions: [],
 });

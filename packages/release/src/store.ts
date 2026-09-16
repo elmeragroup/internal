@@ -14,6 +14,7 @@ import {
   serializeIntent,
 } from "./record.ts";
 import type { ReleaseAsset } from "./record.ts";
+import type { CanaryVersion } from "./version.ts";
 
 /** A durable GitHub release record: its release identity, parsed intent, and archive asset state. */
 export type SavedRelease = {
@@ -34,7 +35,7 @@ export type ReleaseStore = {
   upload: (release: SavedRelease, bytes: Uint8Array) => Effect.Effect<SavedRelease, ReleaseError>;
   download: (release: SavedRelease) => Effect.Effect<Uint8Array, ReleaseError>;
   complete: (release: SavedRelease) => Effect.Effect<void, ReleaseError>;
-  reservedCanaryVersions: () => Effect.Effect<string[], ReleaseError>;
+  reservedCanaryVersions: () => Effect.Effect<readonly CanaryVersion[], ReleaseError>;
 };
 
 type CatalogEntry =
@@ -168,7 +169,7 @@ export function createReleaseStore(client: GitHubClient, packageName: string): R
     return undefined;
   }
 
-  async function readSaved(id: number): Promise<SavedRelease> {
+  async function readSaved(id: ReleaseId): Promise<SavedRelease> {
     const value = await client.jsonFrom(`${root}/releases/${String(id)}`, GitHubRelease, "GitHub release");
     const saved = savedFromRecord(value);
     await assertTagMatchesCommit(releaseTag(saved.intent), saved);
@@ -267,8 +268,8 @@ export function createReleaseStore(client: GitHubClient, packageName: string): R
     );
   }
 
-  async function reservedCanaryVersions(): Promise<string[]> {
-    const versions: string[] = [];
+  async function reservedCanaryVersions(): Promise<readonly CanaryVersion[]> {
+    const versions: CanaryVersion[] = [];
     for (const entry of (await releaseCatalog()).values()) {
       if (entry.kind === "saved" && entry.release.intent.channel === "canary") {
         versions.push(entry.release.intent.version);

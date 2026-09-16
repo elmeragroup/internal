@@ -21,8 +21,8 @@ import { componentObjectNode } from "./component-object.ts";
 import { componentNode } from "./component.ts";
 import { authoredUndefinedUnionSyntax, intersectionNode, unionNode } from "./compound.ts";
 import { arrayNode, tupleNode } from "./container.ts";
-import type { ResolvedExtractorOptions, ResolverContext } from "./contracts.ts";
 import { warningLocation } from "./contracts.ts";
+import type { ResolverContext } from "./contracts.ts";
 import { externalPolicy } from "./external-policy.ts";
 import type { ExternalPolicyDecision } from "./external-policy.ts";
 import { unsupported, warningMessage } from "./fallback.ts";
@@ -37,6 +37,7 @@ import {
   canonicalizeProvenance,
   recordProvenance,
 } from "./object-resolver.ts";
+import type { ResolvedExtractorOptions } from "./options.ts";
 import { isStandardLibraryDeclaration, primaryDeclaration } from "./ownership.ts";
 import {
   collectSemanticPaths,
@@ -85,12 +86,11 @@ export function resolveModule(
     provenancePath: [],
     provenancePropertyContainer: "object",
     symbolStack: [],
-    options: { shouldInclude: options.shouldInclude, shouldResolveObject: options.shouldResolveObject },
-    externalTypes: options.externalTypes,
+    options,
     substitutions: new Map(),
     active: new Set(),
     propertyDepth: 0,
-    compoundMember: false,
+    exportRoot: undefined,
   };
   context.operations.setErrorContext([]);
   // Module-walk warnings (unresolved re-exports, barrel cycles, ambiguous
@@ -142,6 +142,7 @@ function resolveExport(entry: BackendExportDraft, base: Context): ExportNode {
     provenance: resolvedProvenance,
     provenancePath: semanticPath,
     symbolStack,
+    exportRoot: declaredType,
   });
   const componentContext = {
     ...base,
@@ -775,9 +776,7 @@ function typeNameFor(
     namespaces,
     sourceNode,
     symbol,
-    // Type arguments are members of the type they parameterize, never the
-    // export root, so an anonymous object argument is structure to describe.
-    context: { ...context, compoundMember: true },
+    context,
     resolveType: typeNode,
   });
   return {

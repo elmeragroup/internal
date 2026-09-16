@@ -111,8 +111,8 @@ function operandNamesUnselectedExternalType(
   );
   return symbols.some(
     (symbol) =>
-      (isExternalSymbol(symbol, context) || context.externalTypes.kind === "packages") &&
-      !externalTypeSelectionAllowsSymbol(symbol, context.operations, context.externalTypes)
+      (isExternalSymbol(symbol, context) || context.options.externalTypes.kind === "packages") &&
+      !externalTypeSelectionAllowsSymbol(symbol, context.operations, context.options.externalTypes)
   );
 }
 

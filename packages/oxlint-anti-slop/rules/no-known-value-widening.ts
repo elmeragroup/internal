@@ -6,25 +6,12 @@ import {
 	isKnownEvidenceExpression,
 } from "../shared/dictionary-types.ts";
 import type { TypeEnvironment, WideningTarget } from "../shared/dictionary-types.ts";
-import { resolveVariable } from "../shared/scope-lookup.ts";
+import { isEmptyObjectExpression, unwrapExpression } from "../shared/expression-unwrapping.ts";
+import { resolveVariable } from "../shared/variable-scope.ts";
 
 import type { ESTree, SourceCode, Variable } from "@oxlint/plugins";
 
 type FunctionExpression = ESTree.ArrowFunctionExpression | ESTree.Function;
-
-function unwrapExpression(expression: ESTree.Expression): ESTree.Expression {
-	let current = expression;
-	while (
-		current.type === "ParenthesizedExpression" ||
-		current.type === "TSAsExpression" ||
-		current.type === "TSSatisfiesExpression" ||
-		current.type === "TSTypeAssertion" ||
-		current.type === "TSNonNullExpression"
-	) {
-		current = current.expression;
-	}
-	return current;
-}
 
 function variableDeclarator(variable: Variable): ESTree.VariableDeclarator | null {
 	if (variable.defs.length !== 1) return null;
@@ -102,11 +89,6 @@ function functionName(sourceCode: SourceCode, owner: FunctionExpression | null):
 		return parent.id.name;
 	if (parent.type === "MethodDefinition") return sourceKeyName(sourceCode, parent.key);
 	return "anonymous function";
-}
-
-function isEmptyObjectExpression(expression: ESTree.Expression): boolean {
-	const unwrapped = unwrapExpression(expression);
-	return unwrapped.type === "ObjectExpression" && unwrapped.properties.length === 0;
 }
 
 function isDictionaryAccumulatorTarget(destination: WideningTarget): boolean {

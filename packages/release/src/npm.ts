@@ -5,7 +5,7 @@ import { spawnSync } from "node:child_process";
 import { lift, liftPromise } from "./errors.ts";
 import type { ReleaseError } from "./errors.ts";
 import type { ReleasePackage } from "./files.ts";
-import { assertCommit, isCommit } from "./intent.ts";
+import { isCommit } from "./intent.ts";
 import type { CommitSha } from "./intent.ts";
 import { decodeJson } from "./json.ts";
 
@@ -51,11 +51,12 @@ function registryUrl(packageName: string): string {
 }
 
 function publishedCommit(manifest: typeof NpmVersion.Type): CommitSha | undefined {
-  if (manifest.elmeraRelease === undefined) {
-    // The pre-elmeraRelease fallback tolerates an unusable gitHead; the recorded field is parsed.
-    return manifest.gitHead !== undefined && isCommit(manifest.gitHead) ? manifest.gitHead : undefined;
+  // Both fields are usable only as a full commit SHA; an unusable recorded value is absent
+  // metadata, not a reason to fail every read of the package's history.
+  if (manifest.elmeraRelease !== undefined) {
+    return isCommit(manifest.elmeraRelease.commit) ? manifest.elmeraRelease.commit : undefined;
   }
-  return assertCommit(manifest.elmeraRelease.commit);
+  return manifest.gitHead !== undefined && isCommit(manifest.gitHead) ? manifest.gitHead : undefined;
 }
 
 async function fetchRegistry(packageName: string, fetcher: typeof fetch): Promise<Registry> {
@@ -77,7 +78,10 @@ async function fetchRegistry(packageName: string, fetcher: typeof fetch): Promis
 export function createNpmPublisher(pkg: ReleasePackage): NpmPublisher {
   function runNpm(args: readonly string[]): Effect.Effect<void, ReleaseError> {
     return lift(() => {
-      // npm writes diagnostics to stderr; stdout stays attached so progress is still visible live.
+      // npm writes everything, including its publish notice, to stderr. Stdout stays attached
+      // so progress is visible live, stdin stays closed so npm can never block on a prompt
+      // (CI authentication is token-based), and stderr is captured to name a failure and
+      // re-emitted after a success so the CI log keeps the trace.
       const result = spawnSync("npm", args, {
         cwd: pkg.checkoutRoot,
         encoding: "utf8",
@@ -92,6 +96,7 @@ export function createNpmPublisher(pkg: ReleasePackage): NpmPublisher {
             : `npm failed with status ${String(result.status)}: ${stderr}`
         );
       }
+      process.stderr.write(result.stderr);
     });
   }
   return {

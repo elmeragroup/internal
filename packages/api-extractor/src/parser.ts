@@ -1,8 +1,8 @@
 import type { BackendExtractionSession, BackendModuleDraft } from "./backend/contracts.ts";
 import { applyTypeOnlyStarFilter } from "./backend/type-only-star-filter.ts";
 import type { ExtractorOptions } from "./options.ts";
-import type { ResolvedExtractorOptions } from "./parse/contracts.ts";
 import { parseExtractorOptions } from "./parse/options.ts";
+import type { ResolvedExtractorOptions } from "./parse/options.ts";
 import { resolveModule } from "./parse/resolver.ts";
 import type { ResolvedModule } from "./parse/resolver.ts";
 
@@ -20,7 +20,7 @@ export function parseModule(
   options?: ExtractorOptions
 ): ResolvedModule {
   const draft = readModuleDraft(session, filePath);
-  return resolveModuleDraft(session, draft, filePath, options);
+  return resolveModuleDraft(session, draft, filePath, parseExtractorOptions(options));
 }
 
 /**
@@ -36,24 +36,11 @@ export function readModuleDraft(session: BackendExtractionSession, filePath: str
  * Apply module re-export policy and then invoke the compiler-free resolver.
  *
  * Type-only star re-exports keep only their pure types; structured module-walk
- * warnings flow into the extraction result beside resolver warnings. Public
- * options are parsed once here; the extraction entry parses them earlier and
- * uses `resolveParsedModuleDraft` instead.
+ * warnings flow into the extraction result beside resolver warnings. Options
+ * must already be parsed with `parseExtractorOptions`, so a session and its
+ * resolver consume one policy value instead of re-reading caller options.
  */
 export function resolveModuleDraft(
-  session: BackendExtractionSession,
-  draft: BackendModuleDraft,
-  filePath: string,
-  options?: ExtractorOptions
-): ResolvedModule {
-  return resolveParsedModuleDraft(session, draft, filePath, parseExtractorOptions(options));
-}
-
-/**
- * Resolves one draft with options already parsed at the extraction entry, so
- * the session and the resolver consume the same policy value.
- */
-export function resolveParsedModuleDraft(
   session: BackendExtractionSession,
   draft: BackendModuleDraft,
   filePath: string,

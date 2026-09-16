@@ -220,19 +220,16 @@ function followAliasToMappedDeclaration(
   if (bodyInfo.kind !== "typeReference" || bodyInfo.typeName?.authoredSymbol === undefined) return undefined;
   const target = context.operations.symbolFacts(bodyInfo.typeName.authoredSymbol).declarations[0];
   if (target === undefined) return undefined;
-  const authoredArguments = bodyInfo.typeName.authoredArguments;
+  const authoredArguments = bodyInfo.typeName.authoredArguments ?? [];
   // Each hop's authored arguments are re-bound through the substitutions
   // accumulated so far before they become the next hop's bindings.
   const next =
     bindAliasParameters(
       target,
+      authoredArguments.map((argument) =>
+        applySubstitutions(context.operations.typeAtNode(argument), substitutions, context.operations)
+      ),
       context,
-      (index) => {
-        const argumentNode = authoredArguments?.[index];
-        const authoredArgument =
-          argumentNode === undefined ? undefined : context.operations.typeAtNode(argumentNode);
-        return applySubstitutions(authoredArgument, substitutions, context.operations);
-      },
       substitutions
     ) ?? substitutions;
   return followAliasToMappedDeclaration(target, next, context, seen);

@@ -69,43 +69,31 @@ export function aliasInstantiationArguments(
 }
 
 /**
- * Binds a declaration's type parameters to the arguments of one instantiation.
+ * Binds a declaration's type parameters to one instantiation's positional
+ * arguments. This is the one owner of that invariant; every alias walk reaches
+ * its bindings through here.
  *
  * Arguments pair with parameters by position, exactly as TypeScript's own
- * instantiation does: an unresolved argument position stays a hole and every
- * later argument keeps its own parameter, with `bindAliasParameters` applying
- * the parameter's authored default when one exists. Compacting holes out of the
- * list would shift every later argument onto the wrong parameter.
- */
-export function bindAliasInstantiation(
-  declaration: BackendNodeReference,
-  type: BackendTypeHandle,
-  sourceNode: BackendNodeReference | undefined,
-  context: BindingContext
-): Substitutions {
-  const args = aliasInstantiationArguments(type, sourceNode, context);
-  return bindAliasParameters(declaration, context, (index) => args[index]) ?? new Map(context.substitutions);
-}
-
-/**
- * Binds an alias declaration's type parameters to the arguments of one
- * instantiation. This is the one owner of that invariant; every alias walk
- * reaches its bindings through here.
+ * instantiation does: an unresolved position stays a hole at index N and every
+ * later argument keeps its own parameter, with the parameter's authored default
+ * filling a hole when one exists. Compacting holes out of the list would shift
+ * every later argument onto the wrong parameter.
  *
- * The argument at each position comes from `argumentAt`; a missing argument
- * falls back to the parameter's authored default, mirroring upstream's
- * `deriveTypeParameterBindings`. Bindings accumulate onto a copy of
- * `inherited` — the active substitutions by default — so a multi-hop alias
- * walk re-binds each hop's parameters over the previous hop's bindings.
+ * Bindings accumulate onto a copy of `inherited` — the active substitutions by
+ * default — so a multi-hop alias walk re-binds each hop's parameters over the
+ * previous hop's bindings.
  *
- * Returns `undefined` when the declaration contributes no binding at all: it
- * declares no parameters, or no parameter whose symbol and argument both
- * resolve.
+ * @param declaration - The alias declaration whose parameters bind.
+ * @param args - The instantiation's arguments, holes included.
+ * @param context - Compiler operations and the substitutions accumulated so far.
+ * @param inherited - The bindings to accumulate onto; defaults to the active substitutions.
+ * @returns The bindings, or `undefined` when the declaration contributes no binding at all: it
+ *   declares no parameters, or no parameter whose symbol and argument both resolve.
  */
 export function bindAliasParameters(
   declaration: BackendNodeReference,
+  args: readonly (BackendTypeHandle | undefined)[],
   context: BindingContext,
-  argumentAt: (index: number) => BackendTypeHandle | undefined,
   inherited: Substitutions = context.substitutions
 ): Substitutions | undefined {
   const result = new Map(inherited);
@@ -115,11 +103,34 @@ export function bindAliasParameters(
     const info = context.operations.nodeFacts(parameter);
     const symbol = info.typeName?.authoredSymbol;
     const argument =
-      argumentAt(index) ??
+      args[index] ??
       (info.defaultType === undefined ? undefined : context.operations.typeAtNode(info.defaultType));
     if (symbol === undefined || argument === undefined) continue;
     result.set(symbol, argument);
     bindings += 1;
   }
   return bindings === 0 ? undefined : result;
+}
+
+/**
+ * Binds a declaration's type parameters to the arguments of one instantiation,
+ * reading those arguments from the alias instantiation first.
+ *
+ * A declaration that contributes no binding keeps the active substitutions, so
+ * callers can always substitute with the result.
+ *
+ * @param declaration - The alias declaration whose parameters bind.
+ * @param type - The instantiated alias type.
+ * @param sourceNode - The authored reference that reached the alias, when known.
+ * @param context - Compiler operations and the substitutions accumulated so far.
+ * @returns The instantiation's bindings, or the active substitutions when nothing binds.
+ */
+export function bindAliasInstantiation(
+  declaration: BackendNodeReference,
+  type: BackendTypeHandle,
+  sourceNode: BackendNodeReference | undefined,
+  context: BindingContext
+): Substitutions {
+  const args = aliasInstantiationArguments(type, sourceNode, context);
+  return bindAliasParameters(declaration, args, context) ?? new Map(context.substitutions);
 }

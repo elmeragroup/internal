@@ -3,12 +3,12 @@ import { writeFileSync } from "node:fs";
 import { assertCanaryReleaseVersion } from "@elmeragroup/release";
 
 import { readJsonObject } from "./lib/json-object.mjs";
-import { manifestPath } from "./release.ts";
+import { releaseLayout } from "./release.ts";
 
 const version = process.argv[2];
 if (version === undefined) throw new Error("Usage: pnpm canary:version x.y.z-canary.N");
 assertCanaryReleaseVersion(version);
-const path = manifestPath();
+const path = releaseLayout().manifestPath;
 const manifest = readJsonObject(path);
 manifest.version = version;
 writeFileSync(path, `${JSON.stringify(manifest, null, 2)}\n`);

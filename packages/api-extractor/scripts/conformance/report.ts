@@ -4,7 +4,11 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { ExtractWarningSchema, ProjectExtractor } from "../../src/index.ts";
-import type { ExtractWarning, ProjectExtractorService } from "../../src/index.ts";
+import type {
+  ExtractionResult as ExtractorResult,
+  ExtractWarning,
+  ProjectExtractorService,
+} from "../../src/index.ts";
 import { definedFields } from "../../src/optional-fields.ts";
 import { writeArtifactBatchOrThrow } from "../artifact-batch-writer.ts";
 import type { ArtifactBatchItem } from "../artifact-batch-writer.ts";
@@ -58,65 +62,94 @@ type ConformanceMode =
   | { readonly mode: "write-warnings"; readonly names: readonly string[] }
   | { readonly mode: "write-ts7"; readonly names: readonly string[] };
 
-const conformanceFlags = new Set([
-  "--check",
-  "--write",
-  "--audit-reference",
-  "--reference-required",
-  "--write-warnings",
-  "--write-ts7",
+/** The five exclusive conformance modes, keyed by the flag that selects each. */
+const modeFlags = new Map<string, ConformanceMode["mode"]>([
+  ["--check", "check"],
+  ["--write", "write"],
+  ["--audit-reference", "audit-reference"],
+  ["--write-warnings", "write-warnings"],
+  ["--write-ts7", "write-ts7"],
 ]);
 
 /**
- * Parses the conformance command line into exactly one mode.
+ * Parses the conformance command line into exactly one mode. `--reference-required`
+ * is the one flag that modifies a mode instead of selecting one.
  *
  * @param argv - Arguments after the script name.
  * @returns The selected mode and its arguments.
- * @throws When a flag is unknown, repeated, or combined with a contradictory mode.
+ * @throws When a flag is unknown, repeated, or combined with a contradictory mode, when a mode
+ *   that takes no fixture names is given one, or when any argument targets the immutable oracle.
  */
 function parseConformanceMode(argv: readonly string[]): ConformanceMode {
-  const flags = new Set<string>();
+  const seenFlags = new Set<string>();
+  const modes = new Set<ConformanceMode["mode"]>();
   const names: string[] = [];
+  let referenceRequired = false;
   for (const argument of argv) {
+    if (argument.endsWith("output.json")) {
+      throw new Error("Issue 14 regeneration refuses to target the immutable output.json oracle.");
+    }
     if (!argument.startsWith("--")) {
       names.push(argument);
       continue;
     }
-    if (!conformanceFlags.has(argument)) throw new Error(`Unknown conformance flag: ${argument}`);
-    if (flags.has(argument)) throw new Error(`Repeated conformance flag: ${argument}`);
-    flags.add(argument);
+    if (seenFlags.has(argument)) throw new Error(`Repeated conformance flag: ${argument}`);
+    seenFlags.add(argument);
+    if (argument === "--reference-required") {
+      referenceRequired = true;
+      continue;
+    }
+    const mode = modeFlags.get(argument);
+    if (mode === undefined) throw new Error(`Unknown conformance flag: ${argument}`);
+    modes.add(mode);
   }
 
-  const evidenceRefresh = ["--write-warnings", "--write-ts7"].filter((flag) => flags.has(flag));
-  if (evidenceRefresh.length > 0) {
-    const [refresh] = evidenceRefresh;
-    if (refresh === undefined) throw new Error("Unreachable: evidence refresh selection is empty.");
-    if (evidenceRefresh.length > 1) {
-      throw new Error("--write-warnings and --write-ts7 are mutually exclusive.");
-    }
-    const conflicting = [...flags].filter((flag) => flag !== refresh && flag !== "--reference-required");
-    if (conflicting.length > 0)
-      throw new Error(`${refresh} does not combine with ${conflicting.join(", ")}.`);
-    if (flags.has("--reference-required")) {
-      throw new Error(`${refresh} always requires a verified reference before extraction.`);
-    }
-    if (refresh === "--write-ts7" && names.length === 0) {
-      throw new Error("--write-ts7 requires one or more explicit fixture names.");
-    }
-    return refresh === "--write-warnings" ? { mode: "write-warnings", names } : { mode: "write-ts7", names };
+  if (modes.size > 1) {
+    throw new Error(
+      "Choose exactly one of --check, --write, --audit-reference, --write-warnings, or --write-ts7."
+    );
   }
-
-  if (names.length > 0) throw new Error(`Unexpected conformance argument: ${names.join(" ")}`);
-  const referenceRequired = flags.has("--reference-required");
-  const modes = ["--check", "--write", "--audit-reference"].filter((flag) => flags.has(flag));
-  if (modes.length > 1) throw new Error(`Choose exactly one of ${modes.join(", ")}.`);
-  if (modes[0] === "--write") return { mode: "write", referenceRequired };
-  if (modes[0] === "--audit-reference") return { mode: "audit-reference", referenceRequired };
-  return { mode: "check", referenceRequired };
+  const mode = [...modes][0] ?? "check";
+  // The two evidence-refresh modes always verify the reference before extraction; asking for
+  // it explicitly is a contradiction, not a no-op.
+  if (referenceRequired && (mode === "write-warnings" || mode === "write-ts7")) {
+    throw new Error(`--${mode} always requires a verified reference before extraction.`);
+  }
+  switch (mode) {
+    case "check":
+    case "write":
+    case "audit-reference": {
+      if (names.length > 0) throw new Error(`Unexpected conformance argument: ${names.join(" ")}`);
+      return { mode, referenceRequired };
+    }
+    case "write-warnings":
+      return { mode, names };
+    case "write-ts7":
+      if (names.length === 0) throw new Error("--write-ts7 requires one or more explicit fixture names.");
+      return { mode, names };
+  }
 }
 
 async function writeEvidenceBatch(artifacts: readonly ArtifactBatchItem[]): Promise<void> {
   await writeArtifactBatchOrThrow({ outputRoot: fixtureDirectory, artifacts }, "Issue 14 evidence write");
+}
+
+/**
+ * Extracts every definition through one live extractor, keyed by fixture name.
+ *
+ * @param extractor - The live fixture extractor.
+ * @param definitions - One definition per fixture to extract, in order.
+ * @returns The extraction result per fixture.
+ */
+function extractEachFixture(extractor: ProjectExtractorService, definitions: readonly ConformanceFixture[]) {
+  return Effect.gen(function* () {
+    const results = new Map<string, ExtractorResult>();
+    for (const definition of definitions) {
+      const inputPath = join(fixtureDirectory, definition.fixture, definition.file);
+      results.set(definition.fixture, yield* extractor.extractModule(inputPath));
+    }
+    return results;
+  });
 }
 
 /**
@@ -563,18 +596,10 @@ export async function writeAdditionalTs7Evidence(
     return { definition, evidence };
   });
   const results = await withFixtureExtractor((extractor) =>
-    Effect.gen(function* () {
-      const extracted = new Map<
-        string,
-        { readonly module: unknown; readonly warnings: readonly ExtractWarning[] }
-      >();
-      for (const { definition } of definitions) {
-        const inputPath = join(fixtureDirectory, definition.fixture, definition.file);
-        const result = yield* extractor.extractModule(inputPath);
-        extracted.set(definition.fixture, { module: result.module, warnings: result.warnings });
-      }
-      return extracted;
-    })
+    extractEachFixture(
+      extractor,
+      definitions.map(({ definition }) => definition)
+    )
   );
   const generatedFiles: ArtifactBatchItem[] = [];
   for (const { definition, evidence } of definitions) {
@@ -662,20 +687,16 @@ async function extractWarningEvidence(
   selections: readonly WarningEvidenceSelection[]
 ): Promise<ReadonlyMap<string, readonly Schema.Json[]>> {
   const extracted = await withFixtureExtractor((extractor) =>
-    Effect.gen(function* () {
-      const warnings = new Map<string, readonly ExtractWarning[]>();
-      for (const { definition } of selections) {
-        const inputPath = join(fixtureDirectory, definition.fixture, definition.file);
-        const result = yield* extractor.extractModule(inputPath);
-        warnings.set(definition.fixture, result.warnings);
-      }
-      return warnings;
-    })
+    extractEachFixture(
+      extractor,
+      selections.map(({ definition }) => definition)
+    )
   );
   return new Map(
     selections.map(({ definition, codes }) => {
-      const warnings = extracted.get(definition.fixture);
-      if (warnings === undefined) throw new Error(`No warning result for ${definition.fixture}.`);
+      const result = extracted.get(definition.fixture);
+      if (result === undefined) throw new Error(`No warning result for ${definition.fixture}.`);
+      const warnings = result.warnings;
       const actualCodes = warnings.map((warning) => warning.code);
       if (JSON.stringify(actualCodes) !== JSON.stringify(codes)) {
         throw new Error(
@@ -826,9 +847,6 @@ export function assertStoredReportInvariants(
 
 async function main(): Promise<void> {
   assertCompilerIdentity();
-  if (process.argv.some((argument) => argument.endsWith("output.json"))) {
-    throw new Error("Issue 14 regeneration refuses to target the immutable output.json oracle.");
-  }
   const command = parseConformanceMode(process.argv.slice(2));
   switch (command.mode) {
     case "write-ts7":

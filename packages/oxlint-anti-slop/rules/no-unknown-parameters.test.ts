@@ -3,6 +3,10 @@ import { noUnknownParametersRule } from "./no-unknown-parameters.ts";
 
 const tester = createRuleTester();
 const error = { messageId: "unknownParameter" };
+const named = (parameter: string) => ({
+  messageId: "unknownParameter",
+  data: { parameter },
+});
 
 tester.run("anti-slop/no-unknown-parameters", noUnknownParametersRule, {
   valid: [
@@ -21,9 +25,11 @@ tester.run("anti-slop/no-unknown-parameters", noUnknownParametersRule, {
     "type Expected = unknown;",
   ],
   invalid: [
-    { code: "function f(value: unknown) {}", errors: [error] },
-    { code: "function f(value: unknown = initial) {}", errors: [error] },
-    { code: "function f(...values: unknown) {}", errors: [error] },
+    { code: "function f(value: unknown) {}", errors: [named("value")] },
+    { code: "function f(value: unknown = initial) {}", errors: [named("value")] },
+    { code: "function f(...values: unknown) {}", errors: [named("values")] },
+    { code: "function f({ value }: unknown) {}", errors: [named("{ value }")] },
+    { code: "function f({ value }: unknown = {}) {}", errors: [named("{ value }")] },
     { code: "const f = (value: unknown) => value;", errors: [error] },
     { code: "type Handler = (value: unknown) => void;", errors: [error] },
     { code: "interface Handler { call(value: unknown): void }", errors: [error] },
@@ -31,7 +37,10 @@ tester.run("anti-slop/no-unknown-parameters", noUnknownParametersRule, {
     { code: "declare function f(value: unknown): void;", errors: [error] },
     { code: "function f(cause: unknown, value: unknown) {}", errors: [error] },
     { code: "function f(value: unknown, other: unknown) {}", errors: [error, error] },
-    { code: "class C { constructor(private readonly value: unknown) {} }", errors: [error] },
+    {
+      code: "class C { constructor(private readonly value: unknown) {} }",
+      errors: [named("value")],
+    },
     { code: "class C { method(value: unknown) {} }", errors: [error] },
     { code: "function f(value: unknown) {} function g(other: unknown) {}", errors: [error, error] },
   ],

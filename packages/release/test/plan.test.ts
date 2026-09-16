@@ -7,10 +7,13 @@ import { describe, expect, it } from "vitest";
 import { readJson } from "../src/json.ts";
 import { changesetBaseBranch, plannedCanaryBase, readReleasePlan } from "../src/plan.ts";
 import type { PlannedRelease } from "../src/plan.ts";
-import { assertCanaryReleaseVersion, assertReleaseVersion } from "../src/version.ts";
+import {
+  assertCanaryReleaseVersion,
+  assertReleaseVersion,
+  assertStableReleaseVersion,
+} from "../src/version.ts";
 import { commitBaseline, withGitWorkspace, workspaceTimeout } from "./lib/git-workspace.ts";
 import type { WorkspaceHead } from "./lib/git-workspace.ts";
-import { stableVersion } from "./lib/release-fixtures.ts";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "../../..");
 const packageName = "@elmeragroup/internal";
@@ -187,9 +190,9 @@ describe("canary base planning in the publisher's checkout", () => {
         expect(existsSync(join(workspace, ".git/refs/heads/main"))).toBe(false);
         writeChangeset(workspace, "minor-internal", packageName, "minor");
         const planned = plannedVersion(plannedPublicReleases(workspace));
-        expect(Effect.runSync(plannedCanaryBase(stableVersion("0.0.1"), packageName, workspace))).toBe(
-          planned
-        );
+        expect(
+          Effect.runSync(plannedCanaryBase(assertStableReleaseVersion("0.0.1"), packageName, workspace))
+        ).toBe(planned);
       }, "detached");
     },
     workspaceTimeout
@@ -199,9 +202,9 @@ describe("canary base planning in the publisher's checkout", () => {
     "falls back to the next patch when no changeset is pending",
     () => {
       withPlannerWorkspace((workspace) => {
-        expect(Effect.runSync(plannedCanaryBase(stableVersion("0.2.9"), packageName, workspace))).toBe(
-          "0.2.10"
-        );
+        expect(
+          Effect.runSync(plannedCanaryBase(assertStableReleaseVersion("0.2.9"), packageName, workspace))
+        ).toBe("0.2.10");
       }, "detached");
     },
     workspaceTimeout

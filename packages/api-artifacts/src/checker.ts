@@ -2,20 +2,13 @@ import path from "node:path";
 import type { SourceFile } from "typescript/unstable/ast";
 import { isExpressionStatement, isStringLiteral } from "typescript/unstable/ast/is";
 import { API, NodeBuilderFlags, SignatureKind, SymbolFlags } from "typescript/unstable/sync";
-import type {
-  Checker,
-  Program,
-  Project,
-  Signature,
-  Symbol as TsSymbol,
-  Type,
-} from "typescript/unstable/sync";
+import type { Checker, Program, Project, Symbol as TsSymbol, Type } from "typescript/unstable/sync";
 
 import type { ComponentSourceRequest, ComponentSourceResult } from "@elmeragroup/api-extractor";
 
 import type { ProblemLog } from "./errors.ts";
 import type { ApiPart, ApiProp, RscStatus } from "./model.ts";
-import { compareCodepoint } from "./ordering.ts";
+import { compareUtf16CodeUnits } from "./ordering.ts";
 
 export type LibraryProject = {
   projectRoot: string;
@@ -215,17 +208,13 @@ export type PartRequest = ComponentSourceRequest & {
   type: Type;
 };
 
-type CallSignatureSet =
-  | { kind: "none" }
-  | { kind: "one"; signature: Signature }
-  | { kind: "many"; count: number };
-
-function callSignaturesOf(checker: Checker, type: Type): CallSignatureSet {
-  const signatures = checker.getSignaturesOfType(type, SignatureKind.Call);
-  const first = signatures[0];
-  if (first === undefined) return { kind: "none" };
-  if (signatures.length === 1) return { kind: "one", signature: first };
-  return { kind: "many", count: signatures.length };
+/**
+ * Whether a type exposes at least one call signature, i.e. whether it can be a
+ * component or one of a namespace's component members. The walk asks only this so
+ * it never resolves a props type before the part itself is described.
+ */
+function hasCallSignatures(checker: Checker, type: Type): boolean {
+  return checker.getSignaturesOfType(type, SignatureKind.Call).length > 0;
 }
 
 function isForwardedProp(context: LibraryProject, symbol: TsSymbol): boolean {
@@ -247,7 +236,7 @@ const emptyForwarded: PartForwarded = { count: 0, from: [] };
 /** A forwarded value's own declaring package joins the packages its forwarded props come from. */
 function withForwardedValue(forwarded: PartForwarded, result: ComponentSourceResult): PartForwarded {
   if (result.status !== "forwarded" || forwarded.from.includes(result.packageName)) return forwarded;
-  const from = [...forwarded.from, result.packageName].sort(compareCodepoint);
+  const from = [...forwarded.from, result.packageName].sort(compareUtf16CodeUnits);
   return { count: forwarded.count, from };
 }
 
@@ -266,7 +255,7 @@ function forwardedOfProps(context: LibraryProject, properties: Iterable<TsSymbol
       if (packageName !== null) from.add(packageName);
     }
   }
-  return { count, from: [...from].sort(compareCodepoint) };
+  return { count, from: [...from].sort(compareUtf16CodeUnits) };
 }
 
 function addProblem(problems: ProblemLog | undefined, message: string): void {
@@ -316,14 +305,14 @@ export function componentPartRequests(
       addProblem(problems, `${exportName}: exported value has an unresolvable type`);
       continue;
     }
-    if (callSignaturesOf(checker, rootType).kind !== "none") {
+    if (hasCallSignatures(checker, rootType)) {
       parts.push({ name: exportName, exportName, type: rootType });
       continue;
     }
     const start = parts.length;
     for (const member of checker.getPropertiesOfType(rootType)) {
       const memberType = checker.getTypeOfSymbol(member);
-      if (memberType === undefined || callSignaturesOf(checker, memberType).kind === "none") continue;
+      if (memberType === undefined || !hasCallSignatures(checker, memberType)) continue;
       parts.push({
         name: `${exportName}.${member.name}`,
         exportName,
@@ -394,57 +383,59 @@ export type ComponentApi = {
 };
 
 /**
- * The single call signature's first parameter, distinguished by what could be
- * recovered from it: `absent` when there is no parameter, `unresolved` when the
- * parameter type is missing or an error type, and `resolved` with the accepted
- * prop symbols otherwise. The three states cannot be confused by position.
+ * What a single call signature's first parameter yields: `absent` when there is
+ * none, `unresolved` when its type is missing or an error type, and `resolved`
+ * with the accepted prop symbols.
  */
 type PropsParameter =
   | { readonly kind: "absent" }
   | { readonly kind: "unresolved" }
   | { readonly kind: "resolved"; readonly props: ReadonlyMap<string, TsSymbol> };
 
-function describePart(
+/**
+ * What one part's call signatures yield for its published props contract. `none`
+ * and `many` are the signature problems that fail generation; `one` carries the
+ * single signature's props parameter. No state is built for a question another
+ * state answers.
+ */
+type PartContract =
+  | { readonly kind: "none" }
+  | { readonly kind: "many"; readonly count: number }
+  | { readonly kind: "one"; readonly props: PropsParameter };
+
+/** Resolves what a part's call signatures yield, reading its props type at most once. */
+function partContractOf(checker: Checker, type: Type): PartContract {
+  const signatures = checker.getSignaturesOfType(type, SignatureKind.Call);
+  const first = signatures[0];
+  if (first === undefined) return { kind: "none" };
+  if (signatures.length > 1) return { kind: "many", count: signatures.length };
+  const parameter = first.getParameters()[0];
+  if (parameter === undefined) return { kind: "one", props: { kind: "absent" } };
+  const declared = checker.getTypeOfSymbol(parameter);
+  if (declared === undefined || declared.isErrorType()) return { kind: "one", props: { kind: "unresolved" } };
+  const props = new Map<string, TsSymbol>();
+  for (const property of checker.getPropertiesOfType(declared)) {
+    props.set(property.name, property);
+  }
+  return { kind: "one", props: { kind: "resolved", props } };
+}
+
+/**
+ * Builds the published prop rows for a resolved props parameter. A prop with no
+ * declaration at all is synthesised by `VariantProps` over a library `tv` recipe:
+ * there is no declaration site to hang JSDoc on, so its printed union is the
+ * documentation and the JSDoc gate does not apply.
+ */
+function describeProps(
   context: LibraryProject,
   request: PartRequest,
-  signatures: CallSignatureSet,
-  source: PartSource | null,
-  propsParameter: PropsParameter,
-  forwarded: PartForwarded,
+  source: PartSource,
+  props: ReadonlyMap<string, TsSymbol>,
   problems: ProblemLog
-): ApiPart | null {
+): ApiProp[] {
   const { checker } = context;
-  if (signatures.kind !== "one") {
-    problems.add(
-      signatures.kind === "none"
-        ? `${request.name}: no call signature — it does not look like a component`
-        : `${request.name}: ${String(signatures.count)} call signatures — API artifacts describe one public props contract; keep one public overload`
-    );
-    return null;
-  }
-  if (source === null) {
-    return null;
-  }
-  if (propsParameter.kind === "absent") {
-    return {
-      name: request.name,
-      rsc: source.rsc,
-      sourcePath: source.sourcePath,
-      props: [],
-      forwardedFrom: forwarded.from,
-      forwardedCount: 0,
-    };
-  }
-  if (propsParameter.kind === "unresolved") {
-    problems.add(`${request.name}: props type is unresolvable`);
-    return null;
-  }
-
   const rows: ApiProp[] = [];
-  for (const property of propsParameter.props.values()) {
-    // A prop with no declaration at all is synthesised by `VariantProps` over a library
-    // `tv` recipe: there is no declaration site to hang JSDoc on, so its printed union
-    // is the documentation and the JSDoc gate does not apply.
+  for (const property of props.values()) {
     const declarationPaths = property.declarations.map((declaration) => declaration.path);
     const isRecipeAxis = propOrigin(declarationPaths, property.declarations.length === 0) === "recipe-axis";
     if (isForwardedProp(context, property)) continue;
@@ -472,17 +463,52 @@ function describePart(
       required: !isOptional(property),
     });
   }
+  rows.sort((left, right) => compareUtf16CodeUnits(left.name, right.name));
+  return rows;
+}
 
-  rows.sort((left, right) => compareCodepoint(left.name, right.name));
-
-  return {
-    name: request.name,
-    rsc: source.rsc,
-    sourcePath: source.sourcePath,
-    props: rows,
-    forwardedFrom: forwarded.from,
-    forwardedCount: forwarded.count,
-  };
+function describePart(
+  context: LibraryProject,
+  request: PartRequest,
+  contract: PartContract,
+  source: PartSource | null,
+  forwarded: PartForwarded,
+  problems: ProblemLog
+): ApiPart | null {
+  if (contract.kind !== "one") {
+    problems.add(
+      contract.kind === "none"
+        ? `${request.name}: no call signature — it does not look like a component`
+        : `${request.name}: ${String(contract.count)} call signatures — API artifacts describe one public props contract; keep one public overload`
+    );
+    return null;
+  }
+  if (source === null) {
+    return null;
+  }
+  switch (contract.props.kind) {
+    case "absent":
+      return {
+        name: request.name,
+        rsc: source.rsc,
+        sourcePath: source.sourcePath,
+        props: [],
+        forwardedFrom: forwarded.from,
+        forwardedCount: 0,
+      };
+    case "unresolved":
+      problems.add(`${request.name}: props type is unresolvable`);
+      return null;
+    case "resolved":
+      return {
+        name: request.name,
+        rsc: source.rsc,
+        sourcePath: source.sourcePath,
+        props: describeProps(context, request, source, contract.props.props, problems),
+        forwardedFrom: forwarded.from,
+        forwardedCount: forwarded.count,
+      };
+  }
 }
 
 /** Reads every fact one part yields, resolving its props type exactly once. */
@@ -493,23 +519,11 @@ export function extractPart(
   problems: ProblemLog
 ): LibraryPartApi {
   const source = partSourceFromInspection(context, request.name, sourceResult, problems);
-  const { checker } = context;
-  const signatures = callSignaturesOf(checker, request.type);
-  const signature = signatures.kind === "one" ? signatures.signature : undefined;
-  const parameter = signature?.getParameters()[0];
-  const declared = parameter === undefined ? undefined : checker.getTypeOfSymbol(parameter);
-  const props = new Map<string, TsSymbol>();
-  let propsParameter: PropsParameter;
-  if (parameter === undefined) {
-    propsParameter = { kind: "absent" };
-  } else if (declared === undefined || declared.isErrorType()) {
-    propsParameter = { kind: "unresolved" };
-  } else {
-    for (const property of checker.getPropertiesOfType(declared)) {
-      props.set(property.name, property);
-    }
-    propsParameter = { kind: "resolved", props };
-  }
+  const contract = partContractOf(context.checker, request.type);
+  const props =
+    contract.kind === "one" && contract.props.kind === "resolved"
+      ? contract.props.props
+      : new Map<string, TsSymbol>();
   const forwarded = withForwardedValue(
     props.size === 0 ? emptyForwarded : forwardedOfProps(context, props.values()),
     sourceResult
@@ -519,6 +533,6 @@ export function extractPart(
     source,
     forwarded,
     props,
-    part: describePart(context, request, signatures, source, propsParameter, forwarded, problems),
+    part: describePart(context, request, contract, source, forwarded, problems),
   };
 }

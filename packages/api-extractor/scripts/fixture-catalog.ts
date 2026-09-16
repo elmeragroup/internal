@@ -1,5 +1,5 @@
 import { Schema } from "effect";
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import type {
@@ -119,13 +119,14 @@ export function fixtureDirectories(root: string): readonly { readonly id: string
  * @param root - The fixture root directory.
  * @param budgets - The hand-maintained facts from `fixtures.json`.
  * @returns Records ordered by fixture id.
- * @throws When a fixture directory holds more than one input file.
+ * @throws When a fixture directory holds more than one input file, a derived record violates the
+ *   evidence contract, or a budget names a missing fixture or type-check project.
  */
 export function deriveFixtureCatalog(
   root: string,
   budgets: FixtureBudgets
 ): readonly FixtureEvidenceRecord[] {
-  return fixtureDirectories(root).map(({ id, file }) => {
+  const records: FixtureEvidenceRecord[] = fixtureDirectories(root).map(({ id, file }) => {
     const contents = readdirSync(join(root, id));
     const locallyGenerated = budgets.locallyGeneratedOracles.includes(id);
     const upstream = contents.includes("output.json") && !locallyGenerated;
@@ -167,6 +168,44 @@ export function deriveFixtureCatalog(
       },
     };
   });
+  validateFixtureEvidenceCatalog(records);
+  validateBudgetFixtures(records, root, budgets);
+  return records;
+}
+
+/**
+ * Cross-checks the hand-maintained `fixtures.json` budgets against the derived inventory, so a
+ * rename or removal cannot silently drop a timing ceiling, a virtual dependency, a
+ * generated-oracle exemption, or a type-check exclusion.
+ *
+ * @param records - The derived fixture records.
+ * @param root - The fixture root directory.
+ * @param budgets - The hand-maintained facts from `fixtures.json`.
+ * @throws When a budget names a fixture that does not exist, or excludes a project that is not on disk.
+ */
+function validateBudgetFixtures(
+  records: readonly FixtureEvidenceRecord[],
+  root: string,
+  budgets: FixtureBudgets
+): void {
+  const ids = new Set(records.map((record) => record.id));
+  const groups = [
+    ["timing.boundary", budgets.timing.boundary.map((entry) => entry.fixture)],
+    ["timing.externalSelection", budgets.timing.externalSelection.map((entry) => entry.fixture)],
+    ["virtualUpstreamDependency", budgets.virtualUpstreamDependency],
+    ["locallyGeneratedOracles", budgets.locallyGeneratedOracles],
+  ] as const;
+  for (const [group, names] of groups) {
+    for (const name of names) {
+      if (!ids.has(name))
+        throw new Error(`fixtures.json ${group} names a fixture that does not exist: ${name}`);
+    }
+  }
+  for (const project of budgets.excludedTypecheckProjects) {
+    if (!existsSync(join(root, project))) {
+      throw new Error(`fixtures.json excludes a type-check project that does not exist: ${project}`);
+    }
+  }
 }
 
 /**
@@ -221,9 +260,8 @@ export const fixtureTreeRoot = fixtureRoot;
 
 /** The decoded `test/fixtures/fixtures.json` facts for this package's own fixture tree. */
 export const fixtureBudgets = readFixtureBudgets(fixtureRoot);
-/** The derived catalog for this package's own fixture tree. */
+/**
+ * The derived catalog for this package's own fixture tree. Derivation validates every record, so
+ * an importer can never observe an invalid catalog.
+ */
 export const fixtureEvidenceCatalog = deriveFixtureCatalog(fixtureRoot, fixtureBudgets);
-
-// The catalog validates itself once, here, when this module loads. Plans and
-// gates project it afterwards and never re-validate.
-validateFixtureEvidenceCatalog(fixtureEvidenceCatalog);

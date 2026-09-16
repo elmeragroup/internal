@@ -370,10 +370,7 @@ async function prepareBatch(
   normalized: readonly NormalizedArtifact[],
   root: string,
   runFileSystem: FileSystemRunner
-): Promise<{
-  readonly root: string;
-  readonly artifacts: readonly PreparedArtifact[];
-}> {
+): Promise<readonly PreparedArtifact[]> {
   const oracleIdentities = await immutableOracleIdentities(root, runFileSystem);
   const existingIdentities: Array<{ readonly destination: string; readonly identity: ArtifactIdentity }> = [];
   const artifacts: PreparedArtifact[] = [];
@@ -437,7 +434,7 @@ async function prepareBatch(
       existed: entry !== undefined,
     });
   }
-  return { root, artifacts };
+  return artifacts;
 }
 
 async function acquireLock(root: string, runFileSystem: FileSystemRunner): Promise<string> {
@@ -681,6 +678,29 @@ function makeFileSystemRunner(controls: ArtifactBatchWriterTestControls, deadlin
   };
 }
 
+/** The value of a fallible setup step, or its writer-classified error. */
+type Attempted<Value> =
+  | { readonly ok: true; readonly value: Value }
+  | { readonly ok: false; readonly error: ArtifactBatchError };
+
+/**
+ * Runs one fallible setup step, classifying a throw into the writer's error type.
+ *
+ * @param step - The setup step to run.
+ * @param category - The failure category a non-`ArtifactBatchError` throw becomes.
+ * @returns The step's value, or the classified error.
+ */
+async function attempt<Value>(
+  step: () => Value | Promise<Value>,
+  category: ArtifactBatchFailureCategory
+): Promise<Attempted<Value>> {
+  try {
+    return { ok: true, value: await step() };
+  } catch (error) {
+    return { ok: false, error: asBatchError(error, category) };
+  }
+}
+
 async function writeBatch(
   request: ArtifactBatchRequest,
   controls: ArtifactBatchWriterTestControls
@@ -693,29 +713,24 @@ async function writeBatch(
   let cleanupDeadline = deadline;
   // Request-shape validation is filesystem-free, so an invalid batch fails
   // before any lock or evidence file is touched.
-  let normalized: readonly NormalizedArtifact[];
-  try {
-    normalized = validateBatchRequest(request);
-  } catch (error) {
-    return failure(asBatchError(error, "invalid-batch"));
-  }
+  const validated = await attempt(() => validateBatchRequest(request), "invalid-batch");
+  if (!validated.ok) return failure(validated.error);
+  const normalized = validated.value;
 
-  let root: string;
-  try {
-    root = await rootPath(request.outputRoot, runFileSystem);
-  } catch (error) {
-    return failure(asBatchError(error, "filesystem-unavailable"));
-  }
+  const resolvedRoot = await attempt(
+    () => rootPath(request.outputRoot, runFileSystem),
+    "filesystem-unavailable"
+  );
+  if (!resolvedRoot.ok) return failure(resolvedRoot.error);
+  const root = resolvedRoot.value;
 
-  let lockPath: string;
-  try {
-    lockPath = await acquireLock(root, runFileSystem);
-  } catch (error) {
-    const lockFailure = asBatchError(error, "filesystem-unavailable");
-    return lockFailure.mayCompleteAfterTimeout
-      ? failure(lockFailure, { originalState: "restored", temporaryState: "not-removed" })
-      : failure(lockFailure);
+  const locked = await attempt(() => acquireLock(root, runFileSystem), "filesystem-unavailable");
+  if (!locked.ok) {
+    return locked.error.mayCompleteAfterTimeout
+      ? failure(locked.error, { originalState: "restored", temporaryState: "not-removed" })
+      : failure(locked.error);
   }
+  const lockPath = locked.value;
 
   let transactionPath: string | undefined;
   const backups: Backup[] = [];
@@ -724,13 +739,13 @@ async function writeBatch(
   let result: ArtifactBatchResult;
   try {
     const prepared = await prepareBatch(normalized, root, runFileSystem);
-    transactionPath = join(prepared.root, `.artifact-batch-${randomUUID()}`);
+    transactionPath = join(root, `.artifact-batch-${randomUUID()}`);
     const stagedPath = join(transactionPath, "staged");
     const backupPath = join(transactionPath, "backups");
     await runFileSystem("make-directory", stagedPath, () => mkdir(stagedPath, { recursive: true }));
     await runFileSystem("make-directory", backupPath, () => mkdir(backupPath));
 
-    for (const [index, artifact] of prepared.artifacts.entries()) {
+    for (const [index, artifact] of prepared.entries()) {
       const path = join(stagedPath, String(index));
       await runFileSystem(
         "write-file",
@@ -739,7 +754,7 @@ async function writeBatch(
         artifact.destination
       );
     }
-    for (const [index, artifact] of prepared.artifacts.entries()) {
+    for (const [index, artifact] of prepared.entries()) {
       if (!artifact.existed) continue;
       const path = join(backupPath, String(index));
       await runFileSystem("rename", path, () => rename(artifact.absolutePath, path), artifact.destination);
@@ -749,9 +764,9 @@ async function writeBatch(
         destination: artifact.destination,
       });
     }
-    for (const [index, artifact] of prepared.artifacts.entries()) {
+    for (const [index, artifact] of prepared.entries()) {
       await ensureParentDirectories(
-        prepared.root,
+        root,
         artifact.absolutePath,
         createdDirectories,
         runFileSystem,
@@ -784,7 +799,7 @@ async function writeBatch(
     // backups may be destroyed, so cleanup failures must never trigger rollback.
     result = {
       status: "success",
-      artifacts: prepared.artifacts.map(({ destination, evidence }) => ({ destination, evidence })),
+      artifacts: prepared.map(({ destination, evidence }) => ({ destination, evidence })),
     };
   } catch (error) {
     const primary = asBatchError(error, "write-failed");

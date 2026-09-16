@@ -1,9 +1,11 @@
 import { defineRule } from "@oxlint/plugins";
 
+/** @import { ESTree } from "@oxlint/plugins" */
+
 export default defineRule({
   createOnce(context) {
     return {
-      /** @param {import("estree").ImportExpression} node */
+      /** @param {ESTree.ImportExpression} node */
       ImportExpression(node) {
         context.report({
           loc: node.loc,
@@ -24,5 +26,4 @@ export default defineRule({
         "The library never lazy-loads internally. Dynamic import() is forbidden in packages/ui/src.",
     },
   },
-  defaultOptions: [],
 });

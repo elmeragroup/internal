@@ -1,5 +1,6 @@
 import type { ESTree } from "@oxlint/plugins";
 
+import { unwrapExpression } from "./expression-unwrapping.ts";
 import type { VisitorKeys } from "./lexical-type-parameters.ts";
 import { createTypeNameScope } from "./type-name-scope.ts";
 import type { TypeNameScope } from "./type-name-scope.ts";
@@ -479,16 +480,7 @@ function classifyAliasBroadTarget(
  * @returns True when the expression carries known evidence without a variable reference.
  */
 export function isKnownEvidenceExpression(expression: ESTree.Expression): boolean {
-	let current = expression;
-	while (
-		current.type === "ParenthesizedExpression" ||
-		current.type === "TSAsExpression" ||
-		current.type === "TSTypeAssertion" ||
-		current.type === "TSNonNullExpression" ||
-		current.type === "TSSatisfiesExpression"
-	) {
-		current = current.expression;
-	}
+	const current = unwrapExpression(expression);
 	if (current.type === "ObjectExpression") return true;
 	return (
 		current.type === "ArrayExpression" ||

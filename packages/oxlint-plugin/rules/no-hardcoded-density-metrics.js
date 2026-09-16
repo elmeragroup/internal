@@ -3,6 +3,8 @@ import { defineRule } from "@oxlint/plugins";
 import { classTokens } from "../class-tokens.js";
 import { extractStrings, isNamedCall } from "../extract-strings.js";
 
+/** @import { ESTree } from "@oxlint/plugins" */
+
 const CONTROL_VAR_RE = /--control-(?:h|px-icon|px|gap)-|--control-(?:text|leading)\b/;
 
 const KEYWORD_BOX = new Set([
@@ -64,9 +66,9 @@ const BUTTON_SIZE_KEYS = new Set([
 ]);
 
 /**
- * @param {import("estree").ObjectExpression} obj
+ * @param {ESTree.ObjectExpression} obj
  * @param {string} name
- * @returns {import("estree").Node | null}
+ * @returns {ESTree.Node | null}
  */
 function objectPropValue(obj, name) {
   for (const prop of obj.properties) {
@@ -79,7 +81,7 @@ function objectPropValue(obj, name) {
 }
 
 /**
- * @param {import("estree").Property} prop
+ * @param {ESTree.ObjectProperty} prop
  * @returns {string | null}
  */
 function propertyName(prop) {
@@ -301,7 +303,7 @@ function densityOwnedFamily(className, checkType) {
  * Class tokens from a tv/cn/record arm, excluding `data-[size=…]` tokens
  * which are reported from the literal/template visitors instead.
  *
- * @param {import("estree").Node | null | undefined} node
+ * @param {ESTree.Node | null | undefined} node
  * @returns {string[]}
  */
 function recipeTokens(node) {
@@ -311,7 +313,7 @@ function recipeTokens(node) {
 }
 
 /**
- * @param {import("estree").Node | null | undefined} node
+ * @param {ESTree.Node | null | undefined} node
  * @param {string} name
  */
 function isInsideNamedCall(node, name) {
@@ -345,11 +347,11 @@ function checkTypeForTokens(tokens) {
 }
 
 /**
- * @param {import("estree").ObjectExpression} obj
- * @returns {Array<{ key: string; value: import("estree").Node }> | null}
+ * @param {ESTree.ObjectExpression} obj
+ * @returns {Array<{ key: string; value: ESTree.Node }> | null}
  */
 function recordArms(obj) {
-  /** @type {Array<{ key: string; value: import("estree").Node }>} */
+  /** @type {Array<{ key: string; value: ESTree.Node }>} */
   const arms = [];
   for (const prop of obj.properties) {
     if (prop.type !== "Property") return null;
@@ -361,7 +363,7 @@ function recordArms(obj) {
 }
 
 /**
- * @param {import("estree").ObjectExpression} obj
+ * @param {ESTree.ObjectExpression} obj
  */
 function isButtonSizeKeyedRecord(obj) {
   const arms = recordArms(obj);
@@ -407,12 +409,11 @@ export default defineRule({
     },
     schema: [],
   },
-  defaultOptions: [],
   createOnce(context) {
     let fileHasControlH = false;
 
     /**
-     * @param {import("estree").Node} node
+     * @param {ESTree.Node} node
      * @param {string[]} tokens
      * @param {boolean} checkType
      */
@@ -429,7 +430,7 @@ export default defineRule({
     }
 
     /**
-     * @param {import("estree").Node} node
+     * @param {ESTree.Node} node
      * @param {string} value
      */
     function reportDataSizeLiterals(node, value) {
@@ -437,7 +438,7 @@ export default defineRule({
     }
 
     /**
-     * @param {import("estree").CallExpression} node
+     * @param {ESTree.CallExpression} node
      */
     function reportCnLiterals(node) {
       if (isInsideNamedCall(node, "tv")) return;
@@ -447,7 +448,7 @@ export default defineRule({
     }
 
     /**
-     * @param {import("estree").ObjectExpression} recipe
+     * @param {ESTree.ObjectExpression} recipe
      */
     function reportTvSlots(recipe) {
       const slots = objectPropValue(recipe, "slots");
@@ -463,7 +464,7 @@ export default defineRule({
     }
 
     /**
-     * @param {import("estree").ObjectExpression} node
+     * @param {ESTree.ObjectExpression} node
      */
     function reportSizeKeyedRecord(node) {
       if (isInsideNamedCall(node, "tv")) return;
@@ -515,7 +516,7 @@ export default defineRule({
         if (!isNamedCall(node.callee, "tv")) return;
         if (node.arguments.length === 0) return;
         const recipe = node.arguments[0];
-        if (recipe.type !== "ObjectExpression") return;
+        if (recipe?.type !== "ObjectExpression") return;
         const variants = objectPropValue(recipe, "variants");
         const size = variants?.type === "ObjectExpression" ? objectPropValue(variants, "size") : null;
 
@@ -536,7 +537,7 @@ export default defineRule({
           // on a `box` axis (field-box's control/content height model). Decorative
           // variant axes (e.g. media image sizes) are not density rungs, so only
           // base and the `box` axis are scanned.
-          /** @type {Array<{ node: import("estree").Node; tokens: string[] }>} */
+          /** @type {Array<{ node: ESTree.Node; tokens: string[] }>} */
           const groups = [];
           const base = objectPropValue(recipe, "base");
           if (base) {

@@ -1,7 +1,9 @@
 // Adapted from kumo lint/no-primitive-colors.js (MIT, Copyright (c) 2026 Cloudflare, Inc.).
 import { defineRule } from "@oxlint/plugins";
 
-import { extractStrings, isNamedCall } from "../extract-strings.js";
+import { extractStrings } from "../extract-strings.js";
+
+/** @import { ESTree } from "@oxlint/plugins" */
 
 const RULE_NAME = "no-primitive-colors";
 const LITERAL_RULE = "color-literal";
@@ -205,8 +207,9 @@ function findPrimitiveColor(str) {
     const colorFamily = match[3];
     if (!fullToken || !colorFamily) continue;
 
-    // Group 3 never contains the `/opacity` suffix or the shade step; TOKEN_RE
-    // consumes both outside the capture.
+    // Group 3 excludes only the `/opacity` suffix: the slash is outside the
+    // capture. The group is greedy, so a shade step like `slate-500` is
+    // captured whole and stripped below before the family lookup.
     if (isNonColorUtility(colorFamily)) continue;
     if (ROLE_TOKENS.has(colorFamily)) continue;
 
@@ -238,35 +241,9 @@ export default defineRule({
     },
     schema: [],
   },
-  defaultOptions: [],
   createOnce(context) {
     /**
-     * The `className`/`class` JSXAttribute and `cn`/`tv` CallExpression visitors
-     * already collect every string in their own subtree. Inner visitors must not
-     * report the same string again.
-     *
-     * @param {import("estree").Node} node
-     */
-    function isCoveredByOuterVisit(node) {
-      let current = node.parent;
-      while (current) {
-        if (current.type === "JSXElement" || current.type === "JSXFragment") return false;
-        if (current.type === "JSXAttribute") {
-          const name = current.name.type === "JSXIdentifier" ? current.name.name : undefined;
-          if (name === "className" || name === "class") return true;
-        } else if (
-          current.type === "CallExpression" &&
-          (isNamedCall(current.callee, "cn") || isNamedCall(current.callee, "tv"))
-        ) {
-          return true;
-        }
-        current = current.parent;
-      }
-      return false;
-    }
-
-    /**
-     * @param {import("estree").Node} node
+     * @param {ESTree.Node} node
      * @param {string[]} collected
      */
     function reportColorIssues(node, collected) {
@@ -284,24 +261,11 @@ export default defineRule({
     }
 
     return {
-      JSXAttribute(node) {
-        const name = node.name.type === "JSXIdentifier" ? node.name.name : undefined;
-        if (name !== "className" && name !== "class") return;
-        if (node.value) {
-          reportColorIssues(node, extractStrings(node.value));
-        }
-      },
-      CallExpression(node) {
-        if (!isNamedCall(node.callee, "tv") && !isNamedCall(node.callee, "cn")) return;
-        if (isCoveredByOuterVisit(node)) return;
-        reportColorIssues(node, extractStrings(node));
-      },
       Literal(node) {
-        if (typeof node.value !== "string" || isCoveredByOuterVisit(node)) return;
+        if (typeof node.value !== "string") return;
         reportColorIssues(node, [node.value]);
       },
       TemplateLiteral(node) {
-        if (isCoveredByOuterVisit(node)) return;
         reportColorIssues(node, extractStrings(node));
       },
     };

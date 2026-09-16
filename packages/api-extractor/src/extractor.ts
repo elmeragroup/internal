@@ -17,10 +17,10 @@ import { ExtractionResultSchema } from "./model.ts";
 import { definedFields } from "./optional-fields.ts";
 import type { ExtractorOptions, OpenProjectOptions } from "./options.ts";
 import { inspectRequestedComponentSources } from "./parse/component-source.ts";
-import type { ExternalTypeSelection } from "./parse/external-type-selection.ts";
 import { parseExtractorOptions } from "./parse/options.ts";
+import type { ResolvedExtractorOptions } from "./parse/options.ts";
 import { ResolverFailure } from "./parse/resolver-failure.ts";
-import { readModuleDraft, resolveParsedModuleDraft } from "./parser.ts";
+import { readModuleDraft, resolveModuleDraft } from "./parser.ts";
 
 /** One extracted module: its semantic model, warnings, and provenance. */
 export type ExtractionResult = typeof ExtractionResultSchema.Type;
@@ -36,7 +36,7 @@ export type ProjectExtractorService = {
    * Extracts one file that belongs to the configured project.
    *
    * @param filePath - The file to extract.
-   * @param options - Per-extraction options; defaults come from `parseExtractorOptions`.
+   * @param options - Per-extraction options; every field has a documented default.
    * @returns An effect that succeeds with the module model, warnings, and provenance, or fails
    *   with a typed `BackendError`, `FileNotInProgramError`, or `ExtractError`.
    */
@@ -71,9 +71,9 @@ export class ProjectExtractor extends Context.Service<ProjectExtractor, ProjectE
    * Builds the live service for one TypeScript project.
    *
    * @param options - The tsconfig path plus optional cwd and filesystem seams.
-   * @returns A scoped layer that opens the project when provided and closes it on release.
-   * @throws Fails the layer with a `ConfigError` for invalid configuration or a `BackendError`
-   *   defect when the compiler cannot start the project.
+   * @returns A scoped layer that opens the project when provided and closes it on release. Its
+   *   error channel carries a `ConfigError` for invalid configuration and a `BackendError` when
+   *   the compiler cannot start the project.
    */
   static live(options: OpenProjectOptions): Layer.Layer<ProjectExtractor, ConfigError | BackendError> {
     return projectExtractorLayer(options).pipe(Layer.provide(CompilerBackend.layer));
@@ -134,7 +134,7 @@ export function projectExtractorLayerWithTiming(
 
 function openExtraction(
   project: BackendProject,
-  externalTypes: ExternalTypeSelection,
+  externalTypes: ResolvedExtractorOptions["externalTypes"],
   componentSources = false
 ) {
   return Effect.acquireRelease(
@@ -190,7 +190,7 @@ const extractModule = Effect.fn("ProjectExtractor.extractModule")(function* (
     catch: (cause) => classifyThrown(cause, { filePath, operation: "readModule" }),
   });
   const resolved = yield* Effect.try({
-    try: () => resolveParsedModuleDraft(session, draft, filePath, parsedOptions),
+    try: () => resolveModuleDraft(session, draft, filePath, parsedOptions),
     catch: (cause) => classifyThrown(cause, { filePath, operation: "resolveModule", fallback: "extract" }),
   });
   // The resolver violating its own schema is a bug, not user input.

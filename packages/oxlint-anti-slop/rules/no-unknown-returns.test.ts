@@ -21,15 +21,44 @@ tester.run("anti-slop/no-unknown-returns", noUnknownReturnsRule, {
     'import { Promise } from "./p"; declare function f(): Promise<unknown>;',
     "function outer() { type Promise<T> = { value: T }; function f(): Promise<unknown> { return x; } }",
     'import Promise = require("./p"); declare function f(): Promise<unknown>;',
+    {
+      name: "a self-referential alias stops the chase",
+      code: "type Alias = Alias; function load(): Alias { return input; }",
+    },
+    {
+      name: "a self-referential promise alias stops the chase",
+      code: "type Alias = Promise<Alias>; function load(): Alias { return input; }",
+    },
+    {
+      name: "an applied generic alias is not chased",
+      code: "type Box<T> = { readonly value: T }; function load(): Box<unknown> { return input; }",
+    },
   ],
   invalid: [
     { code: "function load(): unknown { return input; }", errors: [error] },
+    { code: "function load(): (unknown) { return input; }", errors: [error] },
     { code: "const load = (): unknown => input;", errors: [error] },
     { code: "type Loader = () => unknown;", errors: [error] },
     { code: "interface Loader { load(): unknown }", errors: [error] },
     { code: "declare function load(): unknown;", errors: [error] },
     { code: "function load(): string | unknown { return input; }", errors: [error] },
     { code: "function load(): Promise<unknown> { return promise; }", errors: [error] },
+    { code: "function load(): PromiseLike<unknown> { return promise; }", errors: [error] },
+    {
+      name: "an alias to parenthesized unknown",
+      code: "type Alias = (unknown); function load(): Alias { return input; }",
+      errors: [error],
+    },
+    {
+      name: "an alias that chases to a promise of unknown",
+      code: "type Hidden = Promise<unknown>; function load(): Hidden { return input; }",
+      errors: [error],
+    },
+    {
+      name: "a union member that chases to an alias of unknown",
+      code: "type Hidden = unknown; function load(): string | Hidden { return input; }",
+      errors: [error],
+    },
     { code: "type UnknownValue = unknown; function load(): UnknownValue { return input; }", errors: [error] },
     { code: "type Item = unknown; type Fallback<Input> = Input extends infer Item ? string : () => Item;", errors: [error] },
     {

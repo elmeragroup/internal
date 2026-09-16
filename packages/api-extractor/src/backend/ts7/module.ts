@@ -268,24 +268,25 @@ function appendDescriptors(
   out: BackendExportDraft[],
   visitedNamespaces: ReadonlySet<TsSymbol>
 ): void {
-  const first = resolveOwnedDeclaration(scope.session, scope.symbol.declarations[0]);
-  // A pure namespace symbol owns only `namespace` declarations. When a value
-  // declaration is merged in (`namespace X {}` written before `class X {}`),
-  // the namespace is just one declaration of the merged symbol: the value must
-  // keep its own descriptor and the namespace members follow it, exactly as
-  // they do when the value is declared first.
-  const ownedDeclarations = scope.symbol.declarations.flatMap((declaration) => {
-    const resolved = resolveOwnedDeclaration(scope.session, declaration);
-    return resolved === undefined ? [] : [resolved];
-  });
+  const declarations = scope.symbol.declarations;
+  // A pure namespace symbol owns only `namespace` declarations. The handle's
+  // kind and path answer that without materializing any declaration: resolving
+  // every declaration would fetch whole files for a question the handles
+  // already answer. When a value declaration is merged in (`namespace X {}`
+  // written before `class X {}`), the namespace is just one declaration of the
+  // merged symbol: the value must keep its own descriptor and the namespace
+  // members follow it, exactly as they do when the value is declared first.
   const namespaceOnly =
-    ownedDeclarations.length > 0 &&
-    ownedDeclarations.length === scope.symbol.declarations.length &&
-    ownedDeclarations.every((declaration) => isModuleDeclaration(declaration));
+    declarations.length > 0 &&
+    declarations.every(
+      (declaration) =>
+        declaration.kind === SyntaxKind.ModuleDeclaration && !scope.session.isExternalPath(declaration.path)
+    );
   if (namespaceOnly) {
     appendNamespaceMembers(scope, out, visitedNamespaces);
     return;
   }
+  const first = resolveOwnedDeclaration(scope.session, declarations[0]);
   if (first !== undefined && isNamespaceExport(first)) {
     // `export * as Name from '…'`: flatten the target module under the public
     // name. The alias statement itself contributes no export of its own.

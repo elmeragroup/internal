@@ -1,11 +1,6 @@
 import { assertCommit } from "../../src/intent.ts";
 import type { CommitSha, ReleaseIntent, VerifiedRelease } from "../../src/intent.ts";
-import {
-  assertCanaryReleaseVersion,
-  assertStableReleaseVersion,
-  isCanaryReleaseVersion,
-} from "../../src/version.ts";
-import type { CanaryVersion, StableVersion } from "../../src/version.ts";
+import { assertStableReleaseVersion, isCanaryReleaseVersion } from "../../src/version.ts";
 
 /** Full commit SHA from a repeated seed character: `commitSha("a")` is forty `a`s. */
 export function commitSha(seed: string): CommitSha {
@@ -20,16 +15,6 @@ export const newerCommit = commitSha("b");
 
 /** A commit unrelated to `commit` in those histories. */
 export const unrelatedCommit = commitSha("c");
-
-/** Parses a stable version through the version parser. */
-export function stableVersion(version: string): StableVersion {
-  return assertStableReleaseVersion(version);
-}
-
-/** Parses a canary version through the version parser. */
-export function canaryVersion(version: string): CanaryVersion {
-  return assertCanaryReleaseVersion(version);
-}
 
 /** Builds a release intent through the parser that owns each channel's version grammar. */
 export function releaseIntent(version: string, target: CommitSha = commit): ReleaseIntent {

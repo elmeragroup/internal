@@ -51,10 +51,11 @@ filenames contain the package path (`packages/ui/...`).
 
 ## Tests
 
-Run the rule-tester suites with Node 24:
+Run the rule-tester suites and type-check with Node 24:
 
 ```sh
 pnpm --filter @elmeragroup/oxlint-plugin test
+pnpm --filter @elmeragroup/oxlint-plugin type-check
 ```
 
 Each rule has a sibling `rules/<rule-name>.test.js` suite.

@@ -245,7 +245,7 @@ export function resolveObjectNode(
     return (
       isRenderProp(info.name) ||
       info.declarations.length === 0 ||
-      externalTypeSelectionAllowsSymbol(property, context.operations, context.externalTypes)
+      externalTypeSelectionAllowsSymbol(property, context.operations, context.options.externalTypes)
     );
   });
   const objectSymbol = facts.symbol === undefined ? undefined : context.operations.symbolFacts(facts.symbol);
@@ -263,11 +263,9 @@ export function resolveObjectNode(
   // survives that classification. It is therefore the one post-gate shape
   // fact read for both expanded and declined anonymous objects.
   const indexSignature = selectIndexSignature(type, context);
-  // Each predicate records a different reason an anonymous object has no
-  // anchor in the model. The compiler-internal predicate adds to the module
-  // value one only while resolving a member of an authored compound:
-  // `compoundMember` suppresses that one, and otherwise the first predicate's
-  // every condition is implied by it.
+  // The two predicates record independent reasons an anonymous object has no
+  // anchor in the model: an internal compiler-generated shape at the top level,
+  // and the export's own value (identity-based; see below).
   const isAnonymousCompilerObject =
     typeNameValue === undefined &&
     context.propertyDepth === 0 &&
@@ -277,15 +275,19 @@ export function resolveObjectNode(
     !hasExpandableCandidate &&
     !hasAuthoredObjectSyntax;
   const isAnonymousModuleValue =
-    typeNameValue === undefined &&
     // Only the export's OWN value declines here (`export const value = { … }`).
-    // An unnamed object in a nested position is ordinary structure to describe,
-    // not a module value; upstream resolves an inferred function return such as
-    // the useHook fixture in namespace-export-resolution.
-    context.provenancePath.length === 1 &&
-    context.propertyDepth === 0 &&
-    !hasAuthoredObjectSyntax &&
-    !context.compoundMember;
+    // Identity is sound because type handles are interned per session, and it
+    // says exactly what the old position heuristics approximated: every nested
+    // occurrence — a member, element, type argument, or union arm — is ordinary
+    // structure to describe, including an inferred function return such as the
+    // useHook fixture in namespace-export-resolution.
+    type === context.exportRoot &&
+    // A union or intersection reaches this call as its own merged view; only a
+    // bare object type is the export's anonymous value.
+    facts.isUnion !== true &&
+    facts.isIntersection !== true &&
+    typeNameValue === undefined &&
+    !hasAuthoredObjectSyntax;
   const isEmptyUnanchored =
     properties.length === 0 &&
     indexSignature === undefined &&
@@ -545,7 +547,7 @@ function propertyEligible(
     const ownerSymbol = ownerFacts.aliasSymbol ?? ownerFacts.symbol;
     return (
       ownerSymbol === undefined ||
-      externalTypeSelectionAllowsSymbol(ownerSymbol, context.operations, context.externalTypes)
+      externalTypeSelectionAllowsSymbol(ownerSymbol, context.operations, context.options.externalTypes)
     );
   }
   // Ownership/package selection is a cheap declaration-path fact. Consult it
@@ -553,7 +555,7 @@ function propertyEligible(
   // property must not pay for its modifier/kind subtree merely to be dropped.
   // `isRenderProp` is the single exception owner; its rationale sits with the
   // predicate.
-  if (!externalTypeSelectionAllowsSymbol(property, context.operations, context.externalTypes)) {
+  if (!externalTypeSelectionAllowsSymbol(property, context.operations, context.options.externalTypes)) {
     return isRenderProp(info.name);
   }
   // A class instance reached as an object must not contribute its methods:
@@ -801,9 +803,11 @@ export function propertyTypeNode(
 }
 
 /**
- * The value type of one object or class member: the declared property type when
- * the checker exposes one, otherwise the symbol's own type. Method members have
- * no property type; inferred properties have one.
+ * The value type of one object or class member: the checker's direct symbol
+ * type when it exposes one, otherwise the alias-resolved read that also
+ * recovers a variable declaration's inferred type. Methods, properties, and
+ * parameters all have a symbol type; the fallback covers symbols the direct
+ * read does not resolve.
  *
  * @param member - The member symbol to read.
  * @param operations - Compiler operations exposing member value types.

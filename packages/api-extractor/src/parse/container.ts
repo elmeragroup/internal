@@ -42,15 +42,9 @@ export function arrayNode(
   const elementType = (facts.typeArguments ?? [])[0];
   const alias = facts.aliasSymbol;
   const aliasName = alias === undefined ? undefined : context.operations.symbolFacts(alias).name;
-  // An element is a member of the container, never the export's own value: an
-  // anonymous object element is structure to describe, exactly as an
-  // intersection member is.
   return {
     kind: "array",
-    elementType: resolve(elementType, containerElementNode(sourceNode, context), undefined, {
-      ...context,
-      compoundMember: true,
-    }),
+    elementType: resolve(elementType, containerElementNode(sourceNode, context), undefined, context),
     ...flagFields({ isReadonly: context.operations.isReadonlyType(type) }),
     ...definedFields({
       typeName:
@@ -83,14 +77,13 @@ export function tupleNode(
       const authored = expansion.elements[index];
       const node = authored?.node;
       const scoped = authored === undefined ? context : { ...context, substitutions: authored.substitutions };
-      const memberContext: Context = { ...scoped, compoundMember: true };
-      if (node === undefined) return resolve(element, undefined, undefined, memberContext);
+      if (node === undefined) return resolve(element, undefined, undefined, scoped);
       // A donated element node written in terms of a spread alias's own
       // parameters resolves to its bound argument; every other node keeps the
       // semantic element the checker already instantiated.
       const nodeType = context.operations.typeAtNode(node);
       const bound = applySubstitutions(nodeType, scoped.substitutions, context.operations);
-      return resolve(bound === nodeType ? element : nodeType, node, undefined, memberContext);
+      return resolve(bound === nodeType ? element : nodeType, node, undefined, scoped);
     }),
     ...flagFields({ isReadonly: context.operations.isReadonlyType(type) }),
     ...definedFields({ typeName: typeNameValue }),
@@ -304,16 +297,13 @@ function finiteTupleSource(
   }
   // A generic instantiation: bind the declaration's parameters to the written
   // arguments so its element nodes describe this spread.
-  const bindings = bindAliasParameters(declaration, context, (index) => {
-    const argument = authoredArguments[index];
-    return argument === undefined
-      ? undefined
-      : applySubstitutions(
-          context.operations.typeAtNode(argument),
-          context.substitutions,
-          context.operations
-        );
-  });
+  const bindings = bindAliasParameters(
+    declaration,
+    authoredArguments.map((argument) =>
+      applySubstitutions(context.operations.typeAtNode(argument), context.substitutions, context.operations)
+    ),
+    context
+  );
   if (bindings === undefined) {
     return finiteTupleSource(body, context, new Set([...visited, node]));
   }

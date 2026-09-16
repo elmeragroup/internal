@@ -1,26 +1,11 @@
 import { defineRule } from "@oxlint/plugins";
 
-import type { ESTree, SourceCode } from "@oxlint/plugins";
+import type { ESTree } from "@oxlint/plugins";
 
-import { parameterAnnotation } from "../shared/scope-lookup.ts";
-import { createTypeNameScope } from "../shared/type-name-scope.ts";
+import { functionLikeVisitors, parameterAnnotation, parameterName } from "../shared/function-parameters.ts";
+import type { FunctionLikeNode } from "../shared/function-parameters.ts";
+import { createTypeNameScope, resolvesThroughAliases } from "../shared/type-name-scope.ts";
 import type { TypeNameScope } from "../shared/type-name-scope.ts";
-
-type Parameter = ESTree.ParamPattern;
-type ParameterOwner =
-	| ESTree.ArrowFunctionExpression
-	| ESTree.Function
-	| ESTree.TSCallSignatureDeclaration
-	| ESTree.TSConstructSignatureDeclaration
-	| ESTree.TSConstructorType
-	| ESTree.TSFunctionType
-	| ESTree.TSMethodSignature;
-
-function parameterName(parameter: Parameter, sourceCode: SourceCode): string {
-	return parameter.type === "Identifier"
-		? parameter.name
-		: sourceCode.getText(parameter).replace(/\s*:\s*object\s*$/u, "");
-}
 
 /** Ban the broad object type on function inputs, including local aliases to object. */
 export const noObjectParametersRule = defineRule({
@@ -38,41 +23,13 @@ export const noObjectParametersRule = defineRule({
 	createOnce(context) {
 		let scope: TypeNameScope | null = null;
 
-		const resolvesToObject = (
-			type: ESTree.TSType,
-			visited = new Set<ESTree.TSTypeAliasDeclaration>(),
-		): boolean => {
-			if (scope === null) return false;
-			if (type.type === "TSObjectKeyword") return true;
-			if (type.type === "TSParenthesizedType")
-				return resolvesToObject(type.typeAnnotation, visited);
-			if (type.type === "TSUnionType") {
-				return type.types.some((member) => resolvesToObject(member, visited));
-			}
-			if (
-				type.type !== "TSTypeReference" ||
-				type.typeName.type !== "Identifier" ||
-				(type.typeArguments !== null &&
-					type.typeArguments !== undefined &&
-					type.typeArguments.params.length > 0)
-			) {
-				return false;
-			}
-			const binding = scope.resolve(type, type.typeName.name);
-			if (binding?.kind !== "alias") return false;
-			const alias = binding.declaration;
-			if (
-				(alias.typeParameters !== null && alias.typeParameters !== undefined) ||
-				visited.has(alias)
-			) {
-				return false;
-			}
-			const nextVisited = new Set(visited);
-			nextVisited.add(alias);
-			return resolvesToObject(alias.typeAnnotation, nextVisited);
-		};
+		const resolvesToObject = (type: ESTree.TSType): boolean =>
+			scope !== null &&
+			resolvesThroughAliases(scope, type, (candidate) => candidate.type === "TSObjectKeyword", {
+				throughUnions: true,
+			});
 
-		const checkParameters = (node: ParameterOwner) => {
+		const checkParameters = (node: FunctionLikeNode) => {
 			for (const parameter of node.params) {
 				const annotation = parameterAnnotation(parameter);
 				if (annotation === null || annotation === undefined) continue;
@@ -89,16 +46,7 @@ export const noObjectParametersRule = defineRule({
 			Program(node) {
 				scope = createTypeNameScope(node, context.sourceCode.visitorKeys);
 			},
-			ArrowFunctionExpression: checkParameters,
-			FunctionDeclaration: checkParameters,
-			FunctionExpression: checkParameters,
-			TSCallSignatureDeclaration: checkParameters,
-			TSConstructSignatureDeclaration: checkParameters,
-			TSConstructorType: checkParameters,
-			TSDeclareFunction: checkParameters,
-			TSEmptyBodyFunctionExpression: checkParameters,
-			TSFunctionType: checkParameters,
-			TSMethodSignature: checkParameters,
+			...functionLikeVisitors(checkParameters),
 		};
 	},
 });

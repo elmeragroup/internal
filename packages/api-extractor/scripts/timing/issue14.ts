@@ -71,7 +71,11 @@ const SampleSchema = Schema.Struct({
   delta: NumberTotalsSchema,
 });
 const FixtureSamplesSchema = Schema.Array(SampleSchema).check(
-  Schema.makeFilter((samples) => samples.length === 4 || "exactly four timing samples are required")
+  Schema.makeFilter(
+    (samples) =>
+      samples.length === expectedFixtureOrder.length ||
+      `exactly ${expectedFixtureOrder.length} timing samples are required`
+  )
 );
 
 /** The Issue 14 timing report: baseline, measured samples, aggregates, stop conditions, and decision. */
@@ -682,7 +686,7 @@ export async function runIssue14Timing(mode: TimingCheckMode | "write"): Promise
   const measured = await measure();
   if (mode === "write") {
     // Fail before writing when the report violates the schema every reader decodes.
-    const report = decodeReport(Schema.decodeUnknownSync(Schema.Json)(JSON.parse(JSON.stringify(measured))));
+    const report = decodeReport(Schema.decodeUnknownSync(Schema.Json)(measured));
     await writeArtifactBatchOrThrow(
       {
         outputRoot: fixtureDirectory,

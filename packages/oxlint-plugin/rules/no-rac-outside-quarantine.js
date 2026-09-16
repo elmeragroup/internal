@@ -3,6 +3,8 @@ import { defineRule } from "@oxlint/plugins";
 import { normalizeFilename } from "../filename-normalizer.js";
 import { isForbiddenRacSpecifier } from "../forbidden-rac-packages.js";
 
+/** @import { ESTree } from "@oxlint/plugins" */
+
 /**
  * The quarantine is exactly `packages/ui/src/react-aria/**`. Matching the full
  * package-relative segment keeps an unrelated `src/react-aria/` (another
@@ -18,7 +20,7 @@ function isReactAriaQuarantine(filename) {
 }
 
 /**
- * @param {import("estree").Node | null | undefined} source
+ * @param {ESTree.Node | null | undefined} source
  * @returns {string | null}
  */
 function specifierFromSource(source) {
@@ -40,12 +42,11 @@ export default defineRule({
     },
     schema: [],
   },
-  defaultOptions: [],
   createOnce(context) {
     let skipFile = false;
 
     /**
-     * @param {import("estree").Node} node
+     * @param {ESTree.Node} node
      * @param {string | null} specifier
      */
     function reportIfForbidden(node, specifier) {

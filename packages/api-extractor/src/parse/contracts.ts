@@ -6,19 +6,8 @@ import type {
   BackendWarningFact,
 } from "../backend/contracts.ts";
 import type { SemanticType } from "../model.ts";
-import type { ExtractorOptions } from "../options.ts";
 import type { ProvenanceEntry } from "../provenance.ts";
-import type { ExternalTypeSelection } from "./external-type-selection.ts";
-
-/**
- * Extraction options after defaults and the external-type selection are parsed
- * once at the extraction entry. The session and the resolver share this value.
- */
-export type ResolvedExtractorOptions = {
-  readonly shouldInclude?: ExtractorOptions["shouldInclude"];
-  readonly shouldResolveObject: NonNullable<ExtractorOptions["shouldResolveObject"]>;
-  readonly externalTypes: ExternalTypeSelection;
-};
+import type { ResolvedExtractorOptions } from "./options.ts";
 
 /** Resolver state shared by the synchronous semantic resolver modules. */
 export type ResolverContext = {
@@ -31,17 +20,17 @@ export type ResolverContext = {
   /** Selects the final collection shape for properties at the current node. */
   readonly provenancePropertyContainer: "object" | "componentProps";
   readonly symbolStack: readonly string[];
-  readonly options: Pick<ResolvedExtractorOptions, "shouldInclude" | "shouldResolveObject">;
-  readonly externalTypes: ExternalTypeSelection;
+  readonly options: ResolvedExtractorOptions;
   readonly substitutions: ReadonlyMap<BackendSymbolHandle, BackendTypeHandle>;
   readonly active: ReadonlySet<BackendTypeHandle>;
   readonly propertyDepth: number;
   /**
-   * True while resolving a member of an authored compound: an intersection
-   * member or a container element. An anonymous object there is structure to
-   * describe, not the module-value fallback the export root itself takes.
+   * The type resolved as one export's root value, or `undefined` when no export
+   * root is being resolved. Only that exact type takes the anonymous
+   * module-value fallback; members, elements, type arguments, and union arms are
+   * structure to describe.
    */
-  readonly compoundMember: boolean;
+  readonly exportRoot: BackendTypeHandle | undefined;
   /** Defaults authored in an object-binding parameter, keyed by public property name. */
   readonly bindingDefaults?: ReadonlyMap<string, string>;
   /** Namespaces inherited only while descending into checker-generated type arguments. */

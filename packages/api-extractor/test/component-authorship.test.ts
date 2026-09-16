@@ -7,10 +7,9 @@ import type {
   BackendTypeNodeHandle,
 } from "../src/backend/contracts.ts";
 import { openTsgoProject } from "../src/backend/ts7/project.ts";
-import { defaultExtractorOptions } from "../src/options.ts";
 import { recoverAuthoredComponent } from "../src/parse/component-authorship.ts";
 import type { ResolverContext } from "../src/parse/contracts.ts";
-import { normalizeExternalTypeSelection } from "../src/parse/external-type-selection.ts";
+import { parseExtractorOptions } from "../src/parse/options.ts";
 import { extractFixture } from "./support/extract.ts";
 
 const fixtureDirectory = resolve(import.meta.dirname, "fixtures/component-authorship");
@@ -26,14 +25,11 @@ function authorshipContext(operations: BackendCompilerOperations): ResolverConte
     provenancePath: [],
     provenancePropertyContainer: "object",
     symbolStack: ["TripleWrapped"],
-    options: {
-      shouldResolveObject: defaultExtractorOptions.shouldResolveObject,
-    },
-    externalTypes: normalizeExternalTypeSelection(false),
+    options: parseExtractorOptions(),
     substitutions: new Map(),
     active: new Set(),
     propertyDepth: 0,
-    compoundMember: false,
+    exportRoot: undefined,
   };
 }
 

@@ -29,8 +29,6 @@ export function assertStableBump(
   packageDirectory: string
 ): Effect.Effect<void, ReleaseError> {
   return lift(() => {
-    assertStableReleaseVersion(previous);
-    assertStableReleaseVersion(current);
     if (compareStableVersions(current, previous) <= 0) throw new Error("Stable version must increase");
     const pending = readdirSync(resolve(root, ".changeset")).filter(
       (name) => name.endsWith(".md") && name !== "README.md"

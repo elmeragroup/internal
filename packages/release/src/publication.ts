@@ -6,7 +6,10 @@ import type { NpmPublisher, Registry } from "./npm.ts";
 import { distTagFor, npmIdentity, planPublication, shouldPromote } from "./policy.ts";
 import type { CommitAncestry } from "./policy.ts";
 
-/** Everything publication reads from the engine; `EngineDeps` is a superset. */
+/**
+ * Everything publication reads from the engine; `ReleaseDeps` is a superset, and
+ * `CheckedCommitDeps` a superset of that.
+ */
 export type PublicationDeps = {
   readRegistry: () => Effect.Effect<Registry, ReleaseError>;
   npm: NpmPublisher;

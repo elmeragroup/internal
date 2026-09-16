@@ -2,17 +2,14 @@ import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
 
 import { ReleaseError } from "../src/errors.ts";
-import { assertCommit } from "../src/intent.ts";
 import type { VerifiedRelease } from "../src/intent.ts";
 import type { Registry } from "../src/npm.ts";
 import type { CommitAncestry } from "../src/policy.ts";
 import { publishVerifiedRelease } from "../src/publication.ts";
 import type { PublicationDeps } from "../src/publication.ts";
 import { assertCanaryReleaseVersion, assertStableReleaseVersion } from "../src/version.ts";
+import { commit, newerCommit, unrelatedCommit } from "./lib/release-fixtures.ts";
 
-const commit = assertCommit("a".repeat(40));
-const newerCommit = assertCommit("b".repeat(40));
-const unrelatedCommit = assertCommit("c".repeat(40));
 const release: VerifiedRelease = {
   channel: "canary",
   version: assertCanaryReleaseVersion("0.2.0-canary.11"),

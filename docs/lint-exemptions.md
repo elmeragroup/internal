@@ -6,11 +6,17 @@ that it is load-bearing. Every exemption was re-verified by removing it and runn
 
 ## `packages/oxlint-plugin/**`
 
-The rules are plain JavaScript running on untyped ESTree nodes, so the type-aware checks below
-cannot hold. Removing any of them produces errors in the rule implementations themselves (unsafe
-member access on `node.parent`, unsafe calls to plugin helpers, `any` in the visitor JSDoc types,
-and so on). `anti-slop/no-runtime-typeof` is exempt for the same reason: `typeof` is exactly what
-the rules inspect in source text.
+One exemption remains:
+
+- `anti-slop/no-runtime-typeof` — the rules inspect source-level `typeof` expressions and runtime
+  value shapes by design; that is the analyzer's input, not the package's own boundary. Removing it
+  produces 14 findings across the rule implementations.
+
+The package previously disabled the `typescript/no-unsafe-*` checks and
+`typescript/no-redundant-type-constituents`. Those were not about JavaScript: the package had no
+`tsconfig.json`, so its JSDoc `import("estree")` types resolved to `error`-typed values. With the
+package's own program in place (`tsconfig.json` + `type-check`), all six exemptions are provably
+unnecessary — removing them yields zero diagnostics.
 
 ## `packages/oxlint-anti-slop/**`
 

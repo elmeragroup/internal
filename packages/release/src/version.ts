@@ -130,7 +130,7 @@ export function compareStableVersions(left: StableVersion, right: StableVersion)
 }
 
 /** The next patch after `version`, keeping the major and minor components. */
-export function nextPatchVersion(version: string): StableVersion {
+export function nextPatchVersion(version: StableVersion): StableVersion {
   const parsed = parseStableVersion(version);
   return assertStableReleaseVersion(formatStableVersion({ ...parsed, patch: parsed.patch + 1n }));
 }

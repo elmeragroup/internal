@@ -1,5 +1,8 @@
 import { Effect } from "effect";
-import { describe, expect, it } from "vitest";
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { describe, expect, it, vi } from "vitest";
 
 import type { ReleasePackage } from "../src/files.ts";
 import { createNpmPublisher, readRegistry } from "../src/npm.ts";
@@ -31,19 +34,18 @@ describe("registry failures", () => {
     );
     expect(registry.versions.get("0.1.0")).toEqual({ integrity: undefined, commit });
   });
-  it("parses the recorded release commit and rejects an unusable one", async () => {
-    await expect(
-      Effect.runPromise(
-        readRegistry(packageName, () =>
-          Promise.resolve(
-            Response.json({
-              versions: { "0.1.0": { dist: {}, elmeraRelease: { commit: "main" } } },
-              "dist-tags": {},
-            })
-          )
+  it("keeps an unusable recorded commit as absent metadata instead of blocking every read", async () => {
+    const registry = await Effect.runPromise(
+      readRegistry(packageName, () =>
+        Promise.resolve(
+          Response.json({
+            versions: { "0.1.0": { dist: {}, elmeraRelease: { commit: "main" } } },
+            "dist-tags": {},
+          })
         )
       )
-    ).rejects.toThrow("Expected a full commit SHA; received main");
+    );
+    expect(registry.versions.get("0.1.0")?.commit).toBeUndefined();
   });
   it("keeps an unusable legacy gitHead as absent metadata", async () => {
     const registry = await Effect.runPromise(
@@ -111,5 +113,35 @@ describe("npm CLI failures", () => {
     expect(failure).toMatchObject({ _tag: "ReleaseError" });
     expect(failure.message).toMatch(/^npm failed with status \d+: /u);
     expect(failure.message).toContain("npm error code ENOENT");
+  });
+});
+
+describe("npm CLI output", () => {
+  it("re-emits captured stderr after a successful npm run", async () => {
+    const bin = mkdtempSync(join(tmpdir(), "elmera-npm-bin-"));
+    const script = join(bin, "npm");
+    const written: string[] = [];
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation((...args: unknown[]) => {
+      written.push(String(args[0]));
+      return true;
+    });
+    try {
+      // A fake npm on PATH reaches the real spawn without a registry write. The absolute shebang
+      // keeps the shim runnable while PATH points only at the fake bin directory.
+      writeFileSync(script, `#!${process.execPath}\nprocess.stderr.write("npm notice published");\n`);
+      chmodSync(script, 0o755);
+      vi.stubEnv("PATH", bin);
+      const pkg: ReleasePackage = {
+        checkoutRoot: process.cwd(),
+        packageDirectory: process.cwd(),
+        packageName: "@acme/app",
+      };
+      await Effect.runPromise(createNpmPublisher(pkg).publish("release.tgz"));
+    } finally {
+      stderr.mockRestore();
+      vi.unstubAllEnvs();
+      rmSync(bin, { recursive: true, force: true });
+    }
+    expect(written.join("")).toContain("npm notice published");
   });
 });

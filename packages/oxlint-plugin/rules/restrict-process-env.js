@@ -2,21 +2,23 @@ import { defineRule } from "@oxlint/plugins";
 
 import { normalizeFilename } from "../filename-normalizer.js";
 
+/** @import { ESTree } from "@oxlint/plugins" */
+
 const MESSAGE =
   "Direct process.env access is forbidden except the process.env.NODE_ENV comparison in the theme validator module.";
 
 const ALLOWED_VALIDATOR_SUFFIX = "/src/theme/validate-theme.ts";
 
 /**
- * @param {import("estree").Node | null | undefined} node
- * @returns {node is import("estree").Identifier}
+ * @param {ESTree.Node | null | undefined} node
+ * @returns {node is ESTree.IdentifierReference}
  */
 function isProcessIdentifier(node) {
   return node?.type === "Identifier" && node.name === "process";
 }
 
 /**
- * @param {import("estree").Node | null | undefined} node
+ * @param {ESTree.Node | null | undefined} node
  * @param {boolean} isComputed
  */
 function isEnvProperty(node, isComputed) {
@@ -28,8 +30,8 @@ function isEnvProperty(node, isComputed) {
 }
 
 /**
- * @param {import("estree").Node | null | undefined} node
- * @returns {node is import("estree").MemberExpression}
+ * @param {ESTree.Node | null | undefined} node
+ * @returns {node is ESTree.MemberExpression}
  */
 function isProcessEnvMemberExpression(node) {
   return (
@@ -40,7 +42,7 @@ function isProcessEnvMemberExpression(node) {
 }
 
 /**
- * @param {import("estree").Node | null | undefined} node
+ * @param {ESTree.Node | null | undefined} node
  * @param {boolean} isComputed
  */
 function isNodeEnvProperty(node, isComputed) {
@@ -52,12 +54,12 @@ function isNodeEnvProperty(node, isComputed) {
 }
 
 /**
- * @param {import("estree").MemberExpression} processEnvNode
+ * @param {ESTree.MemberExpression} processEnvNode
  */
 function isProcessEnvNodeEnv(processEnvNode) {
   const parent = processEnvNode.parent;
   return (
-    parent?.type === "MemberExpression" &&
+    parent.type === "MemberExpression" &&
     parent.object === processEnvNode &&
     isNodeEnvProperty(parent.property, parent.computed)
   );
@@ -71,7 +73,7 @@ function isComparisonOperator(operator) {
 }
 
 /**
- * @param {import("estree").MemberExpression} processEnvNode
+ * @param {ESTree.MemberExpression} processEnvNode
  */
 function isNodeEnvComparison(processEnvNode) {
   if (!isProcessEnvNodeEnv(processEnvNode)) {
@@ -93,7 +95,7 @@ function isThemeValidatorModule(filename) {
 export default defineRule({
   createOnce(context) {
     return {
-      /** @param {import("estree").MemberExpression} node */
+      /** @param {ESTree.MemberExpression} node */
       MemberExpression(node) {
         if (!isProcessEnvMemberExpression(node)) {
           return;
@@ -122,5 +124,4 @@ export default defineRule({
       restrictedAccess: MESSAGE,
     },
   },
-  defaultOptions: [],
 });

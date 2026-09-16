@@ -3,6 +3,8 @@ import { defineRule } from "@oxlint/plugins";
 
 import { extractStrings } from "../extract-strings.js";
 
+/** @import { ESTree } from "@oxlint/plugins" */
+
 const RULE_NAME = "no-tailwind-dark-variant";
 
 /**
@@ -49,7 +51,7 @@ function hasDarkVariant(str) {
 }
 
 /**
- * @param {import("estree").Node} node
+ * @param {ESTree.Node} node
  */
 function isInsideJsxAttribute(node) {
   let current = node.parent;
@@ -72,10 +74,9 @@ export default defineRule({
     },
     schema: [],
   },
-  defaultOptions: [],
   createOnce(context) {
     /**
-     * @param {import("estree").Node} node
+     * @param {ESTree.Node} node
      * @param {string[]} collected
      */
     function reportIfDark(node, collected) {

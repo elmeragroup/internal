@@ -4,8 +4,9 @@ import { beforeAll, describe, expect, it } from "vitest";
 
 import type { ExtractionResult, ExtractorOptions } from "../src/index.ts";
 import { ModuleNodeSchema } from "../src/model.ts";
-import type { ExportNode, PropertyNode, SemanticType } from "../src/model.ts";
+import type { PropertyNode, SemanticType } from "../src/model.ts";
 import { ProvenanceSchema } from "../src/provenance.ts";
+import { exportedType } from "./support/exports.ts";
 import { extractFixture } from "./support/extract.ts";
 
 const fixtureDirectory = resolve(import.meta.dirname, "fixtures/container-kinds-and-tuples");
@@ -19,14 +20,8 @@ beforeAll(async () => {
   );
 });
 
-function exportedType(name: string): SemanticType {
-  const entry = result.module.exports.find((candidate: ExportNode) => candidate.name === name);
-  if (entry === undefined) throw new Error(`The fixture does not export ${name}`);
-  return entry.type;
-}
-
 function property(owner: string, name: string): PropertyNode {
-  const type = exportedType(owner);
+  const type = exportedType(result, owner);
   const properties = type.kind === "object" ? type.properties : [];
   const found = properties.find((candidate) => candidate.name === name);
   if (found === undefined) throw new Error(`${owner} has no property ${name}`);
@@ -76,7 +71,7 @@ describe("Issue 05 container extraction through the public seam", () => {
   });
 
   it("extracts tuples with ordered elements, labels, optional and rest elements, and readonly state", () => {
-    const plain = exportedType("Pair");
+    const plain = exportedType(result, "Pair");
     expect(plain).toMatchObject({
       kind: "tuple",
       typeName: { name: "Pair" },
@@ -122,7 +117,7 @@ describe("Issue 05 container extraction through the public seam", () => {
       typeName: { name: "Record" },
     });
     // A finite key domain is described by concrete properties, not a key type.
-    const finite = exportedType("FiniteKeys");
+    const finite = exportedType(result, "FiniteKeys");
     expect(finite).not.toHaveProperty("indexSignature");
     const finiteProperties = finite.kind === "object" ? finite.properties : [];
     expect(finiteProperties.map((entry) => [entry.name, entry.optional, entry.type.kind])).toEqual([
@@ -135,7 +130,7 @@ describe("Issue 05 container extraction through the public seam", () => {
     expect(partial.kind).toBe("object");
     expect(partial).not.toHaveProperty("indexSignature");
     // An open mapped key domain is the case that becomes an index signature.
-    expect(exportedType("SynthesizedKeys")).toMatchObject({
+    expect(exportedType(result, "SynthesizedKeys")).toMatchObject({
       kind: "object",
       properties: [],
       indexSignature: { keyName: "Name", keyType: "string" },
@@ -143,15 +138,15 @@ describe("Issue 05 container extraction through the public seam", () => {
   });
 
   it("extracts string and number index signatures and keeps optional value behavior", () => {
-    expect(exportedType("StringIndexed")).toMatchObject({
+    expect(exportedType(result, "StringIndexed")).toMatchObject({
       indexSignature: { keyName: "elementName", keyType: "string" },
     });
-    expect(exportedType("NumberIndexed")).toMatchObject({
+    expect(exportedType(result, "NumberIndexed")).toMatchObject({
       indexSignature: { keyName: "position", keyType: "number" },
     });
     // An optional index value is representable, and reaches the model as the
     // union the checker produced.
-    expect(exportedType("OptionalIndexed")).toMatchObject({
+    expect(exportedType(result, "OptionalIndexed")).toMatchObject({
       indexSignature: {
         keyType: "string",
         valueType: {
@@ -162,14 +157,14 @@ describe("Issue 05 container extraction through the public seam", () => {
     });
     // A readonly index signature has no encoding in the semantic model, so it
     // reports the same shape as a mutable one rather than a different key.
-    expect(exportedType("ReadonlyIndexed")).toEqual({
-      ...exportedType("StringIndexed"),
+    expect(exportedType(result, "ReadonlyIndexed")).toEqual({
+      ...exportedType(result, "StringIndexed"),
       typeName: { name: "ReadonlyIndexed" },
     });
   });
 
   it("reports an unrepresentable symbol index signature as a structured warning", () => {
-    expect(exportedType("SymbolIndexed")).not.toHaveProperty("indexSignature");
+    expect(exportedType(result, "SymbolIndexed")).not.toHaveProperty("indexSignature");
     const warnings = result.warnings.filter((warning) => warning.code === "omitted-index-signature");
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toMatchObject({ code: "omitted-index-signature", keyTypes: ["symbol"] });
@@ -196,7 +191,7 @@ describe("Issue 05 container extraction through the public seam", () => {
   it("preserves documentation for container members", () => {
     expect(property("Arrays", "mutable").documentation?.description).toBe("Written with array syntax.");
     expect(property("Tuples", "frozen").documentation?.description).toBe("A readonly tuple.");
-    const indexed = exportedType("StringIndexed");
+    const indexed = exportedType(result, "StringIndexed");
     const value = indexed.kind === "object" ? indexed.indexSignature?.valueType : undefined;
     const documented =
       value?.kind === "object"
@@ -249,20 +244,14 @@ beforeAll(async () => {
   reviewShadowed = await extractReview({}, "shadowed.ts");
 });
 
-function reviewExportedType(extraction: ExtractionResult, name: string): SemanticType {
-  const entry = extraction.module.exports.find((candidate: ExportNode) => candidate.name === name);
-  if (entry === undefined) throw new Error(`The fixture does not export ${name}`);
-  return entry.type;
-}
-
 function reviewTupleElements(name: string): readonly SemanticType[] {
-  const type = reviewExportedType(reviewResult, name);
+  const type = exportedType(reviewResult, name);
   if (type.kind !== "tuple") throw new Error(`${name} is a ${type.kind}, not a tuple`);
   return type.types;
 }
 
 function reviewPropertyType(extraction: ExtractionResult, owner: string, name: string): SemanticType {
-  const type = reviewExportedType(extraction, owner);
+  const type = exportedType(extraction, owner);
   const properties = type.kind === "object" ? type.properties : [];
   const found = properties.find((candidate) => candidate.name === name);
   if (found === undefined) throw new Error(`${owner} has no property ${name}`);
@@ -387,7 +376,7 @@ describe("container review regressions", () => {
     expect(tieLoss?.message).toContain('key type "number"');
     expect(unrepresentable?.message).toContain('uses unsupported key type "symbol"');
     // The representable signature is the one the model kept.
-    expect(reviewExportedType(reviewResult, "DualIndexed")).toMatchObject({
+    expect(exportedType(reviewResult, "DualIndexed")).toMatchObject({
       indexSignature: { keyName: "name", keyType: "string" },
     });
   });
@@ -397,14 +386,14 @@ describe("container review regressions", () => {
     // names `Item`. Handing that argument to the element used to publish a
     // string element called `Marker`, with no warning at all. Upstream gates the
     // same branch on `getBuiltInArrayReferenceName`.
-    const elements = reviewExportedType(reviewShadowed, "MislabeledElements");
+    const elements = exportedType(reviewShadowed, "MislabeledElements");
     expect(elements).toMatchObject({
       kind: "array",
       elementType: { kind: "intrinsic", intrinsic: "string" },
     });
     expect(elements.kind === "array" ? elements.elementType : undefined).not.toHaveProperty("typeName");
     // The array reached through a rest position reports the same element.
-    const rest = reviewExportedType(reviewShadowed, "MislabeledRestElements");
+    const rest = exportedType(reviewShadowed, "MislabeledRestElements");
     expect(rest).toMatchObject({
       kind: "tuple",
       types: [{ intrinsic: "boolean" }, { kind: "intrinsic", intrinsic: "string" }],
@@ -418,10 +407,10 @@ describe("container review regressions", () => {
     // gate accepts them and replays element syntax belonging to another type;
     // the checker-verified fact (interface, declared in a TypeScript lib file)
     // does not. Both container paths use the same fact.
-    const array = reviewExportedType(reviewShadowed, "ShadowedArrayElements");
+    const array = exportedType(reviewShadowed, "ShadowedArrayElements");
     expect(array).toMatchObject({ kind: "array", elementType: { kind: "intrinsic", intrinsic: "string" } });
     expect(array.kind === "array" ? array.elementType : undefined).not.toHaveProperty("typeName");
-    const rest = reviewExportedType(reviewShadowed, "ShadowedRestElements");
+    const rest = exportedType(reviewShadowed, "ShadowedRestElements");
     expect(rest.kind === "tuple" ? rest.types[1] : undefined).toEqual({
       kind: "intrinsic",
       intrinsic: "string",
@@ -433,7 +422,7 @@ describe("container review regressions", () => {
     // reference to the tuple or array target whose type arguments are its
     // ELEMENTS. Upstream guards with `if (type.aliasSymbol &&
     // !type.aliasTypeArguments) typeArguments = []` (common.ts).
-    expect(reviewExportedType(reviewResult, "Pair")).toEqual({
+    expect(exportedType(reviewResult, "Pair")).toEqual({
       kind: "tuple",
       typeName: { name: "Pair" },
       types: [
@@ -444,7 +433,7 @@ describe("container review regressions", () => {
     // A *generic* alias does have arguments, and upstream reports the element
     // list as those arguments — the ported `mapped-tuple-rest-synthetic-key`
     // oracle pins `Rest<V> = [V, V]` with `typeArguments: [V, V]`.
-    expect(reviewExportedType(reviewResult, "GenericPair")).toMatchObject({
+    expect(exportedType(reviewResult, "GenericPair")).toMatchObject({
       typeName: {
         name: "GenericPair",
         typeArguments: [{ type: { kind: "typeParameter", name: "Item" } }, { type: { intrinsic: "number" } }],
@@ -454,11 +443,11 @@ describe("container review regressions", () => {
     // arguments it was written with, which is upstream's first branch and what
     // the ported `readonly-array-mapped-type-literal-key` oracle shows for
     // `DirectData = ReadonlyArray<{...}>`.
-    expect(reviewExportedType(reviewResult, "Names")).toMatchObject({
+    expect(exportedType(reviewResult, "Names")).toMatchObject({
       kind: "array",
       typeName: { name: "Names", typeArguments: [{ type: { intrinsic: "string" } }] },
     });
-    expect(reviewExportedType(reviewResult, "InstantiatedPair")).toMatchObject({
+    expect(exportedType(reviewResult, "InstantiatedPair")).toMatchObject({
       typeName: { name: "GenericPair", typeArguments: [{ type: { intrinsic: "string" } }] },
     });
   });
@@ -468,7 +457,7 @@ describe("container review regressions", () => {
     // `keyof Target` has none, so its base constraint stands in and the result
     // says so. The upstream fixture `unresolved-indexed-access-fallback` pins
     // exactly this union and `resolutionKind`.
-    expect(reviewExportedType(reviewResult, "Keys")).toEqual({
+    expect(exportedType(reviewResult, "Keys")).toEqual({
       kind: "typeOperator",
       operator: "keyof",
       type: { kind: "typeParameter", name: "Target" },
@@ -487,7 +476,7 @@ describe("container review regressions", () => {
     // 09's operator-first reconstruction (upstream runs `resolveTypeOperatorType`
     // before every broad resolver, so the authored expression survives with its
     // reduced key set attached instead of collapsing to the bare literal).
-    expect(reviewExportedType(reviewResult, "ElementKeys")).toEqual({
+    expect(exportedType(reviewResult, "ElementKeys")).toEqual({
       kind: "typeOperator",
       operator: "keyof",
       type: { kind: "object", typeName: { name: "Element" }, properties: [] },

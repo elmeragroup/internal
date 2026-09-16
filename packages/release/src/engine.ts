@@ -10,7 +10,7 @@ import type { StableReleaseGate } from "./gate.ts";
 import { createCommitAncestry, createGitPort } from "./git.ts";
 import type { GitPort } from "./git.ts";
 import { createGitHubClient, releaseEnvironment } from "./github.ts";
-import type { GitHubClient, ReleaseEnvironment } from "./github.ts";
+import type { ReleaseEnvironment } from "./github.ts";
 import { assertCommit } from "./intent.ts";
 import type { CanaryIntent, CommitSha, ReleaseIntent, StableIntent, VerifiedRelease } from "./intent.ts";
 import { createNpmPublisher, readRegistry } from "./npm.ts";
@@ -32,11 +32,11 @@ export type PackAndVerify = {
 };
 
 /**
- * Dependencies shared by preparation, retry, and publication: the record store, the ancestry
+ * Dependencies shared by the retry and checked-commit paths: the record store, the ancestry
  * oracle, the registry, the npm publisher, and archive verification. Deliberately free of git,
  * the stable gate, and the Changesets base branch, so a retry never reads branch configuration.
  */
-export type RetryDeps = PublicationDeps & {
+export type ReleaseDeps = PublicationDeps & {
   store: ReleaseStore;
   verifyArchive: (
     intent: ReleaseIntent,
@@ -45,8 +45,8 @@ export type RetryDeps = PublicationDeps & {
   log: (message: string) => void;
 };
 
-/** The checked-commit path needs the branch-scoped ports on top of the shared dependencies. */
-export type EngineDeps = RetryDeps & {
+/** `ReleaseDeps` plus the branch-scoped ports the checked-commit plan needs. */
+export type CheckedCommitDeps = ReleaseDeps & {
   git: GitPort;
   stableGate: StableReleaseGate;
   plannedCanaryBase: (current: StableVersion) => Effect.Effect<StableVersion, ReleaseError>;
@@ -61,7 +61,7 @@ type RecordedRelease = {
 function recordRelease(
   intent: ReleaseIntent,
   adapter: PackAndVerify,
-  deps: RetryDeps
+  deps: ReleaseDeps
 ): Effect.Effect<RecordedRelease, ReleaseError, Scope.Scope> {
   return Effect.gen(function* () {
     const saved = yield* deps.store.create(intent);
@@ -81,7 +81,7 @@ function finishRelease(
   saved: SavedRelease,
   release: VerifiedRelease,
   pkg: ReleasePackage,
-  deps: RetryDeps
+  deps: ReleaseDeps
 ): Effect.Effect<void, ReleaseError> {
   return Effect.gen(function* () {
     const result = yield* publishVerifiedRelease(release, deps);
@@ -98,7 +98,7 @@ function finishRelease(
 
 function mainReleaseIntent(
   commit: CommitSha,
-  deps: EngineDeps
+  deps: CheckedCommitDeps
 ): Effect.Effect<ReleaseIntent | undefined, ReleaseError> {
   return Effect.gen(function* () {
     const previous = yield* deps.git.stableVersionAt(`${commit}^1`);
@@ -124,7 +124,7 @@ function mainReleaseIntent(
   });
 }
 
-function assertCheckedCommit(commit: CommitSha, deps: EngineDeps): Effect.Effect<void, ReleaseError> {
+function assertCheckedCommit(commit: CommitSha, deps: CheckedCommitDeps): Effect.Effect<void, ReleaseError> {
   return Effect.gen(function* () {
     const baseBranchTip = yield* deps.git.baseBranchTip();
     const head = yield* deps.git.head();
@@ -149,7 +149,7 @@ export function executeCheckedCommit(
   pkg: ReleasePackage,
   adapter: PackAndVerify,
   commit: string,
-  deps: EngineDeps
+  deps: CheckedCommitDeps
 ): Effect.Effect<void, ReleaseError, Scope.Scope> {
   return Effect.gen(function* () {
     const checked = yield* lift(() => assertCommit(commit));
@@ -165,7 +165,7 @@ export function executeCheckedCommit(
 export function executeRetry(
   pkg: ReleasePackage,
   recordTag: string,
-  deps: RetryDeps
+  deps: ReleaseDeps
 ): Effect.Effect<void, ReleaseError, Scope.Scope> {
   return Effect.gen(function* () {
     const tag = yield* lift(() => assertReleaseTag(recordTag));
@@ -195,15 +195,11 @@ function liveGit(pkg: ReleasePackage, baseBranch: string): GitPort {
   return createGitPort(pkg.checkoutRoot, packageManifestGitPath(pkg), baseBranch);
 }
 
-/** Everything except git and the branch-scoped gate; the retry path builds only this set. */
-function liveRetryDeps(
-  pkg: ReleasePackage,
-  environment: ReleaseEnvironment,
-  client: GitHubClient = createGitHubClient(environment)
-): RetryDeps {
+/** Everything the retry path builds: no git, stable gate, or Changesets configuration. */
+function liveReleaseDeps(pkg: ReleasePackage, environment: ReleaseEnvironment): ReleaseDeps {
   return {
     ancestry: createCommitAncestry(pkg.checkoutRoot),
-    store: createReleaseStore(client, pkg.packageName),
+    store: createReleaseStore(createGitHubClient(environment), pkg.packageName),
     readRegistry: () => readRegistry(pkg.packageName, environment.fetch),
     npm: createNpmPublisher(pkg),
     confirmationInterval: 5_000,
@@ -214,11 +210,14 @@ function liveRetryDeps(
   };
 }
 
-function liveDeps(pkg: ReleasePackage, environment: ReleaseEnvironment): EngineDeps {
+/** The checked-commit path reads the Changesets base branch and adds the branch-scoped ports. */
+function liveCheckedCommitDeps(pkg: ReleasePackage, environment: ReleaseEnvironment): CheckedCommitDeps {
+  // `liveReleaseDeps` builds its own client for the store: the client is stateless (it
+  // captures only the environment), so one instance per port owner stays intentional.
   const client = createGitHubClient(environment);
   const baseBranch = changesetBaseBranch(pkg.checkoutRoot);
   return {
-    ...liveRetryDeps(pkg, environment, client),
+    ...liveReleaseDeps(pkg, environment),
     git: liveGit(pkg, baseBranch),
     stableGate: createStableReleaseGate(
       client,
@@ -230,6 +229,7 @@ function liveDeps(pkg: ReleasePackage, environment: ReleaseEnvironment): EngineD
   };
 }
 
+/** Acquires the given deps and gives `run` their scope; every external failure stays in the channel. */
 function withLiveDeps<D, A>(
   build: () => D,
   run: (deps: D) => Effect.Effect<A, ReleaseError, Scope.Scope>
@@ -238,22 +238,6 @@ function withLiveDeps<D, A>(
     const deps = yield* lift(build);
     return yield* run(deps);
   }).pipe(Effect.scoped);
-}
-
-function withEngineDeps<A>(
-  pkg: ReleasePackage,
-  environment: () => ReleaseEnvironment,
-  run: (deps: EngineDeps) => Effect.Effect<A, ReleaseError, Scope.Scope>
-): Effect.Effect<A, ReleaseError> {
-  return withLiveDeps(() => liveDeps(pkg, environment()), run);
-}
-
-function withRetryDeps<A>(
-  pkg: ReleasePackage,
-  environment: () => ReleaseEnvironment,
-  run: (deps: RetryDeps) => Effect.Effect<A, ReleaseError, Scope.Scope>
-): Effect.Effect<A, ReleaseError> {
-  return withLiveDeps(() => liveRetryDeps(pkg, environment()), run);
 }
 
 /** The shipped operations with a transport seam that is not part of the public package surface. */
@@ -276,9 +260,15 @@ export function createReleaseOperations(environment: () => ReleaseEnvironment): 
         yield* executeCheckReleasePr(pkg, liveGit(pkg, baseBranch), baseBranch);
       }),
     releaseCheckedCommit: (pkg, adapter, commit) =>
-      withEngineDeps(pkg, environment, (deps) => executeCheckedCommit(pkg, adapter, commit, deps)),
+      withLiveDeps(
+        () => liveCheckedCommitDeps(pkg, environment()),
+        (deps) => executeCheckedCommit(pkg, adapter, commit, deps)
+      ),
     retryRelease: (pkg, recordTag) =>
-      withRetryDeps(pkg, environment, (deps) => executeRetry(pkg, recordTag, deps)),
+      withLiveDeps(
+        () => liveReleaseDeps(pkg, environment()),
+        (deps) => executeRetry(pkg, recordTag, deps)
+      ),
   };
 }
 
@@ -301,6 +291,6 @@ export const releaseCheckedCommit = production.releaseCheckedCommit;
 /**
  * Finishes a prepared release record from its saved archive bytes, verifying them against the
  * recorded intent before publishing. Never packs and never reads the Changesets configuration.
- * Missing or incomplete records fail with the original Merge-job guidance.
+ * A missing record fails naming the requested tag; an incomplete one keeps the Merge-job guidance.
  */
 export const retryRelease = production.retryRelease;

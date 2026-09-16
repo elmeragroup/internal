@@ -30,6 +30,10 @@ tester.run("elmera/no-primitive-colors", noPrimitiveColors, {
       name: "role tokens in a cn call inside a className attribute",
       code: `const x = <div className={cn("bg-background", "text-foreground")} />;\n`,
     },
+    {
+      name: "role tokens in a template expression inside a className attribute",
+      code: 'const x = <div className={`${cond ? "bg-background" : "text-foreground"}`} />;\n',
+    },
   ],
   invalid: [
     {
@@ -73,8 +77,13 @@ tester.run("elmera/no-primitive-colors", noPrimitiveColors, {
       errors: [error],
     },
     {
-      name: "raw palette cn call outside JSX reports once",
+      name: "raw palette cn call outside JSX reports per literal",
       code: `const x = cn("bg-white", "text-slate-500");\n`,
+      errors: [error, error],
+    },
+    {
+      name: "raw palette string inside a className template expression reports",
+      code: 'const x = <div className={`${cond ? "bg-white" : "bg-card"}`} />;\n',
       errors: [error],
     },
     {

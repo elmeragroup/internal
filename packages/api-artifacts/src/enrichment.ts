@@ -4,7 +4,7 @@ import { dedupeDocumentation, readPartPropFact, shortTypeOf } from "./checker.ts
 import type { ComponentApi, LibraryPartApi, LibraryProject } from "./checker.ts";
 import type { ProblemLog } from "./errors.ts";
 import type { ApiArtifactDiagnostic, ApiPart, ApiProp } from "./model.ts";
-import { compareCodepoint } from "./ordering.ts";
+import { compareUtf16CodeUnits } from "./ordering.ts";
 
 function isEnrichable(facts: LibraryPartApi): boolean {
   return facts.source?.origin !== "forwarded";
@@ -65,11 +65,10 @@ function enrichPart(
   if (!isEnrichable(facts)) return current;
   const selected = selectedProps(result, root, current.name);
   if (selected === undefined) return current;
-  const names = new Set(current.props.map((prop) => prop.name));
-  const unresolvable = new Set<string>();
+  const handled = new Set(current.props.map((prop) => prop.name));
   const additions: ApiProp[] = [];
   for (const property of selected.properties) {
-    if (names.has(property.name)) continue;
+    if (handled.has(property.name)) continue;
     const propPath = [...selected.ownerPath, property.name];
     const provenance = result.provenance.find(
       (entry) =>
@@ -95,11 +94,9 @@ function enrichPart(
     if (fact === undefined) continue;
     if (fact.type === null) {
       // An intersection repeats its members in the merged and per-branch lists, so
-      // record the same unresolvable prop once.
-      if (!unresolvable.has(property.name)) {
-        unresolvable.add(property.name);
-        problems.add(`${current.name}.${property.name}: selected dependency prop has an unresolvable type`);
-      }
+      // mark the prop handled to record the same unresolvable problem once.
+      handled.add(property.name);
+      problems.add(`${current.name}.${property.name}: selected dependency prop has an unresolvable type`);
       continue;
     }
     additions.push({
@@ -111,9 +108,9 @@ function enrichPart(
       description,
       required: fact.required,
     });
-    names.add(property.name);
+    handled.add(property.name);
   }
-  additions.sort((left, right) => compareCodepoint(left.name, right.name));
+  additions.sort((left, right) => compareUtf16CodeUnits(left.name, right.name));
   if (additions.length > current.forwardedCount) {
     problems.add(`${current.name}: selected props exceed forwarded prop count`);
     return current;

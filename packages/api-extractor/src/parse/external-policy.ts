@@ -66,11 +66,11 @@ export function externalPolicy(input: ExternalPolicyInput): ExternalPolicyDecisi
   const selectionAllowsSymbol = externalTypeSelectionAllowsSymbol(
     semanticSymbol,
     context.operations,
-    context.externalTypes
+    context.options.externalTypes
   );
   if (
     !isExternalSymbol(semanticSymbol, context) &&
-    (context.externalTypes.kind !== "packages" || selectionAllowsSymbol)
+    (context.options.externalTypes.kind !== "packages" || selectionAllowsSymbol)
   )
     return { kind: "expand" };
   if (isAllowedBuiltInExternal(type, context)) return { kind: "expand" };
