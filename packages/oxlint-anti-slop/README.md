@@ -34,10 +34,21 @@ any other identifier-bearing declaration kind fail-closes as `shadowed` so
 lookup never walks to an outer name. Keep them when refreshing the vendored
 upstream files.
 
+`shared/scope-lookup.ts` is also local: it owns the lexical variable-scope walk,
+parameter-annotation unwrapping, and bare type-reference naming that upstream
+inlines in several rules. Keep it, and the rules importing it, when refreshing
+the vendored upstream files.
+
 ## Tests
 
-Run the rule tests with Node 24:
+Run the rule tests and type-check with Node 24:
 
 ```sh
 pnpm --filter @elmeragroup/oxlint-plugin-anti-slop test
+pnpm --filter @elmeragroup/oxlint-plugin-anti-slop type-check
 ```
+
+## Lint exemptions
+
+The package-wide rule exemptions in the root `.oxlintrc.json` and why each is load-bearing are
+recorded in [docs/lint-exemptions.md](../../docs/lint-exemptions.md).

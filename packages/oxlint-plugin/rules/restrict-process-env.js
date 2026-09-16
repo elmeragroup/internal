@@ -122,4 +122,5 @@ export default defineRule({
       restrictedAccess: MESSAGE,
     },
   },
+  defaultOptions: [],
 });

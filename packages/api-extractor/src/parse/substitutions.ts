@@ -5,7 +5,21 @@ import type {
 } from "../backend/contracts.ts";
 import type { ResolverContext } from "./contracts.ts";
 
-type Context = ResolverContext;
+/**
+ * The compiler operations a binding walk reads: alias facts, member nodes, and
+ * the type at a node. A full `BackendCompilerOperations` satisfies it.
+ */
+export type BindingOperations = Pick<BackendCompilerOperations, "nodeFacts" | "typeAtNode" | "typeFacts">;
+
+/**
+ * The smallest resolver context a binding walk reads: compiler operations and
+ * the substitutions accumulated so far. Callers with a full resolver context
+ * satisfy it structurally.
+ */
+type BindingContext = {
+  readonly operations: BindingOperations;
+  readonly substitutions: Substitutions;
+};
 
 /** Alias type-parameter bindings that make an alias body's syntax resolvable. */
 export type Substitutions = ResolverContext["substitutions"];
@@ -40,7 +54,7 @@ export function applySubstitutions(
 export function aliasInstantiationArguments(
   type: BackendTypeHandle,
   sourceNode: BackendNodeReference | undefined,
-  context: Context
+  context: BindingContext
 ): readonly (BackendTypeHandle | undefined)[] {
   const semanticArguments = context.operations.typeFacts(type).aliasTypeArguments ?? [];
   if (semanticArguments.length > 0) return semanticArguments;
@@ -52,6 +66,25 @@ export function aliasInstantiationArguments(
       ? []
       : (context.operations.nodeFacts(sourceNode).typeName?.authoredArguments ?? []);
   return authoredArguments.map((argument) => context.operations.typeAtNode(argument));
+}
+
+/**
+ * Binds a declaration's type parameters to the arguments of one instantiation.
+ *
+ * Arguments pair with parameters by position, exactly as TypeScript's own
+ * instantiation does: an unresolved argument position stays a hole and every
+ * later argument keeps its own parameter, with `bindAliasParameters` applying
+ * the parameter's authored default when one exists. Compacting holes out of the
+ * list would shift every later argument onto the wrong parameter.
+ */
+export function bindAliasInstantiation(
+  declaration: BackendNodeReference,
+  type: BackendTypeHandle,
+  sourceNode: BackendNodeReference | undefined,
+  context: BindingContext
+): Substitutions {
+  const args = aliasInstantiationArguments(type, sourceNode, context);
+  return bindAliasParameters(declaration, context, (index) => args[index]) ?? new Map(context.substitutions);
 }
 
 /**
@@ -71,7 +104,7 @@ export function aliasInstantiationArguments(
  */
 export function bindAliasParameters(
   declaration: BackendNodeReference,
-  context: Context,
+  context: BindingContext,
   argumentAt: (index: number) => BackendTypeHandle | undefined,
   inherited: Substitutions = context.substitutions
 ): Substitutions | undefined {

@@ -2,6 +2,7 @@ import type { Node } from "typescript/unstable/ast";
 import { SyntaxKind } from "typescript/unstable/ast";
 import type { Project } from "typescript/unstable/sync";
 
+/** A declaration reference from the native compiler: its path, kind, and lazy node resolver. */
 export type CompilerDeclaration = {
   readonly index: number;
   readonly path: string;
@@ -23,6 +24,11 @@ export function resolveOwnedDeclaration(
   return session.resolveDeclaration(declaration);
 }
 
+/**
+ * The declaration that carries a symbol's value side: a variable, function, or class
+ * declaration when one exists, otherwise the checker's value declaration, otherwise the
+ * first declaration.
+ */
 export function valueOrFirstDeclarationHandle<Declaration extends { readonly kind: number }>(symbol: {
   readonly declarations: readonly Declaration[];
   readonly valueDeclaration?: Declaration;

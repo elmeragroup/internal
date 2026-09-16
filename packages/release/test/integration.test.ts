@@ -1,4 +1,4 @@
-import { Effect, Schema } from "effect";
+import { Effect, Redacted, Schema } from "effect";
 import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -209,7 +209,7 @@ writeFileSync(file, JSON.stringify({ releases: [] }));
         throw new Error(`unexpected fetch: ${method} ${href}`);
       };
 
-      const environment = { repository, token: "test-token", fetch: fixtureFetch };
+      const environment = { repository, token: Redacted.make("test-token"), fetch: fixtureFetch };
       const client = createGitHubClient(environment);
       const ancestry = createCommitAncestry(root);
       const deps: EngineDeps = {

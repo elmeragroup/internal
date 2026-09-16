@@ -14,7 +14,7 @@ import {
   isStringLiteral,
 } from "typescript/unstable/ast/is";
 import { SymbolFlags } from "typescript/unstable/sync";
-import type { Checker, Project, Symbol as TsSymbol } from "typescript/unstable/sync";
+import type { Checker, Symbol as TsSymbol } from "typescript/unstable/sync";
 
 import { FileNotInProgramError } from "../../errors.ts";
 import { definedFields } from "../../optional-fields.ts";
@@ -29,7 +29,7 @@ import { applyTypeOnlyStarFilter } from "../type-only-star-filter.ts";
 import { declarationModifiers } from "./class-facts.ts";
 import type { CompilerDeclaration } from "./declarations.ts";
 import { resolveOwnedDeclaration, valueOrFirstDeclarationHandle } from "./declarations.ts";
-import { exportsOf, orderedContainerExports } from "./module-ordering.ts";
+import { orderedContainerExports } from "./module-ordering.ts";
 import { aliasedSymbol, resolveModule } from "./module-resolution.ts";
 import { memoizeWalkFact } from "./module-walk-memo.ts";
 import { repositoryRelativePath } from "./path-identity.ts";
@@ -38,8 +38,8 @@ import { extendChain, followedChain, unforwardedChain } from "./reexport-chain.t
 import { authoredLocation, enclosingExportDeclaration, isStarExport } from "./syntax.ts";
 import { sameUltimateSymbol, ultimateSymbol } from "./ultimate-symbol.ts";
 
+/** The compiler capabilities the module walk uses: files, symbols, and per-session memoization. */
 export type TsgoModuleSession = {
-  readonly project: Project;
   readonly checker: Checker;
   readonly rootDirectory: string;
   readonly cwd: string;
@@ -82,6 +82,14 @@ export type DescriptorScope = {
   readonly warnings: BackendWarningFact[];
 };
 
+/**
+ * Normalizes one source file's public export surface into a draft.
+ *
+ * @param session - The compiler capabilities for this extraction.
+ * @param filePath - The file to read, resolved against the session's cwd.
+ * @returns The module's exports, import specifiers, type-only star specifiers, and warnings.
+ * @throws A `FileNotInProgramError` when the file is not part of the project or has no module symbol.
+ */
 export function readModule(session: TsgoModuleSession, filePath: string): BackendModuleDraft {
   session.ensureOpen("readModule");
   const absoluteFilePath = resolve(session.cwd, filePath);
@@ -187,7 +195,8 @@ function recordAmbiguousStarWarnings(
   // Path identity is enough; resolving the handle would fetch the declaration
   // file of a star contribution before parser policy has asked for a node.
   const explicitNames = new Set(
-    exportsOf(session, moduleSymbol)
+    session
+      .moduleExports(moduleSymbol)
       .filter((symbol) =>
         symbol.declarations.some((declaration) => session.sameSourceFile(declaration.path, source.fileName))
       )
@@ -202,7 +211,7 @@ function recordAmbiguousStarWarnings(
     // declaration file (the same pattern `forwardedSymbol` uses).
     const resolvedModule = session.symbolAt(statement.moduleSpecifier);
     if (resolvedModule === undefined || session.checker.isUnknownSymbol(resolvedModule)) continue;
-    for (const member of exportsOf(session, resolvedModule)) {
+    for (const member of session.moduleExports(resolvedModule)) {
       if (explicitNames.has(member.name)) continue;
       const branches = branchesByName.get(member.name) ?? new Map<string, TsSymbol>();
       // A repeated star target cannot introduce a second declaration. Keep
@@ -260,7 +269,20 @@ function appendDescriptors(
   visitedNamespaces: ReadonlySet<TsSymbol>
 ): void {
   const first = resolveOwnedDeclaration(scope.session, scope.symbol.declarations[0]);
-  if (first !== undefined && isModuleDeclaration(first)) {
+  // A pure namespace symbol owns only `namespace` declarations. When a value
+  // declaration is merged in (`namespace X {}` written before `class X {}`),
+  // the namespace is just one declaration of the merged symbol: the value must
+  // keep its own descriptor and the namespace members follow it, exactly as
+  // they do when the value is declared first.
+  const ownedDeclarations = scope.symbol.declarations.flatMap((declaration) => {
+    const resolved = resolveOwnedDeclaration(scope.session, declaration);
+    return resolved === undefined ? [] : [resolved];
+  });
+  const namespaceOnly =
+    ownedDeclarations.length > 0 &&
+    ownedDeclarations.length === scope.symbol.declarations.length &&
+    ownedDeclarations.every((declaration) => isModuleDeclaration(declaration));
+  if (namespaceOnly) {
     appendNamespaceMembers(scope, out, visitedNamespaces);
     return;
   }

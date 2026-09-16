@@ -27,7 +27,7 @@ export function orderedContainerExports(
   containerSymbol: TsSymbol,
   containerFile: SourceFile
 ): readonly TsSymbol[] {
-  const rawSymbols = exportsOf(session, containerSymbol);
+  const rawSymbols = session.moduleExports(containerSymbol);
   const contributions = starContributionOrder(session, containerFile);
   const positions = authoredExportPositions(containerFile);
   const ordered = rawSymbols.map((symbol, index) => ({
@@ -45,16 +45,6 @@ export function orderedContainerExports(
 
 /** Where a star re-export statement's contributions land in the authored order. */
 type StarContribution = { readonly position: number; readonly names: ReadonlySet<string> };
-
-/**
- * Materializes a container's export symbols as a concrete array.
- *
- * The checker's own enumeration is only loosely typed on the native seam, so
- * every caller goes through this one normalization point.
- */
-export function exportsOf(session: TsgoModuleSession, containerSymbol: TsSymbol): readonly TsSymbol[] {
-  return session.moduleExports(containerSymbol);
-}
 
 /**
  * Resolves every star export statement of the module and records which names

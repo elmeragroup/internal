@@ -42,9 +42,15 @@ export function arrayNode(
   const elementType = (facts.typeArguments ?? [])[0];
   const alias = facts.aliasSymbol;
   const aliasName = alias === undefined ? undefined : context.operations.symbolFacts(alias).name;
+  // An element is a member of the container, never the export's own value: an
+  // anonymous object element is structure to describe, exactly as an
+  // intersection member is.
   return {
     kind: "array",
-    elementType: resolve(elementType, containerElementNode(sourceNode, context), undefined, context),
+    elementType: resolve(elementType, containerElementNode(sourceNode, context), undefined, {
+      ...context,
+      compoundMember: true,
+    }),
     ...flagFields({ isReadonly: context.operations.isReadonlyType(type) }),
     ...definedFields({
       typeName:
@@ -77,13 +83,14 @@ export function tupleNode(
       const authored = expansion.elements[index];
       const node = authored?.node;
       const scoped = authored === undefined ? context : { ...context, substitutions: authored.substitutions };
-      if (node === undefined) return resolve(element, undefined, undefined, scoped);
+      const memberContext: Context = { ...scoped, compoundMember: true };
+      if (node === undefined) return resolve(element, undefined, undefined, memberContext);
       // A donated element node written in terms of a spread alias's own
       // parameters resolves to its bound argument; every other node keeps the
       // semantic element the checker already instantiated.
       const nodeType = context.operations.typeAtNode(node);
       const bound = applySubstitutions(nodeType, scoped.substitutions, context.operations);
-      return resolve(bound === nodeType ? element : nodeType, node, undefined, scoped);
+      return resolve(bound === nodeType ? element : nodeType, node, undefined, memberContext);
     }),
     ...flagFields({ isReadonly: context.operations.isReadonlyType(type) }),
     ...definedFields({ typeName: typeNameValue }),

@@ -1,8 +1,9 @@
 import { Schema } from "effect";
 
-import type { GitHubReleaseAsset } from "./github.ts";
+import { releaseAssetId } from "./github.ts";
+import type { GitHubReleaseAsset, ReleaseAssetId } from "./github.ts";
 import { assertCommit, isCommit } from "./intent.ts";
-import type { ReleaseIntent } from "./intent.ts";
+import type { CommitSha, ReleaseIntent } from "./intent.ts";
 import { decodeJson } from "./json.ts";
 import { assertCanaryReleaseVersion, assertStableReleaseVersion, isStableReleaseVersion } from "./version.ts";
 
@@ -15,6 +16,7 @@ import { assertCanaryReleaseVersion, assertStableReleaseVersion, isStableRelease
  * the store keeps transport and the catalog translation.
  */
 
+/** Body marker that claims a record for this owner; read before intent validation (ADR 0002). */
 export const releaseRecordOwner = "elmera-release";
 
 /** Asset name of the recorded archive on its GitHub draft release. */
@@ -31,31 +33,41 @@ const IntentDocument = Schema.Struct({
 });
 
 /** Record tag for a canary release of `commit`. */
-export function canaryRecordTag(commit: string): string {
+export function canaryRecordTag(commit: CommitSha): string {
   return `${canaryRecordPrefix}${commit}`;
 }
 
+/** The record tag an intent is stored under: `v<version>` for stable, `canary-<commit>` otherwise. */
 export function releaseTag(intent: ReleaseIntent): string {
   return intent.channel === "stable" ? `v${intent.version}` : canaryRecordTag(intent.commit);
 }
 
+/** Whether `tag` is a record tag this module owns. Non-record tags are ignored during discovery. */
 export function isReleaseTag(tag: string): boolean {
   if (tag.startsWith("v")) return isStableReleaseVersion(tag.slice(1));
   return tag.startsWith(canaryRecordPrefix) && isCommit(tag.slice(canaryRecordPrefix.length));
 }
 
+/** Parses a record tag. Throws, naming nothing else, when the tag is not a record tag. */
 export function assertReleaseTag(tag: string): string {
   if (!isReleaseTag(tag)) throw new Error("Expected a stable or canary release record tag");
   return tag;
 }
 
+/**
+ * Parses a record body into an intent. Throws `release intent is invalid` for a body that does not
+ * decode, and the channel-specific version error when the version does not match the channel.
+ */
 export function parseIntent(text: string): ReleaseIntent {
   const value = decodeJson(text, IntentDocument, "release intent");
-  if (value.channel === "stable") assertStableReleaseVersion(value.version);
-  else assertCanaryReleaseVersion(value.version);
-  return { channel: value.channel, version: value.version, commit: assertCommit(value.commit) };
+  const commit = assertCommit(value.commit);
+  if (value.channel === "stable") {
+    return { channel: "stable", version: assertStableReleaseVersion(value.version), commit };
+  }
+  return { channel: "canary", version: assertCanaryReleaseVersion(value.version), commit };
 }
 
+/** Renders an intent as the record body, including the schema and owner marker. */
 export function serializeIntent(intent: ReleaseIntent): string {
   return JSON.stringify({
     schema: 1,
@@ -66,6 +78,11 @@ export function serializeIntent(intent: ReleaseIntent): string {
   });
 }
 
+/**
+ * How a GitHub release relates to this owner: `ignored` (not a record tag), `foreign` (someone
+ * else's release), `owned` (marked by this owner), or `legacy` (unmarked schema 1, or an archive
+ * carrier without a foreign marker).
+ */
 export type ReleaseRecordClassification =
   | { kind: "ignored" }
   | { kind: "foreign" }
@@ -119,7 +136,8 @@ export function classifyReleaseRecord(
   return { kind: "foreign" };
 }
 
-export type ReleaseAsset = { state: "missing" } | { state: "starter" | "uploaded"; id: number };
+/** The recorded archive's presence on a release, with the asset identity when one exists. */
+export type ReleaseAsset = { state: "missing" } | { state: "starter" | "uploaded"; id: ReleaseAssetId };
 
 /** `starterAllowed` records that an empty placeholder is only legal on a draft release. */
 export function classifyReleaseAsset(
@@ -129,9 +147,9 @@ export function classifyReleaseAsset(
   if (asset === undefined) return { state: "missing" };
   if (asset.state === "starter") {
     if (!starterAllowed || asset.size !== 0) throw new Error("Unsupported starter release asset");
-    return { state: "starter", id: asset.id };
+    return { state: "starter", id: releaseAssetId(asset.id) };
   }
   if (asset.state !== "uploaded") throw new Error(`Unsupported release asset state ${asset.state}`);
   if (asset.size <= 0) throw new Error("Uploaded release asset has no bytes");
-  return { state: "uploaded", id: asset.id };
+  return { state: "uploaded", id: releaseAssetId(asset.id) };
 }

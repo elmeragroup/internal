@@ -28,6 +28,12 @@ tester.run("elmera/restrict-focus-ring-call", restrictFocusRingCall, {
 `,
     },
     {
+      name: "browser suites may call the recipe through the .test.tsx arm",
+      filename: "packages/ui/src/components/show/show.browser.test.tsx",
+      code: `const live = focusRing({ target: "state", isFocusVisible }).root();
+`,
+    },
+    {
       name: "components may import the resolved constants",
       filename: component,
       code: `import { selfFocusRingClass } from "../../styles/utils";

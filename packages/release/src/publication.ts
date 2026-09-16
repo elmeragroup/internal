@@ -81,6 +81,11 @@ function promoteAndConfirm(
   });
 }
 
+/**
+ * Publishes a verified release against the registry: uploads and confirms the archive when npm does
+ * not have it, promotes the channel dist-tag when policy says so, and reports `"superseded"` when a
+ * newer release owns the channel. A same-version identity mismatch and confirmation timeouts fail.
+ */
 export function publishVerifiedRelease(
   release: VerifiedRelease,
   deps: PublicationDeps

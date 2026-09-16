@@ -22,7 +22,7 @@ import {
 } from "./contract.ts";
 import type { Issue14ConformanceReport } from "./report.ts";
 
-const expectedFixtureCount = 116;
+const expectedFixtureCount = conformanceFixtureManifest.length;
 const emptyDifferenceDigest = differenceDigest([]);
 
 function warningOraclePathAt(fixtureRoot: string, fixture: string): string | undefined {
@@ -47,6 +47,7 @@ type FixtureStatusRecord = {
   readonly status: string;
 };
 
+/** Aggregate status of one ordered fixture run: counts by disposition plus failure indices. */
 export type FixtureRunSummary = {
   readonly fixtures: number;
   readonly unchanged: number;
@@ -96,6 +97,14 @@ function expectedReferenceAuditCommand(mode: "optional" | "required"): string {
   return `reference audit ${mode} ${pinnedUpstream.repository}@${pinnedUpstream.commit}`;
 }
 
+/**
+ * Checks a report's pinned-reference evidence: repository and commit identity, the audit
+ * commands, and either the verified path-universe counts or a complete skip.
+ *
+ * @param referenceCheck - The report's reference-check record.
+ * @param requireVerified - Whether a skipped check is acceptable.
+ * @throws When identity or commands are stale, or when verified evidence is required but missing.
+ */
 export function assertReferenceEvidence(
   referenceCheck: Issue14ConformanceReport["referenceCheck"],
   requireVerified: boolean
@@ -212,10 +221,20 @@ function assertFixtureRecord(
   }
 }
 
+/** The fixture root the checks read oracle bytes from; defaults to the package fixtures. */
 export type ConformanceInvariantOptions = {
   readonly fixtureRoot?: string;
 };
 
+/**
+ * Checks a decoded conformance report against the fixture tree: identity strings, manifest
+ * digest, reference evidence, the ordered fixture set, per-fixture hashes, type-check,
+ * extraction, and warning evidence, derived totals, and status.
+ *
+ * @param report - The decoded report to check.
+ * @param options - The fixture root to read oracle bytes from.
+ * @throws When any recorded invariant is stale or inconsistent.
+ */
 export function assertConformanceDecoded(
   report: Issue14ConformanceReport,
   options: ConformanceInvariantOptions = {}
@@ -287,6 +306,12 @@ export function manifestSha256(): string {
   return createHash("sha256").update(JSON.stringify(conformanceFixtureManifest), "utf8").digest("hex");
 }
 
+/**
+ * Checks a persisted report the way a stored-evidence reader must: all decoded invariants,
+ * verified reference evidence, and a green status.
+ *
+ * @throws When the report is stale, unverified, or not green.
+ */
 export function assertStoredReportDecoded(
   report: Issue14ConformanceReport,
   options: ConformanceInvariantOptions = {}
@@ -296,6 +321,12 @@ export function assertStoredReportDecoded(
   if (report.status !== "pass") throw new Error("Issue 14 persisted conformance is not green.");
 }
 
+/**
+ * Compares a stored report with a freshly measured one: shared upstream identity and manifest,
+ * reference identity and mode, verified reference evidence, totals, and every fixture record.
+ *
+ * @throws When the stored evidence is stale or either report is not green.
+ */
 export function assertStoredReport(
   stored: Issue14ConformanceReport,
   measured: Issue14ConformanceReport

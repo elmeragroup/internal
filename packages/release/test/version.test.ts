@@ -43,7 +43,12 @@ describe("parsed release versions", () => {
     expect(parseCanaryVersion("0.2.0-canary.11")).toEqual({ base: "0.2.0", n: 11n });
   });
   it("compares large canary counters without rounding", () => {
-    expect(compareCanaryVersions("1.0.0-canary.10", "1.0.0-canary.9")).toBe(1);
+    expect(
+      compareCanaryVersions(
+        assertCanaryReleaseVersion("1.0.0-canary.10"),
+        assertCanaryReleaseVersion("1.0.0-canary.9")
+      )
+    ).toBe(1);
   });
   it("starts a new patch base from the previous stable", () => {
     expect(nextPatchVersion("0.2.9")).toBe("0.2.10");

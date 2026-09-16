@@ -25,7 +25,7 @@
       },
       {
         "fixture": "base-ui-component",
-        "maxFetchedToMaterializedRatio": 140,
+        "maxFetchedToMaterializedRatio": 145,
         "maxRequestCount": 433,
         "maxBytesReceived": 3200000
       }

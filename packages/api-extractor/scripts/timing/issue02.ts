@@ -1,6 +1,5 @@
 import { join } from "node:path";
 
-import { writeArtifactBatchOrThrow } from "../artifact-batch-writer.ts";
 import { assertNodeMajor, issue02TimingCommand, knownIssue02TimingCommands } from "../files.ts";
 import {
   assertBytesReceivedBudget,
@@ -10,6 +9,7 @@ import {
   assertReactDivergenceEvidence,
   assertRequestCountBudget,
   assertSupplementalFixture,
+  assertTimingObservation,
   fetchedToMaterializedRatio,
   fixtureDirectory,
   fixtureInputPath,
@@ -26,10 +26,6 @@ import { boundaryStatuses, timedExtraction } from "./shared.ts";
 const reportPath = join(fixtureDirectory, "timing-boundary.json");
 const tsconfigPath = join(fixtureDirectory, "timing-boundary-tsconfig.json");
 const expectedFixtureOrder = boundaryTimingFixtures.map((fixture) => fixture.fixture);
-
-function isTransportByteObservation(value: number): boolean {
-  return Number.isFinite(value) && value >= 0;
-}
 
 const stopConditionEvidence = {
   backendLeakage:
@@ -97,14 +93,7 @@ function checkLiveSamples(measured: TimingReport): void {
     assertFetchedToMaterializedRatioBudget(sample);
     assertRequestCountBudget(sample);
     assertBytesReceivedBudget(sample);
-    if (
-      !sample.enabled ||
-      sample.totals.requestCount <= 0 ||
-      !isTransportByteObservation(sample.totals.bytesSent) ||
-      !isTransportByteObservation(sample.totals.bytesReceived)
-    ) {
-      throw new Error("Invalid live timing sample for " + sample.fixture);
-    }
+    assertTimingObservation(sample);
   }
 }
 
@@ -166,38 +155,18 @@ function checkStoredReport(stored: TimingReport, measured: TimingReport): void {
     ) {
       throw new Error(`The Issue 02 timing budget is stale for ${sample.fixture}.`);
     }
-    if (
-      sample.enabled !== true ||
-      sample.totals.requestCount <= 0 ||
-      !isTransportByteObservation(sample.totals.bytesSent) ||
-      !isTransportByteObservation(sample.totals.bytesReceived) ||
-      !Number.isFinite(sample.totals.roundTripMs) ||
-      sample.totals.roundTripMs < 0
-    ) {
-      throw new Error("Invalid stored timing sample for " + sample.fixture);
-    }
+    assertTimingObservation(sample);
   }
 }
 
-/** Measures the live Issue 02 report; `--write` stores it, `--check` compares it with the stored evidence. */
-export async function runIssue02Timing(mode: "check" | "write"): Promise<void> {
+/**
+ * Measure the live Issue 02 report and compare it with the stored evidence.
+ *
+ * `test/fixtures/timing-boundary.json` is the immutable pre-optimization
+ * baseline that later plans measure against, so this plan has no write mode.
+ */
+export async function runIssue02Timing(): Promise<void> {
   const measured = reportFrom(await collectSamples());
-  if (mode === "write") {
-    await writeArtifactBatchOrThrow(
-      {
-        outputRoot: fixtureDirectory,
-        artifacts: [
-          {
-            destination: "timing-boundary.json",
-            content: `${JSON.stringify(measured, null, 2)}\n`,
-            evidence: "generated",
-          },
-        ],
-      },
-      "Issue 02 timing artifact write"
-    );
-    return;
-  }
   const stored = readTimingReport(reportPath);
   checkStoredReport(stored, measured);
   console.log(

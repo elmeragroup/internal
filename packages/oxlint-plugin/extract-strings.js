@@ -80,8 +80,11 @@ export function extractStrings(node) {
 }
 
 /**
- * @param {import("estree").Node | null | undefined} callee
- * @param {string} name
+ * Whether a callee node is a direct identifier call such as `cn(...)`.
+ *
+ * @param {import("estree").Node | null | undefined} callee - The callee node to test.
+ * @param {string} name - The identifier name to match.
+ * @returns {boolean} `true` when `callee` is an `Identifier` named `name`.
  */
 export function isNamedCall(callee, name) {
   return callee?.type === "Identifier" && callee.name === name;

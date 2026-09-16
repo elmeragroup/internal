@@ -1,17 +1,21 @@
-import { Effect, Schema } from "effect";
+import { Effect, Redacted, Schema } from "effect";
 import { describe, expect, it } from "vitest";
 
-import { createGitHubClient } from "../src/github.ts";
+import { createGitHubClient, releaseAssetId, releaseId } from "../src/github.ts";
 import type { ReleaseIntent } from "../src/intent.ts";
 import { decodeJson } from "../src/json.ts";
 import { releaseArchiveName, releaseRecordOwner, serializeIntent } from "../src/record.ts";
 import { createReleaseStore } from "../src/store.ts";
 import type { ReleaseStore, SavedRelease } from "../src/store.ts";
+import { commit, commitSha, releaseIntent } from "./lib/release-fixtures.ts";
 
-const commit = "a".repeat(40);
 const packageName = "@elmeragroup/internal";
-const intent: ReleaseIntent = { channel: "stable", version: "0.2.0", commit };
-const saved: SavedRelease = { id: 1, intent, asset: { state: "uploaded", id: 2 } };
+const intent: ReleaseIntent = releaseIntent("0.2.0");
+const saved: SavedRelease = {
+  id: releaseId(1),
+  intent,
+  asset: { state: "uploaded", id: releaseAssetId(2) },
+};
 const uploadedAsset = { id: 2, name: releaseArchiveName, state: "uploaded", size: 12 };
 const starterAsset = { id: 2, name: releaseArchiveName, state: "starter", size: 0 };
 
@@ -99,7 +103,7 @@ function githubStore(releases: readonly ReleasePayload[], options: StoreOptions 
     return Promise.resolve(new Response("", { status: options.status ?? 500 }));
   };
   const store = createReleaseStore(
-    createGitHubClient({ repository: "example/package", token: "test", fetch: fetcher }),
+    createGitHubClient({ repository: "example/package", token: Redacted.make("test"), fetch: fetcher }),
     options.packageName ?? packageName
   );
   return { store, state, mutations, posted };
@@ -111,7 +115,7 @@ describe("durable GitHub release records", () => {
     const found = await savedRelease(store, "v0.2.0");
     await expect(Effect.runPromise(store.download(found))).rejects.toThrow("original Merge job");
     expect(state.removed).toBe(false);
-    await expect(Effect.runPromise(store.create({ ...intent, commit: "b".repeat(40) }))).rejects.toThrow(
+    await expect(Effect.runPromise(store.create({ ...intent, commit: commitSha("b") }))).rejects.toThrow(
       "intent differs"
     );
     expect(state.removed).toBe(false);
@@ -143,7 +147,7 @@ describe("durable GitHub release records", () => {
     const store = createReleaseStore(
       createGitHubClient({
         repository: "example/package",
-        token: "test",
+        token: Redacted.make("test"),
         fetch: () => Promise.reject(new Error("must not request")),
       }),
       packageName
@@ -169,7 +173,7 @@ describe("durable GitHub release records", () => {
     });
   });
   it("includes unfinished canary reservations in canary numbering", async () => {
-    const canaryIntent = { channel: "canary", version: "0.2.0-canary.12", commit };
+    const canaryIntent = releaseIntent("0.2.0-canary.12");
     const { store, state } = githubStore([
       {
         tag_name: `canary-${commit}`,
@@ -303,7 +307,7 @@ describe("release record ownership in the GitHub store", () => {
         tag_name: "v0.2.0",
         id: 8,
         draft: true,
-        body: serializeIntent({ channel: "canary", version: "0.2.0-canary.0", commit }),
+        body: serializeIntent(releaseIntent("0.2.0-canary.0")),
         assets: [],
       },
     ]);
@@ -314,7 +318,7 @@ describe("release record ownership in the GitHub store", () => {
   });
 
   it("names a marked owned record that cannot be decoded without blocking the catalog", async () => {
-    const otherCommit = "b".repeat(40);
+    const otherCommit = commitSha("b");
     const { store } = githubStore([
       {
         tag_name: `canary-${commit}`,
@@ -333,7 +337,7 @@ describe("release record ownership in the GitHub store", () => {
         tag_name: `canary-${otherCommit}`,
         id: 5,
         draft: true,
-        body: serializeIntent({ channel: "canary", version: "0.2.0-canary.12", commit: otherCommit }),
+        body: serializeIntent(releaseIntent("0.2.0-canary.12", otherCommit)),
         assets: [],
       },
       releaseRecord({
@@ -402,7 +406,7 @@ describe("GitHub JSON arrays", () => {
     const store = createReleaseStore(
       createGitHubClient({
         repository: "example/package",
-        token: "test",
+        token: Redacted.make("test"),
         fetch: () => Promise.resolve(Response.json({ releases: [] })),
       }),
       packageName

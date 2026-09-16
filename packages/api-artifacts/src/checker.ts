@@ -15,6 +15,7 @@ import type { ComponentSourceRequest, ComponentSourceResult } from "@elmeragroup
 
 import type { ProblemLog } from "./errors.ts";
 import type { ApiPart, ApiProp, RscStatus } from "./model.ts";
+import { compareCodepoint } from "./ordering.ts";
 
 export type LibraryProject = {
   projectRoot: string;
@@ -246,7 +247,7 @@ const emptyForwarded: PartForwarded = { count: 0, from: [] };
 /** A forwarded value's own declaring package joins the packages its forwarded props come from. */
 function withForwardedValue(forwarded: PartForwarded, result: ComponentSourceResult): PartForwarded {
   if (result.status !== "forwarded" || forwarded.from.includes(result.packageName)) return forwarded;
-  const from = [...forwarded.from, result.packageName].sort((left, right) => left.localeCompare(right));
+  const from = [...forwarded.from, result.packageName].sort(compareCodepoint);
   return { count: forwarded.count, from };
 }
 
@@ -265,7 +266,7 @@ function forwardedOfProps(context: LibraryProject, properties: Iterable<TsSymbol
       if (packageName !== null) from.add(packageName);
     }
   }
-  return { count, from: [...from].sort((left, right) => left.localeCompare(right)) };
+  return { count, from: [...from].sort(compareCodepoint) };
 }
 
 function addProblem(problems: ProblemLog | undefined, message: string): void {
@@ -374,8 +375,6 @@ export function readPartPropFact(
 export type LibraryPartApi = {
   /** Display name, e.g. `Dialog.Content`. */
   readonly name: string;
-  /** Declaring file of the part's call signature, when it has one. */
-  readonly declarationPaths: readonly string[];
   readonly source: PartSource | null;
   readonly forwarded: PartForwarded;
   /** Every prop the part accepts, in checker order, forwarded ones included. */
@@ -394,14 +393,23 @@ export type ComponentApi = {
   readonly partApis: readonly LibraryPartApi[];
 };
 
+/**
+ * The single call signature's first parameter, distinguished by what could be
+ * recovered from it: `absent` when there is no parameter, `unresolved` when the
+ * parameter type is missing or an error type, and `resolved` with the accepted
+ * prop symbols otherwise. The three states cannot be confused by position.
+ */
+type PropsParameter =
+  | { readonly kind: "absent" }
+  | { readonly kind: "unresolved" }
+  | { readonly kind: "resolved"; readonly props: ReadonlyMap<string, TsSymbol> };
+
 function describePart(
   context: LibraryProject,
   request: PartRequest,
   signatures: CallSignatureSet,
   source: PartSource | null,
-  hasPropsParameter: boolean,
-  propsResolved: boolean,
-  props: ReadonlyMap<string, TsSymbol>,
+  propsParameter: PropsParameter,
   forwarded: PartForwarded,
   problems: ProblemLog
 ): ApiPart | null {
@@ -417,7 +425,7 @@ function describePart(
   if (source === null) {
     return null;
   }
-  if (!hasPropsParameter) {
+  if (propsParameter.kind === "absent") {
     return {
       name: request.name,
       rsc: source.rsc,
@@ -427,13 +435,13 @@ function describePart(
       forwardedCount: 0,
     };
   }
-  if (!propsResolved) {
+  if (propsParameter.kind === "unresolved") {
     problems.add(`${request.name}: props type is unresolvable`);
     return null;
   }
 
   const rows: ApiProp[] = [];
-  for (const property of props.values()) {
+  for (const property of propsParameter.props.values()) {
     // A prop with no declaration at all is synthesised by `VariantProps` over a library
     // `tv` recipe: there is no declaration site to hang JSDoc on, so its printed union
     // is the documentation and the JSDoc gate does not apply.
@@ -465,7 +473,7 @@ function describePart(
     });
   }
 
-  rows.sort((left, right) => left.name.localeCompare(right.name));
+  rows.sort((left, right) => compareCodepoint(left.name, right.name));
 
   return {
     name: request.name,
@@ -488,15 +496,19 @@ export function extractPart(
   const { checker } = context;
   const signatures = callSignaturesOf(checker, request.type);
   const signature = signatures.kind === "one" ? signatures.signature : undefined;
-  const declarationPaths = signature?.declaration === undefined ? [] : [signature.declaration.path];
   const parameter = signature?.getParameters()[0];
   const declared = parameter === undefined ? undefined : checker.getTypeOfSymbol(parameter);
-  const propsType = declared === undefined || declared.isErrorType() ? null : declared;
   const props = new Map<string, TsSymbol>();
-  if (propsType !== null) {
-    for (const property of checker.getPropertiesOfType(propsType)) {
+  let propsParameter: PropsParameter;
+  if (parameter === undefined) {
+    propsParameter = { kind: "absent" };
+  } else if (declared === undefined || declared.isErrorType()) {
+    propsParameter = { kind: "unresolved" };
+  } else {
+    for (const property of checker.getPropertiesOfType(declared)) {
       props.set(property.name, property);
     }
+    propsParameter = { kind: "resolved", props };
   }
   const forwarded = withForwardedValue(
     props.size === 0 ? emptyForwarded : forwardedOfProps(context, props.values()),
@@ -504,20 +516,9 @@ export function extractPart(
   );
   return {
     name: request.name,
-    declarationPaths,
     source,
     forwarded,
     props,
-    part: describePart(
-      context,
-      request,
-      signatures,
-      source,
-      parameter !== undefined,
-      propsType !== null,
-      props,
-      forwarded,
-      problems
-    ),
+    part: describePart(context, request, signatures, source, propsParameter, forwarded, problems),
   };
 }

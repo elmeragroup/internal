@@ -38,6 +38,13 @@ import { NodeHandleInterner } from "./node-handles.ts";
 import type { SessionNodeReference } from "./node-handles.ts";
 import type { PathIdentity } from "./path-identity.ts";
 
+/**
+ * One isolated extraction session over an open TypeScript project.
+ *
+ * The session interns handles so the same compiler value always yields the same handle,
+ * memoizes expensive fact reads, and releases every reference on `close`. Sessions never
+ * share mutable state.
+ */
 export class TsgoExtractionSession implements BackendExtractionSession {
   private readonly project: Project;
   private readonly checker: Checker;
@@ -67,8 +74,20 @@ export class TsgoExtractionSession implements BackendExtractionSession {
   private symbolStack: readonly string[] = [];
   private closed = false;
 
+  /** The parser-facing compiler operations, backed by this session's interning and caches. */
   readonly compiler: BackendCompilerOperations;
 
+  /**
+   * @param project - The opened TypeScript project this session reads from.
+   * @param rootDirectory - Compiler `rootDir`, the base for module names.
+   * @param projectRoot - The directory of the tsconfig file.
+   * @param provenanceRoot - The root repository-relative provenance paths are measured from.
+   * @param cwd - The directory module specifiers resolve against.
+   * @param pathIdentity - Path and realpath normalization for this project.
+   * @param externalTypes - Which non-project declarations this extraction may materialize.
+   * @param componentSources - Whether implementation bodies may be read for source inspection.
+   * @param onClose - Called with this session when it closes, so the project can drop it.
+   */
   constructor(
     project: Project,
     rootDirectory: string,
@@ -111,7 +130,6 @@ export class TsgoExtractionSession implements BackendExtractionSession {
     return {
       checker: this.checker,
       componentSources: this.componentSources,
-      program: this.project.program,
       sourceFileMetadata: (path) => this.sourceFileMetadata(path),
       rootDirectory: this.provenanceRoot,
       ensureOpen: (operation) => this.ensureOpen(operation),
@@ -149,7 +167,6 @@ export class TsgoExtractionSession implements BackendExtractionSession {
 
   private moduleContext(): TsgoModuleSession {
     return {
-      project: this.project,
       checker: this.checker,
       rootDirectory: this.rootDirectory,
       cwd: this.cwd,
@@ -169,15 +186,18 @@ export class TsgoExtractionSession implements BackendExtractionSession {
     };
   }
 
+  /** Normalizes one module file into a backend draft; rejects files outside the project. */
   readModule(filePath: string): BackendModuleDraft {
     this.currentFilePath = resolve(this.cwd, filePath);
     return readModule(this.moduleContext(), filePath);
   }
 
+  /** Resolves a module specifier with the project's configured resolution rules. */
   resolveModule(moduleSpecifier: string, containingFile: string) {
     return resolveModule(this.moduleContext(), moduleSpecifier, containingFile);
   }
 
+  /** Releases every handle, cache, and compiler reference; idempotent. */
   close(): void {
     if (this.closed) return;
     this.closed = true;

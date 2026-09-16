@@ -3,11 +3,16 @@ import type { ESTree } from "@oxlint/plugins";
 import { lexicalTypeParameterNames } from "./lexical-type-parameters.ts";
 import type { VisitorKeys } from "./lexical-type-parameters.ts";
 
+/**
+ * Nearest lexical declaration binding a type name, or `shadowed` when a value, import, or
+ * enum declaration makes the name — and any outer declaration it hides — unusable.
+ */
 export type TypeNameBinding =
 	| { readonly kind: "alias"; readonly declaration: ESTree.TSTypeAliasDeclaration }
 	| { readonly kind: "interface"; readonly declarations: readonly ESTree.TSInterfaceDeclaration[] }
 	| { readonly kind: "shadowed" };
 
+/** Lexical lookup of type names, indexed per declaration container. */
 export type TypeNameScope = {
 	/** Nearest lexical binding for `name` visible at `useSite`, or null when no local declaration binds it. */
 	readonly resolve: (useSite: ESTree.Node, name: string) => TypeNameBinding | null;
@@ -134,6 +139,13 @@ function indexStatements(statements: readonly ESTree.Node[]): Map<string, TypeNa
 	return index;
 }
 
+/**
+ * Index the program's type declarations for lexical name lookup.
+ *
+ * @param program - The program whose declaration containers are indexed lazily.
+ * @param visitorKeys - The ESTree visitor keys that name each node's child slots.
+ * @returns A scope resolving names from a use site outward through lexical containers.
+ */
 export function createTypeNameScope(program: ESTree.Program, visitorKeys: VisitorKeys): TypeNameScope {
 	const indexes = new Map<ESTree.Node, Map<string, TypeNameBinding>>();
 	indexes.set(program, indexStatements(program.body));

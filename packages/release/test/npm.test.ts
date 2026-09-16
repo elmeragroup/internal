@@ -1,7 +1,8 @@
 import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
 
-import { readRegistry } from "../src/npm.ts";
+import type { ReleasePackage } from "../src/files.ts";
+import { createNpmPublisher, readRegistry } from "../src/npm.ts";
 
 const commit = "a".repeat(40);
 const packageName = "@elmeragroup/internal";
@@ -29,6 +30,30 @@ describe("registry failures", () => {
       )
     );
     expect(registry.versions.get("0.1.0")).toEqual({ integrity: undefined, commit });
+  });
+  it("parses the recorded release commit and rejects an unusable one", async () => {
+    await expect(
+      Effect.runPromise(
+        readRegistry(packageName, () =>
+          Promise.resolve(
+            Response.json({
+              versions: { "0.1.0": { dist: {}, elmeraRelease: { commit: "main" } } },
+              "dist-tags": {},
+            })
+          )
+        )
+      )
+    ).rejects.toThrow("Expected a full commit SHA; received main");
+  });
+  it("keeps an unusable legacy gitHead as absent metadata", async () => {
+    const registry = await Effect.runPromise(
+      readRegistry(packageName, () =>
+        Promise.resolve(
+          Response.json({ versions: { "0.1.0": { dist: {}, gitHead: "main" } }, "dist-tags": {} })
+        )
+      )
+    );
+    expect(registry.versions.get("0.1.0")?.commit).toBeUndefined();
   });
   it("treats only a real 404 as a new package", async () => {
     const registry = await Effect.runPromise(
@@ -69,5 +94,22 @@ describe("registry failures", () => {
     const schemaError = decodeError.cause;
     if (!(schemaError instanceof Error)) throw new Error("expected a wrapped schema error");
     expect(schemaError.message).toContain('["versions"]["0.1.0"]["dist"]');
+  });
+});
+
+describe("npm CLI failures", () => {
+  it("includes the captured stderr in the failure message", async () => {
+    const pkg: ReleasePackage = {
+      checkoutRoot: process.cwd(),
+      packageDirectory: process.cwd(),
+      packageName: "@acme/app",
+    };
+    // npm fails locally on a missing tarball, so this reaches the real CLI without a registry write.
+    const failure = await Effect.runPromise(
+      Effect.flip(createNpmPublisher(pkg).publish("/elmera-release-test/missing.tgz"))
+    );
+    expect(failure).toMatchObject({ _tag: "ReleaseError" });
+    expect(failure.message).toMatch(/^npm failed with status \d+: /u);
+    expect(failure.message).toContain("npm error code ENOENT");
   });
 });

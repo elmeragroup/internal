@@ -79,6 +79,12 @@ const BASE_CLASSES = "text-xs leading-relaxed max-h-160 overflow-auto font-mono"
 `,
     },
     {
+      name: "browser test file ignored through the .test.tsx arm",
+      filename: "packages/ui/src/components/show/show.browser.test.tsx",
+      code: `const SUITE_CLASSES = { root: "flex gap-2 text-sm" } as const;
+`,
+    },
+    {
       name: "intl dictionary filename ignored",
       filename: intl,
       code: `export const enUS = { close: "Close", open: "Open" };

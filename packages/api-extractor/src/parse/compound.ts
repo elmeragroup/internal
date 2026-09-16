@@ -135,7 +135,7 @@ export function intersectionNode(
 ): SemanticType {
   const members = context.operations.typeFacts(type).unionOrIntersectionTypes ?? [];
   const memberNodes = matchIntersectionMemberNodes(members, sourceNode, context);
-  const memberContext: Context = { ...context, authoredIntersectionMember: true };
+  const memberContext: Context = { ...context, compoundMember: true };
   const resolved = members.map((member, index) =>
     resolve(member, memberNodes[index], undefined, memberContext)
   );

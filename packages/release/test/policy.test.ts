@@ -1,26 +1,20 @@
 import { describe, expect, it } from "vitest";
 
-import type { ReleaseIntent, VerifiedRelease } from "../src/intent.ts";
+import { assertCommit } from "../src/intent.ts";
+import type { VerifiedRelease } from "../src/intent.ts";
 import type { Registry } from "../src/npm.ts";
 import { decideCanary, distTagFor, planPublication, shouldPromote } from "../src/policy.ts";
 import type { CommitAncestry } from "../src/policy.ts";
-
-const commit = "a".repeat(40);
-const newerCommit = "b".repeat(40);
-const unrelatedCommit = "c".repeat(40);
-const canaryIntent: ReleaseIntent = { channel: "canary", version: "0.2.0-canary.11", commit };
-const canary: VerifiedRelease = {
-  ...canaryIntent,
-  archive: "/verified/package.tgz",
-  integrity: "sha512-test",
-};
-const stable: VerifiedRelease = {
-  channel: "stable",
-  version: "0.1.9",
+import {
   commit,
-  archive: "/verified/package.tgz",
-  integrity: "sha512-test",
-};
+  newerCommit,
+  stableVersion,
+  unrelatedCommit,
+  verifiedRelease,
+} from "./lib/release-fixtures.ts";
+
+const canary: VerifiedRelease = verifiedRelease("0.2.0-canary.11");
+const stable: VerifiedRelease = verifiedRelease("0.1.9");
 
 function registry(): Registry {
   return { versions: new Map(), tags: new Map() };
@@ -41,9 +35,9 @@ type CanaryDecisionOptions = {
 function decision(options: CanaryDecisionOptions = {}) {
   return decideCanary(
     {
-      commit: options.commit ?? commit,
-      current: options.current ?? "0.1.9",
-      base: options.plannedBase ?? "0.2.0",
+      commit: assertCommit(options.commit ?? commit),
+      current: stableVersion(options.current ?? "0.1.9"),
+      base: stableVersion(options.plannedBase ?? "0.2.0"),
     },
     options.registry ?? registry(),
     options.reserved ?? [],
@@ -150,23 +144,16 @@ describe("recorded canary retry", () => {
     const published = registry();
     published.versions.set("0.2.0-canary.12", { commit: newerCommit, integrity: "newer" });
     expect(publicationPlan(canary, published)).toEqual({ kind: "superseded" });
-    expect(
-      publicationPlan(
-        { ...canary, commit: newerCommit, version: "0.2.0-canary.12", integrity: "newer" },
-        published
-      )
-    ).toEqual({ kind: "publish", upload: false, promote: true });
+    expect(publicationPlan(verifiedRelease("0.2.0-canary.12", newerCommit, "newer"), published)).toEqual({
+      kind: "publish",
+      upload: false,
+      promote: true,
+    });
   });
 });
 
 describe("descendant stable supersession", () => {
-  const recorded: VerifiedRelease = {
-    channel: "canary",
-    version: "0.3.0-canary.0",
-    commit,
-    archive: "/verified/package.tgz",
-    integrity: "sha512-test",
-  };
+  const recorded: VerifiedRelease = verifiedRelease("0.3.0-canary.0");
 
   it("supersedes when a lower stable is from a descendant commit and the canary is absent", () => {
     const published = registry();
@@ -242,13 +229,13 @@ describe("publication plan", () => {
   it("allows the first stable release to replace the legacy canary on latest", () => {
     const published = registry();
     published.tags.set("latest", "0.1.1-canary.1");
-    expect(publicationPlan({ ...stable, version: "0.1.2" }, published)).toEqual({
+    expect(publicationPlan(verifiedRelease("0.1.2"), published)).toEqual({
       kind: "publish",
       upload: true,
       promote: true,
     });
     published.tags.set("latest", "0.1.3");
-    expect(publicationPlan({ ...stable, version: "0.1.2" }, published)).toEqual({
+    expect(publicationPlan(verifiedRelease("0.1.2"), published)).toEqual({
       kind: "publish",
       upload: true,
       promote: false,
@@ -267,7 +254,7 @@ describe("publication plan", () => {
     const published = registry();
     published.versions.set("0.2.0-canary.10", { commit, integrity: "older" });
     published.tags.set("canary", "0.2.0-canary.10");
-    const later = { ...canary, commit: newerCommit, version: "0.2.0-canary.9" };
+    const later = verifiedRelease("0.2.0-canary.9", newerCommit);
     expect(publicationPlan(later, published)).toEqual({ kind: "publish", upload: true, promote: true });
   });
 

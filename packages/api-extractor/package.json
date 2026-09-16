@@ -19,7 +19,6 @@
     "test:timing": "node scripts/timing.ts --plan issue02 --check",
     "test:timing:issue14": "node scripts/timing.ts --plan issue14 --check",
     "test:timing:external-selection": "node scripts/timing.ts --plan externalSelection --check",
-    "report:timing": "node scripts/timing.ts --plan issue02 --write",
     "report:timing:issue14": "node scripts/timing.ts --plan issue14 --write",
     "report:warnings": "node scripts/conformance/report.ts --write-warnings",
     "check:catalog": "node scripts/check-fixture-catalog.ts",

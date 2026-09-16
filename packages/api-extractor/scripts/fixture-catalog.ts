@@ -60,6 +60,14 @@ function readJson(path: string): Schema.Json {
   return Schema.decodeUnknownSync(Schema.Json)(JSON.parse(readFileSync(path, "utf8")));
 }
 
+/**
+ * Reads and decodes the hand-maintained fixture facts (`fixtures.json`): IPC ceilings and the
+ * recorded per-fixture exceptions no filename can state.
+ *
+ * @param root - The fixture root directory.
+ * @returns The decoded budgets.
+ * @throws When the file is unreadable or does not match the schema.
+ */
 export function readFixtureBudgets(root: string): FixtureBudgets {
   return Schema.decodeUnknownSync(FixtureBudgetsSchema)(readJson(join(root, "fixtures.json")));
 }
@@ -91,14 +99,28 @@ export function fixtureDirectories(root: string): readonly { readonly id: string
   return readdirSync(root, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
     .flatMap((entry) => {
-      const file = readdirSync(join(root, entry.name))
-        .sort()
-        .find((name) => name.startsWith("input."));
+      const inputs = readdirSync(join(root, entry.name))
+        .filter((name) => name.startsWith("input."))
+        .sort();
+      if (inputs.length > 1) {
+        throw new Error(`Fixture ${entry.name} has more than one input.* file: ${inputs.join(", ")}`);
+      }
+      const file = inputs[0];
       return file === undefined ? [] : [{ id: entry.name, file }];
     })
     .sort((left, right) => (left.id < right.id ? -1 : 1));
 }
 
+/**
+ * Derives the complete fixture catalog from the fixture tree: one evidence record per
+ * directory holding an `input.*` file, classified by the oracle files it contains and the
+ * budgets keyed by fixture id.
+ *
+ * @param root - The fixture root directory.
+ * @param budgets - The hand-maintained facts from `fixtures.json`.
+ * @returns Records ordered by fixture id.
+ * @throws When a fixture directory holds more than one input file.
+ */
 export function deriveFixtureCatalog(
   root: string,
   budgets: FixtureBudgets
@@ -147,6 +169,15 @@ export function deriveFixtureCatalog(
   });
 }
 
+/**
+ * Checks a derived catalog against the invariants the gates rely on: stable ordering, valid
+ * input ids, evidence ids that match the record's conformance class, compatible oracle
+ * dispositions, a type-check strategy for every conformance fixture, a divergence record for
+ * every reviewed divergence, and non-negative timing orders.
+ *
+ * @param catalog - The catalog to validate.
+ * @throws When any invariant is violated.
+ */
 export function validateFixtureEvidenceCatalog(catalog: readonly FixtureEvidenceRecord[]): void {
   let previous = "";
   for (const record of catalog) {
@@ -188,7 +219,9 @@ export function validateFixtureEvidenceCatalog(catalog: readonly FixtureEvidence
 /** The fixture tree this package's own gates read. */
 export const fixtureTreeRoot = fixtureRoot;
 
+/** The decoded `test/fixtures/fixtures.json` facts for this package's own fixture tree. */
 export const fixtureBudgets = readFixtureBudgets(fixtureRoot);
+/** The derived catalog for this package's own fixture tree. */
 export const fixtureEvidenceCatalog = deriveFixtureCatalog(fixtureRoot, fixtureBudgets);
 
 // The catalog validates itself once, here, when this module loads. Plans and

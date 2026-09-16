@@ -201,7 +201,7 @@ for (const suite of suites) {
 
   describe(`${suite.label}: ported upstream fixtures`, () => {
     it("keeps every copied input and upstream oracle byte-identical to e145350", () => {
-      if (!referenceAvailable) return;
+      if (!referenceAvailable()) return;
       for (const definition of suite.fixtures) {
         for (const file of [definition.file, "output.json"]) {
           expect(readFileSync(resolve(fixtureRoot, definition.fixture, file), "utf8")).toBe(

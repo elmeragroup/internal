@@ -1,3 +1,5 @@
+import type { Brand } from "effect";
+
 const numericIdentifier = /^(?:0|[1-9]\d*)$/;
 const canaryMarker = "-canary.";
 
@@ -11,8 +13,18 @@ export type ParsedStableVersion = {
   patch: bigint;
 };
 
+/** A stable release version in `x.y.z` form; the release channel that owns it is `stable`. */
+export type StableVersion = Brand.Branded<string, "StableVersion">;
+
+/** A canary release version in `x.y.z-canary.N` form; the release channel that owns it is `canary`. */
+export type CanaryVersion = Brand.Branded<string, "CanaryVersion">;
+
+/** Any release version the pipeline accepts. */
+export type ReleaseVersion = StableVersion | CanaryVersion;
+
+/** A canary split into its stable base and its counter. */
 export type ParsedCanaryVersion = {
-  base: string;
+  base: StableVersion;
   n: bigint;
 };
 
@@ -40,19 +52,22 @@ function canaryComponents(version: string): { base: string; suffix: string } | u
   return { base, suffix };
 }
 
-export function isStableReleaseVersion(version: string): boolean {
+/** Whether `version` is a stable `x.y.z` version; narrows to `StableVersion`. */
+export function isStableReleaseVersion(version: string): version is StableVersion {
   return stableComponents(version) !== undefined;
 }
 
-export function isCanaryReleaseVersion(version: string): boolean {
+/** Whether `version` is a canary `x.y.z-canary.N` version; narrows to `CanaryVersion`. */
+export function isCanaryReleaseVersion(version: string): version is CanaryVersion {
   return canaryComponents(version) !== undefined;
 }
 
-function isSupportedReleaseVersion(version: string): boolean {
+function isSupportedReleaseVersion(version: string): version is ReleaseVersion {
   return isStableReleaseVersion(version) || isCanaryReleaseVersion(version);
 }
 
-export function assertReleaseVersion(version: string): string {
+/** Parses a stable or canary release version. Throws for any other version form. */
+export function assertReleaseVersion(version: string): ReleaseVersion {
   if (!isSupportedReleaseVersion(version)) {
     throw new Error(
       `Unsupported release version ${version}; expected x.y.z or x.y.z-canary.N without leading zeros`
@@ -61,19 +76,22 @@ export function assertReleaseVersion(version: string): string {
   return version;
 }
 
-export function assertCanaryReleaseVersion(version: string): string {
-  assertReleaseVersion(version);
-  if (!isCanaryReleaseVersion(version)) {
+/** Parses a canary release version. Throws for stable versions and unsupported forms. */
+export function assertCanaryReleaseVersion(version: string): CanaryVersion {
+  const supported = assertReleaseVersion(version);
+  if (!isCanaryReleaseVersion(supported)) {
     throw new Error(`Canary publication requires x.y.z-canary.N; received ${version}`);
   }
-  return version;
+  return supported;
 }
 
-export function assertStableReleaseVersion(version: string): string {
+/** Parses a stable release version. Throws for canary versions and unsupported forms. */
+export function assertStableReleaseVersion(version: string): StableVersion {
   if (!isStableReleaseVersion(version)) throw new Error(`Expected a stable version; received ${version}`);
   return version;
 }
 
+/** Parses stable components for arithmetic. Throws for any non-stable input. */
 export function parseStableVersion(version: string): ParsedStableVersion {
   const components = stableComponents(version);
   if (components === undefined) throw new Error(`Expected a stable version; received ${version}`);
@@ -81,20 +99,22 @@ export function parseStableVersion(version: string): ParsedStableVersion {
   return { major: BigInt(major), minor: BigInt(minor), patch: BigInt(patch) };
 }
 
+/** Parses a canary into its stable base and counter. Throws for any non-canary input. */
 export function parseCanaryVersion(version: string): ParsedCanaryVersion {
   const components = canaryComponents(version);
   if (components === undefined) {
     throw new Error(`Canary publication requires x.y.z-canary.N; received ${version}`);
   }
-  return { base: components.base, n: BigInt(components.suffix) };
+  return { base: assertStableReleaseVersion(components.base), n: BigInt(components.suffix) };
 }
 
 function formatStableVersion(version: ParsedStableVersion): string {
   return `${version.major}.${version.minor}.${version.patch}`;
 }
 
-export function formatCanaryVersion(version: ParsedCanaryVersion): string {
-  return `${version.base}-canary.${version.n}`;
+/** Renders parsed canary components as the recorded `x.y.z-canary.N` string. */
+export function formatCanaryVersion(version: ParsedCanaryVersion): CanaryVersion {
+  return assertCanaryReleaseVersion(`${version.base}-canary.${version.n}`);
 }
 
 function compareParsedStableVersions(left: ParsedStableVersion, right: ParsedStableVersion): number {
@@ -104,16 +124,19 @@ function compareParsedStableVersions(left: ParsedStableVersion, right: ParsedSta
   return 0;
 }
 
-export function compareStableVersions(left: string, right: string): number {
+/** Compares two parsed stable versions numerically. */
+export function compareStableVersions(left: StableVersion, right: StableVersion): number {
   return compareParsedStableVersions(parseStableVersion(left), parseStableVersion(right));
 }
 
-export function nextPatchVersion(version: string): string {
+/** The next patch after `version`, keeping the major and minor components. */
+export function nextPatchVersion(version: string): StableVersion {
   const parsed = parseStableVersion(version);
-  return formatStableVersion({ ...parsed, patch: parsed.patch + 1n });
+  return assertStableReleaseVersion(formatStableVersion({ ...parsed, patch: parsed.patch + 1n }));
 }
 
-export function compareCanaryVersions(left: string, right: string): number {
+/** Compares two parsed canaries by base first, then by counter. */
+export function compareCanaryVersions(left: CanaryVersion, right: CanaryVersion): number {
   const parsedLeft = parseCanaryVersion(left);
   const parsedRight = parseCanaryVersion(right);
   const baseOrder = compareStableVersions(parsedLeft.base, parsedRight.base);

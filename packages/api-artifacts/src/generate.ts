@@ -149,7 +149,10 @@ export async function generateApiArtifacts(
           const extracted: readonly ExtractionResult[] = yield* Effect.forEach(requests, (entry) =>
             extractor.extractModule(entry.entryFile, { includeExternalTypes: packages })
           );
-          const enriched = enrichComponents(context, extracted, described, packages);
+          const enriched = enrichComponents(context, extracted, described, packages, problems);
+          if (problems.problems.length > 0) {
+            return yield* Effect.fail(new ApiArtifactsError(problems.problems));
+          }
           const rejected = enriched.diagnostics.filter(
             (diagnostic) => !options.allowedWarningCodes?.includes(diagnostic.warning.code)
           );

@@ -1,7 +1,8 @@
 import { defineRule } from "@oxlint/plugins";
 
+import { classTokens } from "../class-tokens.js";
 import { extractStrings } from "../extract-strings.js";
-import { normalizeFilename } from "../filename-normalizer.js";
+import { isTestFile, normalizeFilename } from "../filename-normalizer.js";
 
 /**
  * Exact utilities that are legal class tokens without a hyphenated suffix.
@@ -208,18 +209,6 @@ const UTILITY_PREFIXES = [
 /**
  * @param {string} filename
  */
-function isTestFile(filename) {
-  return (
-    filename.endsWith(".test.ts") ||
-    filename.endsWith(".test.tsx") ||
-    filename.endsWith(".browser.test.tsx") ||
-    filename.endsWith(".test-d.tsx")
-  );
-}
-
-/**
- * @param {string} filename
- */
 function isSkippedPath(filename) {
   const normalized = normalizeFilename(filename);
   if (isTestFile(normalized)) return true;
@@ -247,13 +236,6 @@ function unwrap(node) {
     break;
   }
   return current;
-}
-
-/**
- * @param {string} str
- */
-function classTokens(str) {
-  return str.split(/\s+/).filter(Boolean);
 }
 
 /**

@@ -31,6 +31,21 @@ export type FreshDeclarationOutputOptions = {
   readonly declarationDirectory: string;
 };
 
+/** How a boundary check failed: a real leak, or the scan could not run. */
+export type BoundaryCheckFailureKind = "violation" | "infrastructure";
+
+/** A failed boundary check; only `violation` means compiler objects escaped the backend boundary. */
+export class BoundaryCheckError extends Error {
+  readonly _tag = "BoundaryCheckError" as const;
+  readonly kind: BoundaryCheckFailureKind;
+
+  constructor(kind: BoundaryCheckFailureKind, message: string, cause?: unknown) {
+    super(message, { cause });
+    this.name = "BoundaryCheckError";
+    this.kind = kind;
+  }
+}
+
 function declarationFiles(directory: string): readonly string[] {
   if (!existsSync(directory)) return [];
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -113,9 +128,17 @@ export function assertFreshDeclarationOutput(options: FreshDeclarationOutputOpti
 
 export function checkBoundary(): BoundaryCheckResult {
   if (!existsSync(declarationDirectory) || !existsSync(publicIndex)) {
-    throw new Error("Boundary scan requires a declaration build at dist/");
+    throw new BoundaryCheckError("infrastructure", "Boundary scan requires a declaration build at dist/");
   }
-  assertFreshDeclarationOutput({ tsconfigPath, cwd: packageDirectory, declarationDirectory });
+  try {
+    assertFreshDeclarationOutput({ tsconfigPath, cwd: packageDirectory, declarationDirectory });
+  } catch (cause) {
+    throw new BoundaryCheckError(
+      "infrastructure",
+      `Fresh declaration build is unavailable: ${compilerFailureDetail(cause)}`,
+      cause
+    );
+  }
   const sourceFilePaths = packageSourceFiles(packageDirectory);
   const ts7AdapterDirectory = join(sourceDirectory, "backend", "ts7") + "/";
   const sourceViolations = sourceFilePaths.flatMap((path) =>
@@ -128,7 +151,8 @@ export function checkBoundary(): BoundaryCheckResult {
   );
   const violations = [...sourceViolations, ...declarationViolations];
   if (violations.length > 0) {
-    throw new Error(
+    throw new BoundaryCheckError(
+      "violation",
       "Compiler declarations/imports escaped the backend boundary:\n" +
         violations.map((violation) => `- ${violation.path}: ${violation.reason}`).join("\n")
     );

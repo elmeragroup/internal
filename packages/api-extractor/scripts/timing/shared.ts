@@ -3,20 +3,28 @@ import { Effect } from "effect";
 import { InternalProjectExtractorTiming, timedProjectExtractorLayer } from "../../src/internal/timing.ts";
 import type { TimedExtraction } from "../../src/internal/timing.ts";
 import type { ExtractorOptions } from "../../src/options.ts";
-import { checkBoundary } from "../check-boundary.ts";
+import { BoundaryCheckError, checkBoundary } from "../check-boundary.ts";
 
 export type BoundaryStatuses = {
   readonly backendLeakage: "clear" | "triggered";
   readonly durableContractLeakage: "clear" | "triggered";
 };
 
-/** Both boundary stop conditions share one scan; a failing scan triggers both. */
+/**
+ * Both boundary stop conditions share one scan. A scan that cannot run is an
+ * infrastructure failure and surfaces as one; only a scanned leak triggers the
+ * stop conditions and prints the violating paths.
+ */
 export function boundaryStatuses(): BoundaryStatuses {
   try {
     checkBoundary();
     return { backendLeakage: "clear", durableContractLeakage: "clear" };
-  } catch {
-    return { backendLeakage: "triggered", durableContractLeakage: "triggered" };
+  } catch (cause) {
+    if (cause instanceof BoundaryCheckError && cause.kind === "violation") {
+      process.stderr.write(`${cause.message}\n`);
+      return { backendLeakage: "triggered", durableContractLeakage: "triggered" };
+    }
+    throw cause;
   }
 }
 

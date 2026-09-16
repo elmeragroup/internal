@@ -6,7 +6,7 @@ import { addUndefined } from "./component.ts";
 import type { ResolveSemanticType, ResolverContext } from "./contracts.ts";
 import { recordIndexSignatureKeyProvenance } from "./object-resolver.ts";
 import { declarationOwnership, isExternalOwnership } from "./ownership.ts";
-import { aliasInstantiationArguments, applySubstitutions, bindAliasParameters } from "./substitutions.ts";
+import { applySubstitutions, bindAliasInstantiation, bindAliasParameters } from "./substitutions.ts";
 import type { Substitutions } from "./substitutions.ts";
 
 type Context = ResolverContext;
@@ -116,7 +116,7 @@ function mappedDeclaration(
       continue;
     const viaAlias = followAliasToMappedDeclaration(
       aliasDeclaration,
-      aliasSubstitutions(aliasDeclaration, type, sourceNode, context),
+      bindAliasInstantiation(aliasDeclaration, type, sourceNode, context),
       context,
       new Set<BackendNodeHandle>()
     );
@@ -197,21 +197,6 @@ function mappedKeyType(
       : constraintType;
   const intrinsic = context.operations.typeFacts(base).intrinsic;
   return intrinsic === "string" ? "string" : intrinsic === "number" ? "number" : undefined;
-}
-
-/** Binds an alias declaration's type parameters to one instantiation's arguments. */
-function aliasSubstitutions(
-  declaration: BackendNodeHandle,
-  type: BackendTypeHandle,
-  sourceNode: BackendNodeReference | undefined,
-  context: Context
-): Substitutions {
-  // A hole in the authored arguments drops out of the list instead of keeping
-  // its parameter position, so later arguments shift left.
-  const args = aliasInstantiationArguments(type, sourceNode, context).filter(
-    (argument): argument is BackendTypeHandle => argument !== undefined
-  );
-  return bindAliasParameters(declaration, context, (index) => args[index]) ?? new Map(context.substitutions);
 }
 
 /**

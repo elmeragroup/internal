@@ -23,11 +23,14 @@ type ResolvedType = {
 	readonly substitutions: TypeAliasEnvironment;
 };
 
+/** A dictionary contract whose direct value type is an escape hatch such as `unknown` or `any`. */
 export type UnsafeDictionary = {
 	readonly kind: "unsafe-dictionary";
+	/** The escape hatch that makes values of this dictionary unsafe to consume. */
 	readonly unsafeValue: "any" | "empty-object" | "object" | "union" | "unknown";
 };
 
+/** Broad destination shapes that discard a known value's type evidence. */
 export type WideningTargetKind =
 	| "anonymous object"
 	| "generic container"
@@ -35,16 +38,26 @@ export type WideningTargetKind =
 	| "open dictionary"
 	| "unknown";
 
+/** A destination type a known value can flow into while losing its evidence. */
 export type WideningTarget = {
 	readonly kind: WideningTargetKind;
 };
 
+/** Lexical type environment used to resolve aliases, interfaces, and built-ins for one program. */
 export type TypeEnvironment = {
+	/** Resolve a type name as it is visible at a use site. */
 	readonly scope: TypeNameScope;
 };
 
 type ResolvingAliases = ReadonlySet<ESTree.TSTypeAliasDeclaration>;
 
+/**
+ * Build the lexical type environment that resolves type names for one program.
+ *
+ * @param program - The program whose declarations are indexed for lookup.
+ * @param visitorKeys - The ESTree visitor keys that name each node's child slots.
+ * @returns A type environment resolving names through lexical scopes.
+ */
 export function createTypeEnvironment(
 	program: ESTree.Program,
 	visitorKeys: VisitorKeys,
@@ -184,7 +197,7 @@ function unsafeDirectValue(
 		);
 		if (unsafeMembers.includes("any")) return "any";
 		return unsafeMembers.length > 0 && unsafeMembers.every((member) => member !== null)
-			? unsafeMembers[0]
+			? (unsafeMembers[0] ?? null)
 			: null;
 	}
 	if (unwrapped.type !== "TSTypeReference") return null;
@@ -276,6 +289,13 @@ function dictionaryValueTypes(
 	return dictionaryValueTypes(alias.typeAnnotation, environment, nextSubstitutions, nextResolving);
 }
 
+/**
+ * Classify a dictionary value type used directly by a contract such as an index signature.
+ *
+ * @param valueType - The dictionary value type to classify.
+ * @param environment - The lexical type environment of the enclosing program.
+ * @returns The unsafe classification, or null when the value type is a concrete contract.
+ */
 export function classifyUnsafeDictionaryValue(
 	valueType: ESTree.TSType,
 	environment: TypeEnvironment,
@@ -284,6 +304,13 @@ export function classifyUnsafeDictionaryValue(
 	return unsafeValue === null ? null : { kind: "unsafe-dictionary", unsafeValue };
 }
 
+/**
+ * Classify a dictionary-shaped type by its direct value types, following aliases and wrappers.
+ *
+ * @param type - The candidate dictionary type to classify.
+ * @param environment - The lexical type environment of the enclosing program.
+ * @returns The unsafe classification, or null when the type is not an unsafe dictionary.
+ */
 export function classifyUnsafeDictionary(
 	type: ESTree.TSType,
 	environment: TypeEnvironment,
@@ -309,6 +336,13 @@ function resolvesToDictionary(
 	return dictionaryValueTypes(type, environment, substitutions, resolvingAliases).length > 0;
 }
 
+/**
+ * Classify a type as a broad destination that discards a known value's evidence.
+ *
+ * @param type - The destination type to classify.
+ * @param environment - The lexical type environment of the enclosing program.
+ * @returns The widening classification, or null when the destination keeps precise evidence.
+ */
 export function classifyWideningTarget(
 	type: ESTree.TSType,
 	environment: TypeEnvironment,
@@ -438,19 +472,12 @@ function classifyAliasBroadTarget(
 	);
 }
 
-export function isPopulatedObjectExpression(expression: ESTree.Expression): boolean {
-	let current = expression;
-	while (
-		current.type === "ParenthesizedExpression" ||
-		current.type === "TSAsExpression" ||
-		current.type === "TSTypeAssertion" ||
-		current.type === "TSNonNullExpression"
-	) {
-		current = current.expression;
-	}
-	return current.type === "ObjectExpression" && current.properties.length > 0;
-}
-
+/**
+ * Whether an expression syntactically establishes its own value, such as an object literal.
+ *
+ * @param expression - The expression to inspect.
+ * @returns True when the expression carries known evidence without a variable reference.
+ */
 export function isKnownEvidenceExpression(expression: ESTree.Expression): boolean {
 	let current = expression;
 	while (

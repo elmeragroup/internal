@@ -174,11 +174,20 @@ export const recipe = tv({
     {
       name: "tv slot beside a pin may read control variables",
       code: `import { tv } from "tailwind-variants";
-/** field box pins h-(--control-h-md) */
+export const pin = "h-(--control-h-md)";
 export const recipe = tv({
   slots: {
     input: "px-(--control-px-md) [font-size:var(--control-text)] [line-height:var(--control-leading)]",
   },
+});
+`,
+    },
+    {
+      name: "a comment that mentions --control-h- is not a file pin",
+      code: `import { tv } from "tailwind-variants";
+/** field box pins h-(--control-h-md) */
+export const recipe = tv({
+  slots: { input: "text-sm block min-w-[150px] px-2 py-1.5" },
 });
 `,
     },
@@ -302,7 +311,7 @@ export const popup = cn("*:data-[slot=input-group]:h-8");
     {
       name: "S9: date-field slot padding is flagged when the file pins --control-h-",
       code: `import { tv } from "tailwind-variants";
-/** field box pins h-(--control-h-md) */
+export const pin = "h-(--control-h-md)";
 export const recipe = tv({
   slots: { input: "text-sm block min-w-[150px] px-2 py-1.5" },
 });
@@ -312,7 +321,7 @@ export const recipe = tv({
     {
       name: "tv slot padding is flagged when the slot sits beside a --control-* pin",
       code: `import { tv } from "tailwind-variants";
-/** field box pins h-(--control-h-md) */
+export const pin = "h-(--control-h-md)";
 export const recipe = tv({
   slots: { input: "px-2 [font-size:var(--control-text)]" },
 });

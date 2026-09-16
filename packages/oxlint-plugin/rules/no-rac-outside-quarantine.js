@@ -4,10 +4,17 @@ import { normalizeFilename } from "../filename-normalizer.js";
 import { isForbiddenRacSpecifier } from "../forbidden-rac-packages.js";
 
 /**
+ * The quarantine is exactly `packages/ui/src/react-aria/**`. Matching the full
+ * package-relative segment keeps an unrelated `src/react-aria/` (another
+ * package, another checkout) from counting as the quarantine.
+ */
+const QUARANTINE_DIR_RE = /(?:^|\/)packages\/ui\/src\/react-aria\//;
+
+/**
  * @param {string} filename
  */
 function isReactAriaQuarantine(filename) {
-  return normalizeFilename(filename).includes("/src/react-aria/");
+  return QUARANTINE_DIR_RE.test(normalizeFilename(filename));
 }
 
 /**
@@ -26,7 +33,7 @@ export default defineRule({
     type: "problem",
     docs: {
       description:
-        "Forbid react-aria-components, react-aria, @internationalized/date, and the scoped @react-aria/* / @react-stately/* packages outside src/react-aria/**",
+        "Forbid react-aria-components, react-aria, @internationalized/date, and the scoped @react-aria/* / @react-stately/* packages outside packages/ui/src/react-aria/**",
     },
     messages: {
       quarantined: "`{{specifier}}` may only be imported from packages/ui/src/react-aria/** (quarantine).",

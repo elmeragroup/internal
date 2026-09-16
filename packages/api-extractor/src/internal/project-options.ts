@@ -16,17 +16,20 @@ export type InternalOpenProjectOptions = OpenProjectOptions & {
   readonly collectTiming?: boolean;
 };
 
+/** One extraction paired with the compiler timing collected while it ran. */
 export type InternalTimedExtraction = {
   readonly result: ExtractionResult;
   /** The backend's own timing shape; the evidence seam adds nothing to it. */
   readonly timing: BackendTiming;
 };
 
+/** Extracts one file and reports the compiler timing observed during the run. */
 export type InternalTimingMethod = (
   filePath: string,
   options?: ExtractorOptions
 ) => Effect.Effect<InternalTimedExtraction, BackendError | FileNotInProgramError | ExtractError>;
 
+/** The timed counterpart of `ProjectExtractorService`, used only by timing evidence. */
 export type InternalTimingService = {
   readonly extractModule: InternalTimingMethod;
 };

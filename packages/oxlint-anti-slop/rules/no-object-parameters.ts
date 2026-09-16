@@ -2,6 +2,7 @@ import { defineRule } from "@oxlint/plugins";
 
 import type { ESTree, SourceCode } from "@oxlint/plugins";
 
+import { parameterAnnotation } from "../shared/scope-lookup.ts";
 import { createTypeNameScope } from "../shared/type-name-scope.ts";
 import type { TypeNameScope } from "../shared/type-name-scope.ts";
 
@@ -14,19 +15,6 @@ type ParameterOwner =
 	| ESTree.TSConstructorType
 	| ESTree.TSFunctionType
 	| ESTree.TSMethodSignature;
-
-function parameterAnnotation(parameter: Parameter): ESTree.TSTypeAnnotation | null | undefined {
-	if (parameter.type === "TSParameterProperty") {
-		return parameterAnnotation(parameter.parameter);
-	}
-	if (parameter.type === "RestElement") {
-		return parameter.typeAnnotation ?? parameterAnnotation(parameter.argument);
-	}
-	if (parameter.type === "AssignmentPattern") {
-		return parameter.typeAnnotation ?? parameter.left.typeAnnotation;
-	}
-	return parameter.typeAnnotation;
-}
 
 function parameterName(parameter: Parameter, sourceCode: SourceCode): string {
 	return parameter.type === "Identifier"

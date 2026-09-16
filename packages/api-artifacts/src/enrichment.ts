@@ -2,7 +2,9 @@ import type { ExtractionResult, PropertyNode, SemanticType } from "@elmeragroup/
 
 import { dedupeDocumentation, readPartPropFact, shortTypeOf } from "./checker.ts";
 import type { ComponentApi, LibraryPartApi, LibraryProject } from "./checker.ts";
+import type { ProblemLog } from "./errors.ts";
 import type { ApiArtifactDiagnostic, ApiPart, ApiProp } from "./model.ts";
+import { compareCodepoint } from "./ordering.ts";
 
 function isEnrichable(facts: LibraryPartApi): boolean {
   return facts.source?.origin !== "forwarded";
@@ -54,7 +56,8 @@ function enrichPart(
   current: ApiPart,
   result: ExtractionResult,
   roots: readonly string[],
-  packages: readonly string[]
+  packages: readonly string[],
+  problems: ProblemLog
 ): ApiPart {
   const root = roots.find((name) => current.name === name || current.name.startsWith(`${name}.`));
   const facts = component.partApis.find((part) => part.name === current.name);
@@ -63,6 +66,7 @@ function enrichPart(
   const selected = selectedProps(result, root, current.name);
   if (selected === undefined) return current;
   const names = new Set(current.props.map((prop) => prop.name));
+  const unresolvable = new Set<string>();
   const additions: ApiProp[] = [];
   for (const property of selected.properties) {
     if (names.has(property.name)) continue;
@@ -89,8 +93,15 @@ function enrichPart(
     if (packageName === undefined || !packages.includes(packageName) || description === "") continue;
     const fact = readPartPropFact(context, facts, property.name);
     if (fact === undefined) continue;
-    if (fact.type === null)
-      throw new Error(`${current.name}.${property.name}: selected dependency prop has an unresolvable type`);
+    if (fact.type === null) {
+      // An intersection repeats its members in the merged and per-branch lists, so
+      // record the same unresolvable prop once.
+      if (!unresolvable.has(property.name)) {
+        unresolvable.add(property.name);
+        problems.add(`${current.name}.${property.name}: selected dependency prop has an unresolvable type`);
+      }
+      continue;
+    }
     additions.push({
       name: property.name,
       origin: { packageName },
@@ -102,9 +113,11 @@ function enrichPart(
     });
     names.add(property.name);
   }
-  additions.sort((left, right) => left.name.localeCompare(right.name));
-  if (additions.length > current.forwardedCount)
-    throw new Error(`${current.name}: selected props exceed forwarded prop count`);
+  additions.sort((left, right) => compareCodepoint(left.name, right.name));
+  if (additions.length > current.forwardedCount) {
+    problems.add(`${current.name}: selected props exceed forwarded prop count`);
+    return current;
+  }
   return {
     ...current,
     props: [...current.props, ...additions],
@@ -112,26 +125,37 @@ function enrichPart(
   };
 }
 
+/** Components after dependency enrichment, together with the extraction diagnostics they produced. */
 export type EnrichedLibraryApi = {
   readonly components: readonly ComponentApi[];
   readonly diagnostics: readonly ApiArtifactDiagnostic[];
 };
 
+/**
+ * Merges documented dependency props into parts that accept them. A part only gains
+ * props whose provenance names a selected `packages` entry and whose type the checker
+ * can print; anything else is skipped. Problems that make the merged API wrong (an
+ * unresolvable selected prop, a forwarded count that cannot absorb the additions) are
+ * recorded on `problems` and reported by the caller as an `ApiArtifactsError`.
+ */
 export function enrichComponents(
   context: LibraryProject,
   results: readonly ExtractionResult[],
   model: readonly ComponentApi[],
-  packages: readonly string[]
+  packages: readonly string[],
+  problems: ProblemLog
 ): EnrichedLibraryApi {
   const diagnostics: ApiArtifactDiagnostic[] = [];
   const components = model.map((component, index) => {
     const result = results[index];
+    // `results` and `model` are built from one request list, so a missing entry is a
+    // generation defect rather than a project problem the user can fix.
     if (result === undefined) throw new Error(`Missing extraction for ${component.slug}`);
     diagnostics.push(...result.warnings.map((warning) => ({ component: component.slug, warning })));
     return {
       ...component,
       parts: component.parts.map((part) =>
-        enrichPart(context, component, part, result, component.exportNames, packages)
+        enrichPart(context, component, part, result, component.exportNames, packages, problems)
       ),
     };
   });

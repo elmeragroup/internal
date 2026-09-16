@@ -1,5 +1,6 @@
 import { Schema } from "effect";
 
+/** Every type flag the extractor reports, in display order; `Other` is the unknown-flag sentinel. */
 export const typeFlagNames = [
   "Any",
   "Unknown",
@@ -33,6 +34,7 @@ export const typeFlagNames = [
   "Other",
 ] as const;
 
+/** One entry of `typeFlagNames`. */
 export type TypeFlagName = (typeof typeFlagNames)[number];
 
 const WarningLocationSchema = Schema.Struct({
@@ -79,14 +81,17 @@ export const UnsupportedTypeFallbackWarningSchema = Schema.Struct({
   typeText: Schema.String,
   sourceText: Schema.optionalKey(Schema.String),
 });
+/** A type the extractor replaced with `any`; `typeText` and `sourceText` carry the evidence. */
 export type UnsupportedTypeFallbackWarning = typeof UnsupportedTypeFallbackWarningSchema.Type;
 
+/** An enum or enum member whose declaration or constant value could not be resolved. */
 export const MissingEnumDeclarationWarningSchema = Schema.Struct({
   ...WarningLocationSchema.fields,
   code: Schema.Literal("missing-enum-declaration"),
   enumName: Schema.String,
   memberName: Schema.optionalKey(Schema.String),
 });
+/** One omission of an enum declaration or member. */
 export type MissingEnumDeclarationWarning = typeof MissingEnumDeclarationWarningSchema.Type;
 
 /**
@@ -98,14 +103,17 @@ export const MissingDefaultExportSymbolWarningSchema = Schema.Struct({
   code: Schema.Literal("missing-default-export-symbol"),
   sourceText: Schema.String,
 });
+/** One skipped `export default` whose expression had no resolvable symbol. */
 export type MissingDefaultExportSymbolWarning = typeof MissingDefaultExportSymbolWarningSchema.Type;
 
+/** An index signature the model cannot carry; `reason` distinguishes the two causes. */
 export const OmittedIndexSignatureWarningSchema = Schema.Struct({
   ...WarningLocationSchema.fields,
   code: Schema.Literal("omitted-index-signature"),
   reason: Schema.Literals(["unrepresentable-key", "additional-signature"] as const),
   keyTypes: Schema.Array(Schema.Literals(["string", "number", "symbol", "other"] as const)),
 });
+/** One omitted index signature, with every key domain that was dropped. */
 export type OmittedIndexSignatureWarning = typeof OmittedIndexSignatureWarningSchema.Type;
 
 /**
@@ -120,6 +128,7 @@ export const UnrepresentedConstructSignaturesWarningSchema = Schema.Struct({
   structuralPath: Schema.Array(Schema.String),
   signatureCount: Schema.Natural,
 });
+/** One non-class shape whose construct signatures the model cannot represent. */
 export type UnrepresentedConstructSignaturesWarning =
   typeof UnrepresentedConstructSignaturesWarningSchema.Type;
 
@@ -135,6 +144,7 @@ export const OmittedCallableMembersWarningSchema = Schema.Struct({
   structuralPath: Schema.Array(Schema.String),
   memberNames: Schema.Array(Schema.String),
 });
+/** Named members dropped from a callable shape that the model can only describe as callable. */
 export type OmittedCallableMembersWarning = typeof OmittedCallableMembersWarningSchema.Type;
 
 /**
@@ -148,16 +158,20 @@ export const UnresolvedReExportWarningSchema = Schema.Struct({
   reason: Schema.Literals(["missing-target", "cycle", "ambiguous"] as const),
   name: Schema.String,
 });
+/** One re-export that produced no export, with the reason the walk could not follow it. */
 export type UnresolvedReExportWarning = typeof UnresolvedReExportWarningSchema.Type;
 
+/** A capitalized union export whose component-like arms are mixed with non-component arms. */
 export const UncertainComponentRecognitionWarningSchema = Schema.Struct({
   ...WarningLocationSchema.fields,
   code: Schema.Literal("uncertain-component-recognition"),
   reason: Schema.Literals(["mixed-component-union"] as const),
   name: Schema.String,
 });
+/** One uncertain component recognition, with the export name and the reason. */
 export type UncertainComponentRecognitionWarning = typeof UncertainComponentRecognitionWarningSchema.Type;
 
+/** Every recoverable extraction warning, discriminated by its stable `code`. */
 export const ExtractWarningSchema = Schema.Union([
   UnsupportedTypeFallbackWarningSchema,
   MissingEnumDeclarationWarningSchema,
@@ -168,4 +182,5 @@ export const ExtractWarningSchema = Schema.Union([
   UnresolvedReExportWarningSchema,
   UncertainComponentRecognitionWarningSchema,
 ]);
+/** A recoverable extraction loss: structured fields plus a rendered `message` for display. */
 export type ExtractWarning = typeof ExtractWarningSchema.Type;

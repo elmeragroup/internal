@@ -4,7 +4,6 @@ import { SymbolFlags } from "typescript/unstable/sync";
 import type { Symbol as TsSymbol } from "typescript/unstable/sync";
 
 import { resolveOwnedDeclaration } from "./declarations.ts";
-import { exportsOf } from "./module-ordering.ts";
 import { memoizeWalkFact } from "./module-walk-memo.ts";
 import type { DescriptorScope, TsgoModuleSession } from "./module.ts";
 import { repositoryRelativePath } from "./path-identity.ts";
@@ -220,9 +219,9 @@ function forwardedSymbol(
 ): ForwardedStep | undefined {
   const moduleSymbol = session.symbolAt(forwarding.moduleNode);
   if (moduleSymbol === undefined || session.checker.isUnknownSymbol(moduleSymbol)) return undefined;
-  const member = exportsOf(session, moduleSymbol).find(
-    (candidate) => candidate.name === forwarding.exportedName
-  );
+  const member = session
+    .moduleExports(moduleSymbol)
+    .find((candidate) => candidate.name === forwarding.exportedName);
   if (member === undefined) return undefined;
   return {
     symbol: member,

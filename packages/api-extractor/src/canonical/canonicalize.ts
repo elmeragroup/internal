@@ -86,11 +86,10 @@ function moveIntrinsicToEnd(
   members: readonly SemanticType[],
   intrinsic: "null" | "undefined"
 ): readonly SemanticType[] {
-  const index = members.findIndex((member) => member.kind === "intrinsic" && member.intrinsic === intrinsic);
-  if (index === -1) return members;
-  const moved = members[index];
-  if (moved === undefined) return members;
-  return [...members.slice(0, index), ...members.slice(index + 1), moved];
+  const matches = members.filter((member) => member.kind === "intrinsic" && member.intrinsic === intrinsic);
+  if (matches.length === 0) return members;
+  const rest = members.filter((member) => !(member.kind === "intrinsic" && member.intrinsic === intrinsic));
+  return [...rest, ...matches];
 }
 
 /**

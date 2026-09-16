@@ -16,7 +16,7 @@ import { createTemporaryRoot, fixtureRoot } from "./support/temp-dirs.ts";
 
 describe("Issue 14 pinned reference", () => {
   it("keeps copied input and output.json bytes equal to the optional pinned reference", () => {
-    if (!referenceAvailable) return;
+    if (!referenceAvailable()) return;
     for (const definition of conformanceFixtureManifest) {
       for (const file of [definition.file, "output.json"]) {
         expect(readFileSync(resolve(fixtureRoot, definition.fixture, file))).toEqual(
@@ -41,7 +41,7 @@ describe("Issue 14 pinned reference", () => {
   });
 
   it("rejects a mutation in a recursively copied upstream support file", () => {
-    if (!referenceAvailable) return;
+    if (!referenceAvailable()) return;
     const temporaryRoot = createTemporaryRoot("api-extractor-reference-audit-");
     const temporaryFixtures = join(temporaryRoot, "fixtures");
     try {
@@ -57,7 +57,7 @@ describe("Issue 14 pinned reference", () => {
   });
 
   it("rejects an unversioned fixture tree instead of accepting its claimed identity", () => {
-    if (!referenceAvailable) return;
+    if (!referenceAvailable()) return;
     const temporaryRoot = createTemporaryRoot("api-extractor-unversioned-reference-");
     try {
       cpSync(upstreamFixtureRoot, join(temporaryRoot, "test/fixtures"), { recursive: true });
@@ -70,7 +70,7 @@ describe("Issue 14 pinned reference", () => {
   });
 
   it("rejects a dirty checkout before it can redefine the pinned evidence", () => {
-    if (!referenceAvailable) return;
+    if (!referenceAvailable()) return;
     const temporaryRoot = createTemporaryRoot("api-extractor-dirty-reference-");
     const temporaryReference = join(temporaryRoot, "checkout");
     try {

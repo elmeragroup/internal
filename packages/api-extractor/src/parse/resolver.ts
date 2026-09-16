@@ -12,8 +12,6 @@ import type { BackendModuleDraft } from "../backend/contracts.ts";
 import { isInternalSymbolName } from "../backend/contracts.ts";
 import type { ExportNode, ModuleNode, SemanticType, TypeName } from "../model.ts";
 import { definedFields, flagFields } from "../optional-fields.ts";
-import { defaultExtractorOptions } from "../options.ts";
-import type { ExtractorOptions } from "../options.ts";
 import type { ProvenanceEntry } from "../provenance.ts";
 import type { ExtractWarning } from "../warnings.ts";
 import { authoredContainsPreservableKeyof } from "./authored-node.ts";
@@ -23,11 +21,10 @@ import { componentObjectNode } from "./component-object.ts";
 import { componentNode } from "./component.ts";
 import { authoredUndefinedUnionSyntax, intersectionNode, unionNode } from "./compound.ts";
 import { arrayNode, tupleNode } from "./container.ts";
-import type { ResolverContext } from "./contracts.ts";
+import type { ResolvedExtractorOptions, ResolverContext } from "./contracts.ts";
 import { warningLocation } from "./contracts.ts";
 import { externalPolicy } from "./external-policy.ts";
 import type { ExternalPolicyDecision } from "./external-policy.ts";
-import { normalizeExternalTypeSelection } from "./external-type-selection.ts";
 import { unsupported, warningMessage } from "./fallback.ts";
 import { mappedObjectNode } from "./mapped.ts";
 import {
@@ -56,6 +53,7 @@ import {
 } from "./type-operator.ts";
 import { isTypeParameterSymbol, isUnauthoredAny, occurrenceTypeParameter } from "./type-parameter.ts";
 
+/** A fully resolved module: its semantic model plus rendered warnings and provenance. */
 export type ResolvedModule = {
   readonly module: ModuleNode;
   readonly warnings: readonly ExtractWarning[];
@@ -63,13 +61,21 @@ export type ResolvedModule = {
 };
 type Context = ResolverContext;
 
+/**
+ * Resolves one module draft into the semantic model.
+ *
+ * @param session - The backend extraction session the draft came from.
+ * @param draft - The backend module draft to resolve.
+ * @param filePath - The module's absolute path, used for warning locations.
+ * @param options - Options already parsed at the extraction entry.
+ * @returns The resolved module, warnings, and provenance.
+ */
 export function resolveModule(
   session: BackendExtractionSession,
   draft: BackendModuleDraft,
   filePath: string,
-  options?: ExtractorOptions
+  options: ResolvedExtractorOptions
 ): ResolvedModule {
-  const { includeExternalTypes, ...resolvedOptions } = { ...defaultExtractorOptions, ...options };
   const warnings: BackendWarningFact[] = [];
   const context: Context = {
     operations: session.compiler,
@@ -79,13 +85,12 @@ export function resolveModule(
     provenancePath: [],
     provenancePropertyContainer: "object",
     symbolStack: [],
-    options: resolvedOptions,
-    externalTypes: normalizeExternalTypeSelection(includeExternalTypes),
+    options: { shouldInclude: options.shouldInclude, shouldResolveObject: options.shouldResolveObject },
+    externalTypes: options.externalTypes,
     substitutions: new Map(),
     active: new Set(),
     propertyDepth: 0,
-    pureTypeExport: false,
-    authoredIntersectionMember: false,
+    compoundMember: false,
   };
   context.operations.setErrorContext([]);
   // Module-walk warnings (unresolved re-exports, barrel cycles, ambiguous
@@ -137,7 +142,6 @@ function resolveExport(entry: BackendExportDraft, base: Context): ExportNode {
     provenance: resolvedProvenance,
     provenancePath: semanticPath,
     symbolStack,
-    pureTypeExport: entry.pureType === true,
   });
   const componentContext = {
     ...base,
@@ -564,8 +568,7 @@ function isClassType(type: BackendTypeHandle, context: Context): boolean {
 function recordMissingEnumWarning(
   type: BackendTypeHandle,
   typeNameValue: TypeName | undefined,
-  context: Context,
-  memberName?: string
+  context: Context
 ): void {
   const facts = context.operations.typeFacts(type);
   const symbol = facts.aliasSymbol ?? facts.symbol;
@@ -574,7 +577,6 @@ function recordMissingEnumWarning(
     code: "missing-enum-declaration",
     ...warningLocation(context, symbolFacts?.declarations[0]),
     enumName: typeNameValue?.name ?? symbolFacts?.name ?? "enum",
-    ...definedFields({ memberName }),
   });
 }
 
@@ -773,7 +775,9 @@ function typeNameFor(
     namespaces,
     sourceNode,
     symbol,
-    context,
+    // Type arguments are members of the type they parameterize, never the
+    // export root, so an anonymous object argument is structure to describe.
+    context: { ...context, compoundMember: true },
     resolveType: typeNode,
   });
   return {

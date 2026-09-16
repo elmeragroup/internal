@@ -24,4 +24,5 @@ export default defineRule({
         "The library never lazy-loads internally. Dynamic import() is forbidden in packages/ui/src.",
     },
   },
+  defaultOptions: [],
 });

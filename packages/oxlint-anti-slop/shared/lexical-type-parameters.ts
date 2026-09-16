@@ -1,5 +1,6 @@
 import type { ESTree } from "@oxlint/plugins";
 
+/** ESTree visitor keys naming each node type's child slots. */
 export type VisitorKeys = Readonly<Record<string, readonly string[]>>;
 
 function isNode(value: unknown): value is ESTree.Node {

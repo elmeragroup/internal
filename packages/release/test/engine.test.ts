@@ -1,8 +1,8 @@
-import { Effect } from "effect";
+import { Effect, Redacted } from "effect";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import type { EngineDeps, PackAndVerify } from "../src/engine.ts";
 import {
@@ -16,15 +16,15 @@ import { ReleaseError } from "../src/errors.ts";
 import type { ReleasePackage } from "../src/files.ts";
 import type { ReleaseLine } from "../src/gate.ts";
 import type { GitPort } from "../src/git.ts";
+import { releaseAssetId, releaseId } from "../src/github.ts";
 import type { ReleaseEnvironment } from "../src/github.ts";
-import type { ReleaseIntent, VerifiedRelease } from "../src/intent.ts";
+import type { CommitSha, ReleaseIntent, VerifiedRelease } from "../src/intent.ts";
 import type { Registry } from "../src/npm.ts";
 import type { CommitAncestry } from "../src/policy.ts";
 import { canaryRecordTag, releaseTag } from "../src/record.ts";
 import type { ReleaseStore, SavedRelease } from "../src/store.ts";
+import { commit, commitSha, newerCommit, releaseIntent, stableVersion } from "./lib/release-fixtures.ts";
 
-const commit = "a".repeat(40);
-const newerCommit = "b".repeat(40);
 const packedArchive = new Uint8Array([1, 2, 3]);
 const storedArchive = new Uint8Array([7, 8, 9]);
 
@@ -34,8 +34,8 @@ const pkg: ReleasePackage = {
   packageName: "@acme/app",
 };
 
-const stableLine: ReleaseLine = { channel: "stable", version: "0.2.0" };
-const canaryLine: ReleaseLine = { channel: "canary", current: "0.1.9" };
+const stableLine: ReleaseLine = { channel: "stable", version: stableVersion("0.2.0") };
+const canaryLine: ReleaseLine = { channel: "canary", current: stableVersion("0.1.9") };
 
 const linearHistory: CommitAncestry = (ancestor, descendant) =>
   ancestor === descendant || (ancestor === commit && descendant === newerCommit);
@@ -84,7 +84,11 @@ function harness(options: HarnessOptions = {}) {
         const existing = byTag.get(releaseTag(intent));
         if (existing !== undefined) return existing;
         outcome.created.push(intent);
-        const saved: SavedRelease = { id: byTag.size + 1, intent, asset: { state: "missing" } };
+        const saved: SavedRelease = {
+          id: releaseId(byTag.size + 1),
+          intent,
+          asset: { state: "missing" },
+        };
         byTag.set(releaseTag(intent), saved);
         return saved;
       }),
@@ -94,7 +98,7 @@ function harness(options: HarnessOptions = {}) {
         const saved: SavedRelease = {
           id: release.id,
           intent: release.intent,
-          asset: { state: "uploaded", id: 9 },
+          asset: { state: "uploaded", id: releaseAssetId(9) },
         };
         byTag.set(releaseTag(saved.intent), saved);
         return saved;
@@ -136,9 +140,9 @@ function harness(options: HarnessOptions = {}) {
 
   const git: GitPort = {
     head: () => Effect.succeed(commit),
-    originMain: () => Effect.succeed(commit),
+    baseBranchTip: () => Effect.succeed(commit),
     isClean: () => Effect.succeed(true),
-    stableVersionAt: () => Effect.succeed("0.1.9"),
+    stableVersionAt: () => Effect.succeed(stableVersion("0.1.9")),
     ...options.git,
   };
 
@@ -150,7 +154,7 @@ function harness(options: HarnessOptions = {}) {
     npm,
     confirmationInterval: 0,
     stableGate: () => Effect.succeed(options.line ?? canaryLine),
-    plannedCanaryBase: () => Effect.succeed(options.base ?? "0.2.0"),
+    plannedCanaryBase: () => Effect.succeed(stableVersion(options.base ?? "0.2.0")),
     verifyArchive: (intent, bytes) => {
       outcome.verified.push({ intent, bytes });
       verified = { ...intent, archive: "/verified/release.tgz", integrity: "sha512-test" };
@@ -161,32 +165,32 @@ function harness(options: HarnessOptions = {}) {
     },
   };
 
-  const adapter: PackAndVerify = { pack: vi.fn(() => packedArchive) };
+  const adapter: PackAndVerify = { pack: () => packedArchive };
   return { deps, adapter, outcome, store, registry };
 }
 
-function runMain(commitSha: string, deps: EngineDeps, adapter: PackAndVerify): Promise<void> {
-  return Effect.runPromise(executeCheckedCommit(pkg, adapter, commitSha, deps).pipe(Effect.scoped));
+function runMain(target: CommitSha, deps: EngineDeps, adapter: PackAndVerify): Promise<void> {
+  return Effect.runPromise(executeCheckedCommit(pkg, adapter, target, deps).pipe(Effect.scoped));
 }
 
 function runRetry(tag: string, deps: EngineDeps): Promise<void> {
   return Effect.runPromise(executeRetry(pkg, tag, deps).pipe(Effect.scoped));
 }
 
-function canaryIntent(version: string): ReleaseIntent {
-  return { channel: "canary", version, commit };
-}
-
 describe("main release preconditions", () => {
-  it("refuses a checkout that is not the checked commit", async () => {
+  it("refuses a checkout that is not the checked commit and names both commits", async () => {
     const { deps, adapter, outcome } = harness({ git: { head: () => Effect.succeed(newerCommit) } });
-    await expect(runMain(commit, deps, adapter)).rejects.toThrow("Checkout differs from the checked commit");
+    await expect(runMain(commit, deps, adapter)).rejects.toThrow(
+      `Checkout ${newerCommit} differs from the checked commit ${commit}`
+    );
     expect(outcome.created).toEqual([]);
   });
 
-  it("refuses a commit that is not on main", async () => {
+  it("refuses a commit that is not an ancestor of the tracked branch tip", async () => {
     const { deps, adapter, outcome } = harness({ isAncestor: () => false });
-    await expect(runMain(commit, deps, adapter)).rejects.toThrow("Release source is not on main");
+    await expect(runMain(commit, deps, adapter)).rejects.toThrow(
+      `Release source ${commit} is not an ancestor of the tracked branch tip ${commit}`
+    );
     expect(outcome.created).toEqual([]);
   });
 
@@ -209,10 +213,10 @@ describe("main release plan execution", () => {
   });
 
   it("prefers a stable version bump over a canary record for the same commit", async () => {
-    const canary: ReleaseIntent = { channel: "canary", version: "0.2.0-canary.11", commit };
+    const canary = releaseIntent("0.2.0-canary.11");
     const { deps, adapter, outcome } = harness({
       line: stableLine,
-      seed: [{ id: 4, intent: canary, asset: { state: "uploaded", id: 2 } }],
+      seed: [{ id: releaseId(4), intent: canary, asset: { state: "uploaded", id: releaseAssetId(2) } }],
     });
     await runMain(commit, deps, adapter);
     expect(outcome.created).toEqual([{ channel: "stable", version: "0.2.0", commit }]);
@@ -221,9 +225,9 @@ describe("main release plan execution", () => {
   });
 
   it("resumes a saved canary record from its downloaded archive", async () => {
-    const intent: ReleaseIntent = { channel: "canary", version: "0.2.0-canary.11", commit };
+    const intent = releaseIntent("0.2.0-canary.11");
     const { deps, adapter, outcome } = harness({
-      seed: [{ id: 4, intent, asset: { state: "uploaded", id: 2 } }],
+      seed: [{ id: releaseId(4), intent, asset: { state: "uploaded", id: releaseAssetId(2) } }],
     });
     await runMain(commit, deps, adapter);
     expect(outcome.created).toEqual([]);
@@ -274,8 +278,8 @@ describe("main release plan execution", () => {
 
   it("numbers after reserved canary versions", async () => {
     const reserved: SavedRelease = {
-      id: 8,
-      intent: { channel: "canary", version: "0.2.0-canary.13", commit: "d".repeat(40) },
+      id: releaseId(8),
+      intent: releaseIntent("0.2.0-canary.13", commitSha("d")),
       asset: { state: "missing" },
     };
     const { deps, adapter, outcome } = harness({
@@ -286,7 +290,7 @@ describe("main release plan execution", () => {
       },
     });
     await runMain(commit, deps, adapter);
-    expect(outcome.created).toEqual([canaryIntent("0.2.0-canary.14")]);
+    expect(outcome.created).toEqual([releaseIntent("0.2.0-canary.14")]);
     expect(outcome.uploaded).toEqual([packedArchive]);
     expect(outcome.published).toEqual(["0.2.0-canary.14"]);
   });
@@ -294,9 +298,9 @@ describe("main release plan execution", () => {
   it("surfaces a pack failure without publishing", async () => {
     const { deps, adapter, outcome } = harness({ line: stableLine });
     const failure = new Error("build failed");
-    adapter.pack = vi.fn(() => {
+    adapter.pack = () => {
       throw failure;
-    });
+    };
     const error = await Effect.runPromise(
       Effect.flip(executeCheckedCommit(pkg, adapter, commit, deps).pipe(Effect.scoped))
     );
@@ -308,9 +312,9 @@ describe("main release plan execution", () => {
 
 describe("retry and finish", () => {
   it("refuses retry of an incomplete record", async () => {
-    const intent: ReleaseIntent = { channel: "stable", version: "0.2.0", commit };
+    const intent = releaseIntent("0.2.0");
     const { deps, outcome } = harness({
-      seed: [{ id: 1, intent, asset: { state: "missing" } }],
+      seed: [{ id: releaseId(1), intent, asset: { state: "missing" } }],
     });
     await expect(runRetry("v0.2.0", deps)).rejects.toThrow("original Merge job");
     expect(outcome.verified).toEqual([]);
@@ -319,9 +323,9 @@ describe("retry and finish", () => {
   });
 
   it("finishes a prepared record from its downloaded archive", async () => {
-    const intent: ReleaseIntent = { channel: "canary", version: "0.2.0-canary.11", commit };
+    const intent = releaseIntent("0.2.0-canary.11");
     const { deps, outcome } = harness({
-      seed: [{ id: 4, intent, asset: { state: "uploaded", id: 2 } }],
+      seed: [{ id: releaseId(4), intent, asset: { state: "uploaded", id: releaseAssetId(2) } }],
     });
     await runRetry(canaryRecordTag(commit), deps);
     expect(outcome.verified).toEqual([{ intent, bytes: storedArchive }]);
@@ -331,9 +335,9 @@ describe("retry and finish", () => {
   });
 
   it("does not complete a superseded canary", async () => {
-    const intent: ReleaseIntent = { channel: "canary", version: "0.2.0-canary.11", commit };
+    const intent = releaseIntent("0.2.0-canary.11");
     const { deps, outcome } = harness({
-      seed: [{ id: 4, intent, asset: { state: "uploaded", id: 2 } }],
+      seed: [{ id: releaseId(4), intent, asset: { state: "uploaded", id: releaseAssetId(2) } }],
       registry: {
         versions: new Map([["0.2.0-canary.12", { commit: newerCommit, integrity: "newer" }]]),
         tags: new Map(),
@@ -347,9 +351,11 @@ describe("retry and finish", () => {
     );
   });
 
-  it("refuses a record tag that has no prepared release", async () => {
+  it("refuses a record tag that has no prepared release and names the tag", async () => {
     const { deps, outcome } = harness();
-    await expect(runRetry("v9.9.9", deps)).rejects.toThrow("No prepared release exists for that tag");
+    await expect(runRetry("v9.9.9", deps)).rejects.toThrow(
+      "No prepared release exists for record tag v9.9.9"
+    );
     expect(outcome.verified).toEqual([]);
   });
 });
@@ -406,7 +412,7 @@ describe("shipped live operations", () => {
       const requested: string[] = [];
       const environment: ReleaseEnvironment = {
         repository: "acme/app",
-        token: "test-token",
+        token: Redacted.make("test-token"),
         fetch: (input) => {
           requested.push(input instanceof URL ? input.href : input instanceof Request ? input.url : input);
           return Promise.resolve(new Response("", { status: 404 }));
@@ -422,6 +428,36 @@ describe("shipped live operations", () => {
         "GitHub GET failed: 404"
       );
       expect(requested[0]).toContain("/releases?per_page=100");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("retries a prepared record without the Changesets config that retry does not read", async () => {
+    const root = mkdtempSync(join(tmpdir(), "elmera-release-retry-"));
+    try {
+      const requested: string[] = [];
+      const environment: ReleaseEnvironment = {
+        repository: "acme/app",
+        token: Redacted.make("test-token"),
+        fetch: (input) => {
+          requested.push(input instanceof URL ? input.href : input instanceof Request ? input.url : input);
+          return Promise.resolve(new Response("", { status: 404 }));
+        },
+      };
+      const pkg: ReleasePackage = {
+        checkoutRoot: root,
+        packageDirectory: root,
+        packageName: "@acme/app",
+      };
+      const operations = createReleaseOperations(() => environment);
+      await expect(Effect.runPromise(operations.retryRelease(pkg, "v0.2.0"))).rejects.toThrow(
+        "GitHub GET failed: 404"
+      );
+      expect(requested[0]).toContain("/releases?per_page=100");
+      await expect(
+        Effect.runPromise(operations.releaseCheckedCommit(pkg, { pack: () => packedArchive }, commit))
+      ).rejects.toThrow(".changeset/config.json");
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

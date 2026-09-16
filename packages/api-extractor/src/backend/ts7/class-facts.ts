@@ -11,6 +11,7 @@ import type { TsgoFactsSession } from "./facts.ts";
  * stay cohesive here. Documentation normalization lives in `documentation.ts`.
  */
 
+/** The construct (`new`) signatures a type declares, in checker order. */
 export function constructSignaturesOfType(
   session: TsgoFactsSession,
   handle: BackendTypeHandle

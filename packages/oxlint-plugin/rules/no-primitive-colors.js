@@ -132,10 +132,6 @@ const NON_COLOR_UTILITIES = new Set([
   "none",
   "auto",
   "color",
-  "0",
-  "2",
-  "4",
-  "8",
   "t",
   "r",
   "b",
@@ -149,18 +145,13 @@ const NON_COLOR_UTILITIES = new Set([
   "hidden",
   "collapse",
   "separate",
-  "1",
   "inset",
   "inner",
 ]);
 
-const NON_COLOR_PATTERNS = [
-  /^linear-to-[trbl]{1,2}$/,
-  /^[trblxy]-\d+$/,
-  /^offset-\d+$/,
-  /^\d+$/,
-  /^clip-.+$/,
-];
+// Numeric shades and steps are not listed above: TOKEN_RE group 3 always starts
+// with a letter, so a bare number never arrives as a family name.
+const NON_COLOR_PATTERNS = [/^linear-to-[trbl]{1,2}$/, /^[trblxy]-\d+$/, /^offset-\d+$/, /^clip-.+$/];
 
 const TOKEN_RE =
   /(?:^|[^a-zA-Z0-9-])(((?:[a-z-]+:)*)?(?:bg|border|text|ring(?:-offset)?|fill|stroke|placeholder|caret|accent|decoration|divide|outline|from|via|to)-([a-z][a-z0-9-]*)(?:-\d{2,3})?(?:\/[0-9]{1,3})?)/gim;
@@ -214,12 +205,13 @@ function findPrimitiveColor(str) {
     const colorFamily = match[3];
     if (!fullToken || !colorFamily) continue;
 
-    const tokenName = colorFamily.replace(/\/\d+$/, "");
-    if (isNonColorUtility(tokenName)) continue;
-    if (ROLE_TOKENS.has(tokenName)) continue;
+    // Group 3 never contains the `/opacity` suffix or the shade step; TOKEN_RE
+    // consumes both outside the capture.
+    if (isNonColorUtility(colorFamily)) continue;
+    if (ROLE_TOKENS.has(colorFamily)) continue;
 
-    const primitiveFamily = tokenName.replace(/-\d+$/, "");
-    if (TAILWIND_COLOR_FAMILIES.has(primitiveFamily) || TAILWIND_COLOR_FAMILIES.has(tokenName)) {
+    const primitiveFamily = colorFamily.replace(/-\d+$/, "");
+    if (TAILWIND_COLOR_FAMILIES.has(primitiveFamily) || TAILWIND_COLOR_FAMILIES.has(colorFamily)) {
       return fullToken;
     }
   }
@@ -249,6 +241,31 @@ export default defineRule({
   defaultOptions: [],
   createOnce(context) {
     /**
+     * The `className`/`class` JSXAttribute and `cn`/`tv` CallExpression visitors
+     * already collect every string in their own subtree. Inner visitors must not
+     * report the same string again.
+     *
+     * @param {import("estree").Node} node
+     */
+    function isCoveredByOuterVisit(node) {
+      let current = node.parent;
+      while (current) {
+        if (current.type === "JSXElement" || current.type === "JSXFragment") return false;
+        if (current.type === "JSXAttribute") {
+          const name = current.name.type === "JSXIdentifier" ? current.name.name : undefined;
+          if (name === "className" || name === "class") return true;
+        } else if (
+          current.type === "CallExpression" &&
+          (isNamedCall(current.callee, "cn") || isNamedCall(current.callee, "tv"))
+        ) {
+          return true;
+        }
+        current = current.parent;
+      }
+      return false;
+    }
+
+    /**
      * @param {import("estree").Node} node
      * @param {string[]} collected
      */
@@ -276,14 +293,15 @@ export default defineRule({
       },
       CallExpression(node) {
         if (!isNamedCall(node.callee, "tv") && !isNamedCall(node.callee, "cn")) return;
+        if (isCoveredByOuterVisit(node)) return;
         reportColorIssues(node, extractStrings(node));
       },
       Literal(node) {
-        if (typeof node.value === "string") {
-          reportColorIssues(node, [node.value]);
-        }
+        if (typeof node.value !== "string" || isCoveredByOuterVisit(node)) return;
+        reportColorIssues(node, [node.value]);
       },
       TemplateLiteral(node) {
+        if (isCoveredByOuterVisit(node)) return;
         reportColorIssues(node, extractStrings(node));
       },
     };

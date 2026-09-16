@@ -7,20 +7,24 @@ import type { ReleaseError } from "./errors.ts";
 import { readManifestVersion } from "./files.ts";
 import { GitHubPullRequest } from "./github.ts";
 import type { GitHubClient } from "./github.ts";
+import type { CommitSha } from "./intent.ts";
 import { assertStableReleaseVersion, compareStableVersions } from "./version.ts";
+import type { StableVersion } from "./version.ts";
 
 /** Which release line the checked-out manifest puts a main commit on. */
-export type ReleaseLine = { channel: "stable"; version: string } | { channel: "canary"; current: string };
+export type ReleaseLine =
+  | { channel: "stable"; version: StableVersion }
+  | { channel: "canary"; current: StableVersion };
 
 /** Reads the checked-out manifest's version and requires it to be a stable release version. */
-export function readStableVersion(packageDirectory: string): Effect.Effect<string, ReleaseError> {
+export function readStableVersion(packageDirectory: string): Effect.Effect<StableVersion, ReleaseError> {
   return lift(() => assertStableReleaseVersion(readManifestVersion(packageDirectory)));
 }
 
 /** The release PR is complete only when its stable bump, changelog, and consumed changesets agree. */
 export function assertStableBump(
-  previous: string,
-  current: string,
+  previous: StableVersion,
+  current: StableVersion,
   root: string,
   packageDirectory: string
 ): Effect.Effect<void, ReleaseError> {
@@ -44,14 +48,14 @@ export function assertStableBump(
  * condition holds, so the checks cannot be reordered apart by a later edit.
  */
 export type StableReleaseGate = (
-  commit: string,
-  previous: string
+  commit: CommitSha,
+  previous: StableVersion
 ) => Effect.Effect<ReleaseLine, ReleaseError>;
 
 /** Only the merge of the generated release PR may raise the published stable version. */
 async function assertMergedReleasePullRequest(
   client: GitHubClient,
-  commit: string,
+  commit: CommitSha,
   trackedBranch: string
 ): Promise<void> {
   const pulls = await client.jsonFrom(
@@ -73,6 +77,11 @@ async function assertMergedReleasePullRequest(
   }
 }
 
+/**
+ * Builds the gate over one checkout and GitHub repository. `trackedBranch` is the base branch name
+ * without its `origin/` prefix; a version change is accepted only from a merged release PR whose
+ * head is `changeset-release/<trackedBranch>` in this repository.
+ */
 export function createStableReleaseGate(
   client: GitHubClient,
   root: string,

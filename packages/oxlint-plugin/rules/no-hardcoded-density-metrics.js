@@ -1,5 +1,6 @@
 import { defineRule } from "@oxlint/plugins";
 
+import { classTokens } from "../class-tokens.js";
 import { extractStrings, isNamedCall } from "../extract-strings.js";
 
 const CONTROL_VAR_RE = /--control-(?:h|px-icon|px|gap)-|--control-(?:text|leading)\b/;
@@ -269,13 +270,6 @@ function isControlBoxHeightClass(className) {
 }
 
 /**
- * @param {string} utility
- */
-function isOpticalArbitrary(utility) {
-  return /^(?:h|w|size|min-h|min-w|px|pl|pr|ps|pe|gap(?:-[xy])?)-\[\d+(?:\.\d+)?px\]$/.test(utility);
-}
-
-/**
  * @param {string} className
  */
 function isDataSizeToken(className) {
@@ -292,22 +286,15 @@ function densityOwnedFamily(className, checkType) {
   const utility = stripImportant(stripVariantPrefixes(className));
   if (!utility) return null;
   if (readsDensityVariable(utility)) return null;
-  // Token reads (any custom property) and arbitrary values are not the numeric ladder.
+  // Token reads (any custom property) and arbitrary values are not the numeric
+  // ladder. The blanket arbitrary-value guard also covers optical pixel tracks
+  // such as `h-[18.4px]`, so no narrower optical-value check is needed.
   if (/\(--[\w-]+\)/.test(utility) || /var\(--/.test(utility)) return null;
   if (/^(?:h|w|size|min-h|min-w|px|pl|pr|ps|pe|gap(?:-[xy])?)-\[/.test(utility)) return null;
-  if (isOpticalArbitrary(utility)) return null;
   const box = boxFamily(utility);
   if (box) return box;
   if (!checkType) return null;
   return typeFamily(utility);
-}
-
-/**
- * @param {string} str
- * @returns {string[]}
- */
-function classTokens(str) {
-  return str.split(/\s+/).filter(Boolean);
 }
 
 /**
@@ -380,6 +367,31 @@ function isButtonSizeKeyedRecord(obj) {
   const arms = recordArms(obj);
   if (arms === null || arms.length === 0) return false;
   return arms.every((arm) => BUTTON_SIZE_KEYS.has(arm.key));
+}
+
+/**
+ * Whether the file pins `--control-h-` in real code rather than in a comment.
+ * Comments document the pin (`field box pins h-(--control-h-md)`), and treating
+ * a documentation mention as a pin would switch the file-wide `cn()` and
+ * Button-size record checks on for files that never read the variable.
+ *
+ * @param {{ getText: () => string, getAllComments: () => ReadonlyArray<{ start: number, end: number }> }} sourceCode - The rule's source-code accessor.
+ * @returns {boolean} `true` when a non-comment `--control-h-` occurrence exists.
+ */
+function hasControlHeightPin(sourceCode) {
+  const text = sourceCode.getText();
+  if (!text.includes("--control-h-")) return false;
+
+  // `getAllComments` returns comments in source order, so one forward pass
+  // drops every comment range from the raw text.
+  let code = "";
+  let cursor = 0;
+  for (const comment of sourceCode.getAllComments()) {
+    code += text.slice(cursor, comment.start);
+    cursor = comment.end;
+  }
+  code += text.slice(cursor);
+  return code.includes("--control-h-");
 }
 
 export default defineRule({
@@ -478,7 +490,7 @@ export default defineRule({
 
     return {
       Program() {
-        fileHasControlH = context.sourceCode.getText().includes("--control-h-");
+        fileHasControlH = hasControlHeightPin(context.sourceCode);
       },
       Literal(node) {
         if (typeof node.value === "string") {

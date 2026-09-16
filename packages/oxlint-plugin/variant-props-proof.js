@@ -3,7 +3,11 @@
  */
 
 /**
- * @param {import("estree").Node | null | undefined} node
+ * Whether a type declaration is owned by the module rather than by a function,
+ * class, or block scope.
+ *
+ * @param {import("estree").Node | null | undefined} node - The declaration node.
+ * @returns {boolean} `true` when the declaration sits at the program top level.
  */
 export function isModuleLevelType(node) {
   const parent = node?.parent;
@@ -13,9 +17,11 @@ export function isModuleLevelType(node) {
 }
 
 /**
- * @param {string} name
- * @param {Map<string, import("estree").Node[]>} typeDeclarations
- * @param {import("estree").Node} node
+ * Append a declaration under its type name in the module-level declaration index.
+ *
+ * @param {string} name - The declared type name.
+ * @param {Map<string, import("estree").Node[]>} typeDeclarations - The index to update.
+ * @param {import("estree").Node} node - The declaration node.
  */
 export function recordTypeDeclaration(name, typeDeclarations, node) {
   const existing = typeDeclarations.get(name);
@@ -24,10 +30,14 @@ export function recordTypeDeclaration(name, typeDeclarations, node) {
 }
 
 /**
- * @param {string} name
- * @param {import("estree").Node} fromNode
+ * Whether an enclosing type-parameter list shadows a type name before the walk
+ * reaches module scope. Shadowed names must not resolve to module declarations.
+ *
+ * @param {string} name - The referenced type name.
+ * @param {import("estree").Node} fromNode - The reference node to walk outward from.
+ * @returns {boolean} `true` when a type parameter of the same name is in scope.
  */
-export function isShadowedTypeName(name, fromNode) {
+function isShadowedTypeName(name, fromNode) {
   let current = fromNode.parent;
   while (current && current.type !== "Program") {
     const params = current.typeParameters?.params;
@@ -44,11 +54,11 @@ export function isShadowedTypeName(name, fromNode) {
 /**
  * Shared VariantProps proof for a direct type reference and an interface heritage clause.
  *
- * @param {{ name?: import("estree").Node | null, typeArguments?: { params?: import("estree").Node[] } | null } | null | undefined} ref
- * @param {Set<string>} helperNames
- * @returns {string | null}
+ * @param {{ name?: import("estree").Node | null, typeArguments?: { params?: import("estree").Node[] } | null } | null | undefined} ref - The type reference to inspect.
+ * @param {Set<string>} helperNames - The VariantProps helper names in scope.
+ * @returns {string | null} The proven recipe name, or `null` when the reference proves nothing.
  */
-export function provesRecipe(ref, helperNames) {
+function provesRecipe(ref, helperNames) {
   const typeName = ref?.name;
   if (typeName?.type !== "Identifier" || !helperNames.has(typeName.name)) return null;
   const firstArg = ref.typeArguments?.params?.[0];
@@ -76,10 +86,13 @@ function heritageReferenceOf(heritage) {
 }
 
 /**
- * @param {import("estree").Node | null | undefined} typeNode
- * @param {{ helperNames: Set<string>, typeDeclarations: Map<string, import("estree").Node[]> }} ctx
- * @param {Set<import("estree").Node>} visited
- * @param {Set<string>} out
+ * Collect every recipe name proven by a type node, following module-level aliases
+ * and interface heritage until a VariantProps helper is found or the chain ends.
+ *
+ * @param {import("estree").Node | null | undefined} typeNode - The type node to walk.
+ * @param {{ helperNames: Set<string>, typeDeclarations: Map<string, import("estree").Node[]> }} ctx - Module-level proof context.
+ * @param {Set<import("estree").Node>} visited - Declarations already walked, to break cycles.
+ * @param {Set<string>} out - Accumulator for proven recipe names.
  */
 export function collectProvenRecipes(typeNode, ctx, visited, out) {
   if (!typeNode) return;

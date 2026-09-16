@@ -33,8 +33,7 @@ function authorshipContext(operations: BackendCompilerOperations): ResolverConte
     substitutions: new Map(),
     active: new Set(),
     propertyDepth: 0,
-    pureTypeExport: false,
-    authoredIntersectionMember: false,
+    compoundMember: false,
   };
 }
 
@@ -72,7 +71,7 @@ function propsTypeText(
 }
 
 describe("component authorship signature zip", () => {
-  it("keeps each wrapper overload's first parameter when an earlier signature has no declaration", async () => {
+  it("keeps each wrapper overload's props type when an earlier signature has no declaration", async () => {
     const extracted = await extractFixture({ tsconfigPath }, inputPath);
     const component = extracted.module.exports.find((entry) => entry.name === "TripleWrapped")?.type;
     expect(component).toMatchObject({
@@ -93,7 +92,7 @@ describe("component authorship signature zip", () => {
       if (symbol === undefined) throw new Error("Missing TripleWrapped export");
       const compiler = session.compiler;
       const baseline = recoverAuthoredComponent(symbol, authorshipContext(compiler));
-      expect(baseline.parameters.map((entry) => propsTypeText(compiler, entry.propsType))).toEqual([
+      expect(baseline.propNodes.map((node) => propsTypeText(compiler, node))).toEqual([
         "TextProps",
         "CountProps",
         "FlagProps",
@@ -101,10 +100,8 @@ describe("component authorship signature zip", () => {
 
       const compressed = omitFirstDeclarationWhenCompressed(compiler);
       const recovered = recoverAuthoredComponent(symbol, authorshipContext(compressed));
-      expect(recovered.parameters.map((entry) => entry.parameter.id)).toEqual(
-        baseline.parameters.map((entry) => entry.parameter.id)
-      );
-      expect(recovered.parameters.map((entry) => propsTypeText(compressed, entry.propsType))).toEqual([
+      expect(recovered.propNodes.map((node) => node.id)).toEqual(baseline.propNodes.map((node) => node.id));
+      expect(recovered.propNodes.map((node) => propsTypeText(compressed, node))).toEqual([
         "TextProps",
         "CountProps",
         "FlagProps",

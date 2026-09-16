@@ -35,8 +35,7 @@ export type ArtifactBatchFailureCategory =
   | "interrupted"
   | "filesystem-unavailable"
   | "write-failed"
-  | "original-state-not-restored"
-  | "temporary-state-not-removed";
+  | "original-state-not-restored";
 
 export type ArtifactBatchResult =
   | {
@@ -310,14 +309,19 @@ function writableEvidence(
   return evidence;
 }
 
-async function prepareBatch(
-  request: ArtifactBatchRequest,
-  runFileSystem: FileSystemRunner
-): Promise<{
-  readonly root: string;
-  readonly artifacts: readonly PreparedArtifact[];
-}> {
-  const root = await rootPath(request.outputRoot, runFileSystem);
+type NormalizedArtifact = {
+  readonly destination: string;
+  readonly content: string | Uint8Array;
+  readonly evidence: Exclude<ArtifactEvidence, "immutable-upstream">;
+};
+
+/**
+ * Validates the request shape without touching the filesystem: at least one
+ * artifact, non-empty unique destinations inside the root, authorized evidence,
+ * and no destination that is also another destination's parent directory. This
+ * is cheap enough to run before the batch lock.
+ */
+function validateBatchRequest(request: ArtifactBatchRequest): readonly NormalizedArtifact[] {
   if (request.artifacts.length === 0) {
     throw new ArtifactBatchError("invalid-batch", "An artifact batch must contain at least one artifact.");
   }
@@ -353,7 +357,23 @@ async function prepareBatch(
       );
     }
   }
+  return normalized;
+}
 
+/**
+ * Validates every destination against the current filesystem: safe parents, no
+ * symlinks, no aliasing of immutable oracles, and concrete existing-entry facts
+ * for backups. Runs under the batch lock, so a cooperating writer's facts cannot
+ * go stale between validation and installation.
+ */
+async function prepareBatch(
+  normalized: readonly NormalizedArtifact[],
+  root: string,
+  runFileSystem: FileSystemRunner
+): Promise<{
+  readonly root: string;
+  readonly artifacts: readonly PreparedArtifact[];
+}> {
   const oracleIdentities = await immutableOracleIdentities(root, runFileSystem);
   const existingIdentities: Array<{ readonly destination: string; readonly identity: ArtifactIdentity }> = [];
   const artifacts: PreparedArtifact[] = [];
@@ -671,16 +691,25 @@ async function writeBatch(
   const runFileSystem = makeFileSystemRunner(controls, deadline);
   let cleanupFileSystem = runFileSystem;
   let cleanupDeadline = deadline;
-  let prepared;
+  // Request-shape validation is filesystem-free, so an invalid batch fails
+  // before any lock or evidence file is touched.
+  let normalized: readonly NormalizedArtifact[];
   try {
-    prepared = await prepareBatch(request, runFileSystem);
+    normalized = validateBatchRequest(request);
   } catch (error) {
     return failure(asBatchError(error, "invalid-batch"));
   }
 
+  let root: string;
+  try {
+    root = await rootPath(request.outputRoot, runFileSystem);
+  } catch (error) {
+    return failure(asBatchError(error, "filesystem-unavailable"));
+  }
+
   let lockPath: string;
   try {
-    lockPath = await acquireLock(prepared.root, runFileSystem);
+    lockPath = await acquireLock(root, runFileSystem);
   } catch (error) {
     const lockFailure = asBatchError(error, "filesystem-unavailable");
     return lockFailure.mayCompleteAfterTimeout
@@ -694,7 +723,7 @@ async function writeBatch(
   const createdDirectories: string[] = [];
   let result: ArtifactBatchResult;
   try {
-    prepared = await prepareBatch(request, runFileSystem);
+    const prepared = await prepareBatch(normalized, root, runFileSystem);
     transactionPath = join(prepared.root, `.artifact-batch-${randomUUID()}`);
     const stagedPath = join(transactionPath, "staged");
     const backupPath = join(transactionPath, "backups");
@@ -759,7 +788,11 @@ async function writeBatch(
     };
   } catch (error) {
     const primary = asBatchError(error, "write-failed");
-    if (primary.mayCompleteAfterTimeout) {
+    if (transactionPath === undefined) {
+      // prepareBatch rejected the batch before any transaction state existed:
+      // the original state was never touched, so there is nothing to restore.
+      result = failure(primary);
+    } else if (primary.mayCompleteAfterTimeout) {
       // Node's mutating filesystem promises do not support cancellation. A
       // timed-out operation may still finish, so keep the lock and backups and
       // report the state as uncertain instead of racing a false rollback.

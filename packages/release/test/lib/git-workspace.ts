@@ -3,6 +3,9 @@ import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { assertCommit } from "../../src/intent.ts";
+import type { CommitSha } from "../../src/intent.ts";
+
 /**
  * Each case builds a git repository and runs git — and sometimes the Changesets CLI — in
  * subprocesses; the default five-second case timeout is not enough for that and made the suite
@@ -83,7 +86,7 @@ export async function withGitWorkspaceAsync(
  * the Publish Release workflow runs every ordinary canary in — there, a bare `main` does not
  * resolve.
  */
-export function commitBaseline(workspace: GitWorkspace, head: WorkspaceHead = "branch"): string {
+export function commitBaseline(workspace: GitWorkspace, head: WorkspaceHead = "branch"): CommitSha {
   workspace.git(["add", "."]);
   workspace.git(["commit", "-m", "baseline"]);
   workspace.git(["update-ref", "refs/remotes/origin/main", "HEAD"]);
@@ -91,5 +94,5 @@ export function commitBaseline(workspace: GitWorkspace, head: WorkspaceHead = "b
     workspace.git(["checkout", "--detach", "HEAD"]);
     workspace.git(["branch", "-D", "main"]);
   }
-  return workspace.git(["rev-parse", "HEAD"]);
+  return assertCommit(workspace.git(["rev-parse", "HEAD"]));
 }

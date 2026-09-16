@@ -1,0 +1,5 @@
+---
+"@elmeragroup/internal": patch
+---
+
+Fix the findings from the deep standards review across the bundled tools. The extractor now describes anonymous objects in inferred container elements and type arguments instead of falling back to `any`, emits the value descriptor for an enum merged with a namespace declared first, no longer reports a false `unsupported-type-fallback` during type-name probing, and keeps a hole in a partially instantiated alias aligned with its parameter. API artifact failures from unresolvable project props are `ApiArtifactsError` and both artifact errors carry a stable `_tag`. Release retry no longer requires `.changeset/config.json`, checkout and retry diagnostics name the SHAs, tag, and tracked branch they were given, npm failures include captured stderr, and the plan adapter reads stderr as text. The `no-primitive-colors` rule reports each class string once, the anti-slop `no-unknown-type-aliases` rule checks nested and switch-case aliases, and the anti-slop package is type-checked.

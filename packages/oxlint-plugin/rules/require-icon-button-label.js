@@ -178,4 +178,5 @@ export default defineRule({
         'Icon-only <{{component}}> must have an aria-label for accessibility. Add aria-label={t("...")} to provide a screen reader label.',
     },
   },
+  defaultOptions: [],
 });

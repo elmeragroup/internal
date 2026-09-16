@@ -60,10 +60,13 @@ import { SessionFactCache } from "./session-fact-cache.ts";
 import { declaringParentIsClass, symbolFacts, symbolNamespaces, symbolOrigin } from "./symbol-facts.ts";
 import { authoredLocation } from "./syntax.ts";
 
+/**
+ * The compiler capabilities fact readers use. Fact readers never reach outside this seam,
+ * and every handle dereference reports the calling operation for diagnostics.
+ */
 export type TsgoFactsSession = {
   readonly componentSources: boolean;
   readonly checker: Checker;
-  readonly program: Program;
   readonly sourceFileMetadata: (path: string) => ReturnType<Program["getSourceFileMetadata"]>;
   readonly rootDirectory: string;
   readonly ensureOpen: (operation: string) => void;
@@ -106,6 +109,7 @@ const typeFlagDisplayOrder: readonly (readonly [TypeFlags, TypeFlagName])[] = ty
   .filter((name): name is Exclude<TypeFlagName, "Other"> => name !== "Other")
   .map((name) => [TypeFlags[name], name] as const);
 
+/** The parser-facing compiler operations one session exposes, plus heritage reads and cache cleanup. */
 export type TsgoSessionFacts = {
   /** Every operation except the error-context breadcrumb, which the session itself owns. */
   readonly operations: Omit<BackendCompilerOperations, "setErrorContext">;
@@ -115,6 +119,13 @@ export type TsgoSessionFacts = {
   readonly clear: () => void;
 };
 
+/**
+ * Builds the session's memoized fact operations.
+ *
+ * @param session - The compiler capabilities fact readers use.
+ * @param heritage - The heritage-clause reader shared with the module walk.
+ * @returns The operations object and the session-scoped cache cleanup.
+ */
 export function createSessionFacts(
   session: TsgoFactsSession,
   heritage: TsgoHeritageSession

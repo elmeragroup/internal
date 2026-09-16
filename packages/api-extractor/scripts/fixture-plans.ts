@@ -21,6 +21,7 @@ import type {
  * the catalog validates itself once when its module loads.
  */
 
+/** One fixture a timing plan measures, with the oracle files its run is checked against. */
 export type TimingFixture = {
   readonly fixture: string;
   readonly file: string;
@@ -28,6 +29,7 @@ export type TimingFixture = {
   readonly warningOracle: "warnings.tsgo.json";
 };
 
+/** A boundary timing entry: the timing fixture plus its IPC ceilings. */
 export type BoundaryTimingFixture = TimingFixture & {
   readonly maxFetchedToMaterializedRatio: number;
   readonly maxRequestCount: number;
@@ -35,8 +37,10 @@ export type BoundaryTimingFixture = TimingFixture & {
   readonly bytesReceivedPathLengthHeadroom?: number;
 };
 
+/** A conformance timing entry; the Issue 14 plan reuses the boundary fixture's oracles. */
 export type ConformanceTimingFixture = TimingFixture;
 
+/** An external-selection timing entry: one fixture and its package-expansion IPC ceilings. */
 export type ExternalSelectionTimingFixture = {
   readonly fixture: string;
   readonly file: string;
@@ -51,7 +55,7 @@ type TimingPlanResult = {
 };
 
 /** Orders one plan's entries and rejects duplicate or negative positions. */
-export function orderedView<T extends { readonly order: number }>(
+function orderedView<T extends { readonly order: number }>(
   values: readonly T[],
   label: string
 ): readonly T[] {
@@ -65,6 +69,7 @@ export function orderedView<T extends { readonly order: number }>(
   return result;
 }
 
+/** Copies a boundary budget, adding the path-length headroom key only when one is recorded. */
 export function boundaryTimingBudget(
   metadata: Pick<
     BoundaryTimingMetadata,
@@ -89,6 +94,16 @@ export function boundaryTimingBudget(
   };
 }
 
+/**
+ * Projects one timing plan from the catalog and orders it by the recorded order.
+ *
+ * @template Plan - The plan id to project.
+ * @param catalog - The derived fixture catalog.
+ * @param plan - Which timing plan to project.
+ * @returns The plan's fixtures with their ceilings, ordered by their recorded order.
+ * @throws When a catalog entry is missing the oracle files or ceilings its plan needs, or
+ *   when orders are duplicated or negative.
+ */
 export function deriveTimingPlan<Plan extends TimingPlan>(
   catalog: readonly FixtureEvidenceRecord[],
   plan: Plan
@@ -139,16 +154,21 @@ export function deriveTimingPlan<Plan extends TimingPlan>(
   );
 }
 
+/** The Issue 02 boundary plan: the fixtures measured with their IPC ceilings. */
 export const boundaryTimingFixtures = deriveTimingPlan(fixtureEvidenceCatalog, "issue02");
+/** The Issue 14 conformance plan's timing entries. */
 export const conformanceTimingFixtures = deriveTimingPlan(fixtureEvidenceCatalog, "issue14");
+/** The external-type-selection timing plan. */
 export const externalSelectionTimingFixtures = deriveTimingPlan(fixtureEvidenceCatalog, "externalSelection");
 
+/** One conformance fixture and the oracle disposition the run must prove. */
 export type ConformanceFixture = {
   readonly fixture: string;
   readonly file: string;
   readonly disposition: ConformanceDisposition;
 };
 
+/** Selects every conformance fixture from the catalog, in catalog order. */
 export function deriveConformancePlan(
   catalog: readonly FixtureEvidenceRecord[]
 ): readonly ConformanceFixture[] {
@@ -159,9 +179,10 @@ export function deriveConformancePlan(
   );
 }
 
+/** The conformance run plan for this package's fixture tree. */
 export const conformanceFixtureManifest = deriveConformancePlan(fixtureEvidenceCatalog);
 
-export function deriveTypecheckPlan(catalog: readonly FixtureEvidenceRecord[]): readonly {
+function deriveTypecheckPlan(catalog: readonly FixtureEvidenceRecord[]): readonly {
   readonly fixture: string;
   readonly file: string;
   readonly strategy: Exclude<TypecheckStrategy, "not-applicable">;
@@ -175,6 +196,7 @@ export function deriveTypecheckPlan(catalog: readonly FixtureEvidenceRecord[]): 
   });
 }
 
+/** The type-check run plan for this package's fixture tree. */
 export const conformanceTypecheckPlan = deriveTypecheckPlan(fixtureEvidenceCatalog);
 
 /** Every type-checkable fixture project, in path order, minus the recorded exclusions. */
@@ -202,6 +224,7 @@ export const packageFixtureTypecheckPlan: readonly { readonly project: string }[
   fixtureBudgets
 ).map((project) => ({ project }));
 
+/** Selects every fixture that has a warning oracle, with the oracle file and its code order. */
 export function deriveWarningEvidencePlan(catalog: readonly FixtureEvidenceRecord[]): readonly {
   readonly fixture: string;
   readonly oracleFile: "warnings.tsgo.json";
@@ -224,6 +247,14 @@ export const expectedFixtureWarnings: Readonly<Record<string, readonly string[]>
   fixtureEvidenceCatalog.map((record) => [record.id, record.warnings.codes])
 );
 
+/**
+ * Looks up one fixture's expected warning codes.
+ *
+ * @param plan - The warning plan to read, keyed by fixture id.
+ * @param fixture - The fixture to look up.
+ * @returns The codes the fixture records, in oracle order.
+ * @throws When the fixture has no entry — every catalogued fixture must have one.
+ */
 export function expectedWarningCodes(
   plan: Readonly<Record<string, readonly string[]>>,
   fixture: string
@@ -233,6 +264,7 @@ export function expectedWarningCodes(
   return codes;
 }
 
+/** A public-seam regression with no upstream oracle: its expected export names are the assertion. */
 export type SupplementalBoundaryFixture = {
   readonly fixture: string;
   readonly file: string;
@@ -258,6 +290,13 @@ export const boundarySupplementalFixtures: readonly SupplementalBoundaryFixture[
   },
 ];
 
+/**
+ * Summarizes which gates cover each catalogued fixture, in catalog order.
+ *
+ * @param catalog - The derived fixture catalog.
+ * @returns One row per fixture naming its input, conformance class, type-check strategy,
+ *   timing plans, and whether it has a warning oracle.
+ */
 export function derivePackageExecutionPlan(catalog: readonly FixtureEvidenceRecord[]): readonly {
   readonly fixture: string;
   readonly input: string;
@@ -276,4 +315,5 @@ export function derivePackageExecutionPlan(catalog: readonly FixtureEvidenceReco
   }));
 }
 
+/** The per-fixture gate summary for this package's fixture tree. */
 export const packageFixtureExecutionPlan = derivePackageExecutionPlan(fixtureEvidenceCatalog);

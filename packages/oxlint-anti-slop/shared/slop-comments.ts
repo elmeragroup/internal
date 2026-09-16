@@ -89,6 +89,14 @@ export function isStandaloneLineComment(sourceCode: SourceCode, comment: ESTree.
   return line !== undefined && line.slice(0, comment.loc.start.column).trim() === "";
 }
 
+/**
+ * Source range to remove for a suggestion, including the indentation and line terminator
+ * of a comment that owns its line.
+ *
+ * @param sourceCode - The rule's source code service.
+ * @param comment - The comment to remove.
+ * @returns The `[start, end]` source range to delete.
+ */
 export function commentRemovalRange(sourceCode: SourceCode, comment: ESTree.Comment): [number, number] {
   const text = sourceCode.text;
   let start = comment.start;

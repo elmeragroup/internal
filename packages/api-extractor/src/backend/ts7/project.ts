@@ -207,6 +207,14 @@ class TsgoProject implements BackendProject {
   }
 }
 
+/**
+ * Opens one TypeScript project for extraction.
+ *
+ * @param options - The tsconfig path, cwd, optional filesystem seam, and timing switch.
+ * @returns A project that owns its compiler and every session opened from it.
+ * @throws A `ConfigError` for unreadable or invalid tsconfig content, or a `BackendError`
+ *   defect when the compiler cannot start or open the project.
+ */
 export function openTsgoProject(options: InternalOpenProjectOptions): BackendProject {
   const cwd = resolve(options.cwd ?? process.cwd());
   const tsconfigPath = resolve(cwd, options.tsconfigPath);

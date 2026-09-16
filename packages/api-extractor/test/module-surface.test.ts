@@ -82,6 +82,10 @@ describe("module-surface review regressions", () => {
     }
     expect(warning.reason).toBe("cycle");
     expect(warning.name).toBe("Loop.Back.Loop");
+    // The centrally rendered prose names the requested re-export and explains
+    // why the chain stopped.
+    expect(warning.message).toContain('Could not resolve re-export "Loop.Back.Loop"');
+    expect(warning.message).toContain("following the re-export chain returned to its starting namespace");
     // The cut keeps extraction alive; no phantom exports are manufactured for
     // the branch that could not be followed.
     expect(result.module.exports).toEqual([]);
