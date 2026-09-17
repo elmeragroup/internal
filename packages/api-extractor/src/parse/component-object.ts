@@ -26,7 +26,12 @@ export function componentObjectNode(
   context: Context,
   resolve: ResolveSemanticType
 ): SemanticType | undefined {
-  if (context.provenancePath.length !== 1 || context.propertyDepth !== 0) return undefined;
+  // Only the export's own value is described by its members (`export const
+  // Menu = { Root, Item }`). Identity is sound because type handles are
+  // interned per session, and it says exactly what the old position heuristic
+  // approximated: a nested occurrence — a union arm included — is ordinary
+  // structure, never the anonymous module value.
+  if (type !== context.exportRoot) return undefined;
   const members = context.operations.propertiesOfType(type);
   if (members.length === 0) return undefined;
   const properties: PropertyNode[] = [];

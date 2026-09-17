@@ -5,7 +5,10 @@ declare const backendHandleBrand: unique symbol;
 
 /**
  * Compiler entities never cross the backend boundary as compiler objects.
- * Handles are created and dereferenced by one extraction session only.
+ * Handles are created and dereferenced by one extraction session only, and are
+ * interned per session and kind, so identity equality between two handles is a
+ * supported semantic: the parser relies on it to recognize an export's own
+ * type (`object-resolver.ts`).
  */
 export type BackendHandle<Tag extends string> = {
   readonly [backendHandleBrand]: Tag;

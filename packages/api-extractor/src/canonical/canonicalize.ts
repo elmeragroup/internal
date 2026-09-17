@@ -86,10 +86,11 @@ function moveIntrinsicToEnd(
   members: readonly SemanticType[],
   intrinsic: "null" | "undefined"
 ): readonly SemanticType[] {
-  const matches = members.filter((member) => member.kind === "intrinsic" && member.intrinsic === intrinsic);
+  const isMatch = (member: SemanticType): boolean =>
+    member.kind === "intrinsic" && member.intrinsic === intrinsic;
+  const matches = members.filter(isMatch);
   if (matches.length === 0) return members;
-  const rest = members.filter((member) => !(member.kind === "intrinsic" && member.intrinsic === intrinsic));
-  return [...rest, ...matches];
+  return [...members.filter((member) => !isMatch(member)), ...matches];
 }
 
 /**

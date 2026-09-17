@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, readdirSync, realpathSync, statSync } from "node:fs";
+import { existsSync, readdirSync, realpathSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { posixRelative, sha256File } from "./files.ts";
@@ -66,9 +66,10 @@ function filesRecursively(root: string): readonly string[] {
     const path = join(root, entry.name);
     if (entry.isDirectory()) result.push(...filesRecursively(path));
     // `readdir` reports a symlink as neither a directory nor a file, but the
-    // recorded path universe comes from `git ls-tree` and includes it, so
-    // follow the link to count a symlinked file like any other file.
-    else if (statSync(path).isFile()) result.push(path);
+    // recorded path universe comes from `git ls-tree`, which tracks the link
+    // itself. Classifying with the dirent counts it like any other file and
+    // never follows a target that may be absent.
+    else if (entry.isFile() || entry.isSymbolicLink()) result.push(path);
   }
   return result.sort();
 }

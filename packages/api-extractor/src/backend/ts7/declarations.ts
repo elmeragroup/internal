@@ -6,7 +6,7 @@ import type { Project } from "typescript/unstable/sync";
 export type CompilerDeclaration = {
   readonly index: number;
   readonly path: string;
-  readonly kind?: number;
+  readonly kind: Node["kind"];
   readonly resolve: (project?: Project) => Node | undefined;
 };
 

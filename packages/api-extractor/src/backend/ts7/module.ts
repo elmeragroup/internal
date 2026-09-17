@@ -353,6 +353,22 @@ function defaultExportNameSymbol(
 }
 
 /**
+ * Members TypeScript synthesizes onto every function or class value and that
+ * must not leak into a merged namespace's flattened public surface. The class
+ * resolver skips the same names on the static side (`class-resolver.ts`).
+ */
+const functionBuiltInStaticNames = new Set(["prototype", "length", "name", "arguments", "caller"]);
+
+/**
+ * Whether one flattened namespace export is a synthesized Function built-in
+ * static rather than an authored member. An authored member of the same name
+ * carries a declaration, so only declaration-less symbols are skipped.
+ */
+function isSynthesizedFunctionStatic(symbol: TsSymbol): boolean {
+  return symbol.declarations.length === 0 && functionBuiltInStaticNames.has(symbol.name);
+}
+
+/**
  * Flattens one namespace symbol's exported members into descriptors under the
  * current namespace path.
  *
@@ -391,6 +407,7 @@ function appendNamespaceMembers(
         ? orderedContainerExports(scope.session, ns, scope.source)
         : scope.session.moduleExports(ns);
   for (const member of members) {
+    if (isSynthesizedFunctionStatic(member)) continue;
     appendDescriptors(
       {
         ...memberScope,

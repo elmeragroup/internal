@@ -284,4 +284,23 @@ describe("object-of-components module values", () => {
     expect(mixed?.type).toEqual({ kind: "intrinsic", intrinsic: "any" });
     expect(result.warnings.map((warning) => warning.code)).toEqual(["unsupported-type-fallback"]);
   });
+
+  it("describes a union arm at the export root as ordinary structure", async () => {
+    const result = await extractComponentObject();
+    const union = result.module.exports.find((entry) => entry.name === "MenuUnion");
+    if (union?.type.kind !== "union")
+      throw new Error(`MenuUnion is ${union?.type.kind ?? "missing"}, not a union`);
+    // The `Menu`-typed arm resolves its members as functions: only the export's
+    // own type takes the object-of-components treatment, never a nested arm.
+    const menuArm = union.type.types.find(
+      (arm) => arm.kind === "object" && arm.properties.some((property) => property.name === "Root")
+    );
+    expect(menuArm).toMatchObject({
+      kind: "object",
+      properties: [
+        { name: "Root", type: { kind: "function", typeName: { name: "MenuRoot" } } },
+        { name: "Item", type: { kind: "function", typeName: { name: "MenuItem" } } },
+      ],
+    });
+  });
 });

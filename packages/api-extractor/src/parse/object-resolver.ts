@@ -49,7 +49,7 @@ type Context = ResolverContext;
  * @param name - The member name.
  * @returns Whether the member is the `render` prop.
  */
-export function isRenderProp(name: string): boolean {
+function isRenderProp(name: string): boolean {
   return name === "render";
 }
 
