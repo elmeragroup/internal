@@ -32,6 +32,7 @@ import type { BoundaryStatuses } from "./shared.ts";
 const reportPath = join(fixtureDirectory, "timing-conformance.json");
 const baselinePath = join(fixtureDirectory, "timing-boundary.json");
 const configPath = join(fixtureDirectory, "conformance-tsconfig.json");
+/** Tolerance in milliseconds for wall-clock comparisons between stored and live timing reports. */
 export const timingToleranceMs = 0.001;
 /**
  * IPC wall-clock counters are scheduler-sensitive. Keep the durable timing
@@ -40,7 +41,9 @@ export const timingToleranceMs = 0.001;
  * decided by the aggregate request count and bytes received against the
  * catalog ceilings, so a loaded machine cannot flip the decision.
  */
+/** The wall-clock timing contract recorded in the report and asserted by readers. */
 export const wallClockContract = issue14TimingWallClockContract;
+/** The rationale recorded beside the wall-clock contract. */
 export const wallClockContractRationale = issue14TimingWallClockRationale;
 const expectedFixtureOrder = conformanceTimingFixtures.map((definition) => definition.fixture);
 const timingFields = ["roundTripMs", "serverTimeMs", "transportOverheadMs"] as const;
@@ -48,6 +51,7 @@ const semanticFields = ["requestCount", "nodesMaterialized", "sourceFilesFetched
 const transportByteFields = ["bytesSent", "bytesReceived"] as const;
 const integerFields = [...semanticFields, ...transportByteFields] as const;
 
+/** The nine IPC counters one timing sample reports. */
 export const NumberTotalsSchema = Schema.Struct({
   requestCount: Schema.Number,
   roundTripMs: Schema.Number,
@@ -67,9 +71,14 @@ const SampleSchema = Schema.Struct({
   delta: NumberTotalsSchema,
 });
 const FixtureSamplesSchema = Schema.Array(SampleSchema).check(
-  Schema.makeFilter((samples) => samples.length === 4 || "exactly four timing samples are required")
+  Schema.makeFilter(
+    (samples) =>
+      samples.length === expectedFixtureOrder.length ||
+      `exactly ${expectedFixtureOrder.length} timing samples are required`
+  )
 );
 
+/** The Issue 14 timing report: baseline, measured samples, aggregates, stop conditions, and decision. */
 export const Issue14TimingReportSchema = Schema.Struct({
   issue: Schema.Literal("14-full-conformance"),
   command: Schema.Literal(issue14TimingCommand),
@@ -116,6 +125,7 @@ export const Issue14TimingReportSchema = Schema.Struct({
   decision: Schema.Literals(["go", "no-go"] as const),
 });
 
+/** Command output for a live-budget check: the report's own decision plus baseline and aggregate. */
 export const LiveBudgetTimingCommandOutputSchema = Schema.Struct({
   issue: Issue14TimingReportSchema.fields.issue,
   decision: Schema.Literals(["go", "no-go"] as const),
@@ -125,6 +135,7 @@ export const LiveBudgetTimingCommandOutputSchema = Schema.Struct({
   aggregate: Issue14TimingReportSchema.fields.aggregate,
 });
 
+/** Command output for a checkout-portability check: the semantic decision plus baseline and aggregate. */
 export const PortabilityTimingCommandOutputSchema = Schema.Struct({
   issue: Issue14TimingReportSchema.fields.issue,
   mode: Schema.Literal("portability"),
@@ -134,15 +145,21 @@ export const PortabilityTimingCommandOutputSchema = Schema.Struct({
   aggregate: Issue14TimingReportSchema.fields.aggregate,
 });
 
+/** Either timing command output shape, discriminated by `mode`. */
 export const TimingCommandOutputSchema = Schema.Union([
   LiveBudgetTimingCommandOutputSchema,
   PortabilityTimingCommandOutputSchema,
 ]);
 
+/** One Issue 14 timing report. */
 export type Issue14TimingReport = Schema.Schema.Type<typeof Issue14TimingReportSchema>;
+/** The JSON a timing command prints. */
 export type TimingCommandOutput = Schema.Schema.Type<typeof TimingCommandOutputSchema>;
+/** The nine IPC counters attached to a timing report or sample. */
 export type TimingTotals = Schema.Schema.Type<typeof NumberTotalsSchema>;
+/** Which comparison a timing check performs: enforce live budgets or verify checkout portability. */
 export type TimingCheckMode = "enforce-live-budget" | "verify-checkout-portability";
+/** The extraction semantics decision a timing check reports. */
 export type SemanticDecision = "go" | "no-go";
 type IpcCeilings = {
   readonly maxAggregateRequestCount: number;
@@ -214,6 +231,7 @@ function sumTotals(totals: readonly TimingTotals[]): TimingTotals {
   return totals.reduce(addTotals, zeroTotals());
 }
 
+/** Field-wise `current - baseline`; wall-clock fields may legitimately be negative. */
 export function subtractTotals(current: TimingTotals, baseline: TimingTotals): TimingTotals {
   return {
     requestCount: current.requestCount - baseline.requestCount,
@@ -287,6 +305,13 @@ function assertTotalsEqual(
   }
 }
 
+/**
+ * Asserts two totals agree exactly on the deterministic semantic integer counters
+ * (request count, materialized/fetched nodes, fetched source files). Wall-clock fields stay
+ * under the observational contract and are not compared here.
+ *
+ * @param allowNegative - Whether delta totals are allowed to carry negative values.
+ */
 export function assertSemanticTotalsEqual(
   leftLabel: string,
   left: TimingTotals,
@@ -414,6 +439,13 @@ function assertCommonReportInvariants(report: Issue14TimingReport): void {
   if (report.decision !== expectedDecision) throw new Error("Issue 14 timing decision is stale.");
 }
 
+/**
+ * Asserts one Issue 14 report is internally consistent: identity and contract strings,
+ * fixture order, finite counters, delta arithmetic, IPC ceilings and status, and the
+ * decision derived from the stop conditions.
+ *
+ * @throws When any invariant is violated.
+ */
 export function assertTimingReportInvariants(report: Issue14TimingReport): void {
   assertCommonReportInvariants(report);
 }
@@ -511,10 +543,24 @@ async function measure(): Promise<Issue14TimingReport> {
   return reportFrom(baseline, samples, statuses);
 }
 
+/** Decodes one persisted report. The writer and every reader share this contract. */
 function decodeReport(value: Schema.Json): Issue14TimingReport {
   return Schema.decodeUnknownSync(Issue14TimingReportSchema)(value);
 }
 
+/**
+ * Compares a stored Issue 14 report against a fresh measurement.
+ *
+ * Leakage statuses must match and the stored decision must be `go`; in `enforce-live-budget`
+ * mode the IPC stop condition and the measured decision must also be `go`, while portability
+ * checks leave live budgets unenforced. Stored baseline fields are re-verified against the
+ * immutable Issue 02 baseline, and the semantic counters of every sample, delta, and aggregate
+ * must match the live run exactly.
+ *
+ * @returns The semantic decision for the command output: `go`.
+ * @throws When stored evidence is stale, boundaries disagree, or budgets are exceeded in a
+ *   mode that enforces them.
+ */
 export function assertStoredTimingReport(
   stored: Issue14TimingReport,
   measured: Issue14TimingReport,
@@ -613,6 +659,7 @@ export function assertStoredTimingReport(
   return "go";
 }
 
+/** Projects a measured report into the schema-encoded output for the requested check mode. */
 export function timingCommandOutput(
   measured: Issue14TimingReport,
   mode: TimingCheckMode,
@@ -638,13 +685,15 @@ export function timingCommandOutput(
 export async function runIssue14Timing(mode: TimingCheckMode | "write"): Promise<void> {
   const measured = await measure();
   if (mode === "write") {
+    // Fail before writing when the report violates the schema every reader decodes.
+    const report = decodeReport(Schema.decodeUnknownSync(Schema.Json)(measured));
     await writeArtifactBatchOrThrow(
       {
         outputRoot: fixtureDirectory,
         artifacts: [
           {
             destination: "timing-conformance.json",
-            content: `${JSON.stringify(measured, null, 2)}\n`,
+            content: `${JSON.stringify(report, null, 2)}\n`,
             evidence: "generated",
           },
         ],

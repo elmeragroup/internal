@@ -42,7 +42,7 @@ function isReactModuleOrigin(origin: BackendModuleOrigin | undefined): boolean {
  *
  * Without `name`, any of the React wrapper type names is accepted.
  */
-export function isReactApiSymbol(facts: ParserSymbolOrigin | undefined, name?: string): boolean {
+function isReactApiSymbol(facts: ParserSymbolOrigin | undefined, name?: string): boolean {
   if (facts === undefined) return false;
   const identity = facts.identity;
   return (

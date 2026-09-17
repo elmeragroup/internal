@@ -24,20 +24,45 @@ both sides are still reported without a suggestion. The predicate is
 `isSafeCommentRemoval` in `shared/slop-comments.ts`.
 
 `shared/type-name-scope.ts` and the scope-aware resolution in
-`shared/dictionary-types.ts`, `rules/no-object-parameters.ts` and
-`rules/no-unknown-returns.ts` are local changes: type names resolve in their
-lexical scope instead of a module-level alias table. Scope containers include
-`StaticBlock`, whose `body` is a statement list, so inner type aliases in
-`class C { static { ... } }` are found. `TSImportEqualsDeclaration` locals,
-including `import Promise = require("./p")`, are recorded as `shadowed`, and
-any other identifier-bearing declaration kind fail-closes as `shadowed` so
-lookup never walks to an outer name. Keep them when refreshing the vendored
+`shared/dictionary-types.ts`, `rules/no-object-parameters.ts`,
+`rules/no-unknown-returns.ts` and `rules/no-unknown-type-aliases.ts` are local
+changes: type names resolve in their lexical scope instead of a module-level
+alias table, and the module-internal `resolveAliasTarget` chases a bare
+reference to the single non-generic local alias it names. `resolvesThroughAliases`
+is the one walk from a type to a keyword leaf through parentheses, aliases, and
+the enabled container steps (`throughUnions`, `throughPromises`); the unshadowed
+`Promise`/`PromiseLike` descent lives there rather than in each rule. Scope
+containers include `StaticBlock`, whose `body` is a statement list, and
+`SwitchStatement`, whose cases share one container through their concatenated
+consequents, so inner type aliases in `class C { static { ... } }` and across
+`switch` cases are found. Type binders are interleaved with those containers
+during the outward walk: a nearer `type T` shadows an outer `<T>`, and a class's
+own type parameters do not apply inside its static members or static blocks,
+while an enclosing class's parameters still do. `TSImportEqualsDeclaration`
+locals, including `import Promise = require("./p")`, are recorded as
+`shadowed`, and any other identifier-bearing declaration kind fail-closes as
+`shadowed` so lookup never walks to an outer name. Keep them when refreshing the
+vendored upstream files.
+
+`shared/variable-scope.ts`, `shared/function-parameters.ts` and
+`shared/expression-unwrapping.ts` are also local: they own the lexical
+variable-scope walk, parameter annotation unwrapping with the diagnostic
+parameter name, the `FunctionLikeNode` union with the ten-key
+`functionLikeVisitors` table the rules share, and the transparent expression
+unwrapping with the empty-object predicate that upstream inlines in several
+rules. Keep them, and the rules importing them, when refreshing the vendored
 upstream files.
 
 ## Tests
 
-Run the rule tests with Node 24:
+Run the rule tests and type-check with Node 24:
 
 ```sh
 pnpm --filter @elmeragroup/oxlint-plugin-anti-slop test
+pnpm --filter @elmeragroup/oxlint-plugin-anti-slop type-check
 ```
+
+## Lint exemptions
+
+The package-wide rule exemptions in the root `.oxlintrc.json` and why each is load-bearing are
+recorded in [docs/lint-exemptions.md](../../docs/lint-exemptions.md).

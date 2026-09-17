@@ -18,11 +18,20 @@ type MutableHandleContextFields = { filePath?: string; symbolStack?: readonly st
  * happens to match.
  */
 export class HandleRegistry {
+  /** The private token every handle this registry created carries. */
   readonly session = Symbol("api-extractor-session");
   private nextId = 1;
   private closed = false;
   private readonly values = new Map<number, { readonly kind: string; readonly value: object }>();
 
+  /**
+   * Stores one compiler value under a fresh branded handle.
+   *
+   * @param kind - The handle kind; checked again on every `get`.
+   * @param value - The compiler value to retain for the extraction session.
+   * @returns A frozen handle that can only be dereferenced by this registry's session.
+   * @throws A `BackendError` defect when the registry was already cleared.
+   */
   create<Tag extends HandleKind, Value extends object>(kind: Tag, value: Value): BackendHandle<Tag> {
     if (this.closed) {
       throw new BackendError({
@@ -38,9 +47,17 @@ export class HandleRegistry {
   }
 
   /**
-   * `context` is a thunk: the operation name, file and symbol breadcrumb are
-   * only assembled when a lookup fails, never on the hot path of a valid
-   * handle.
+   * Dereferences a handle, rejecting handles from another session, the wrong
+   * kind, or an already-cleared registry.
+   *
+   * @template Tag - The handle kind; the result is typed as the stored value.
+   * @template Value - The value type the caller expects for this handle.
+   * @param handle - The handle to dereference.
+   * @param expectedKind - The kind the caller requires; a mismatch is an error, not a cast.
+   * @param context - A thunk assembled only on failure, carrying operation, file, and
+   *   symbol breadcrumb diagnostics.
+   * @returns The compiler value stored when the handle was created.
+   * @throws A `BackendError` defect for a cleared registry or an invalid handle.
    */
   get<Tag extends HandleKind, Value>(
     handle: BackendHandle<Tag>,
@@ -65,6 +82,7 @@ export class HandleRegistry {
     return entry.value as Value;
   }
 
+  /** Closes the registry and drops every retained compiler value. */
   clear(): void {
     this.closed = true;
     this.values.clear();

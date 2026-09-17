@@ -218,7 +218,8 @@ milliseconds. The IPC stop condition is decided by request count and bytes recei
 catalog ceilings: per fixture in the Issue 02 and external-selection plans, and summed over the four
 fixtures in the Issue 14 plan, so a dense walk cannot trade one for a megabyte dump. `test/fixtures/timing-boundary.json`
 is the immutable pre-optimization baseline the Issue 14 plan measures against; only its ceiling
-metadata moves with the catalog. Refresh the Issue 14 report (`report:timing:issue14`) only after
+metadata moves with the catalog. The Issue 02 plan is check-only: no command rewrites that baseline.
+Refresh the Issue 14 report (`report:timing:issue14`) only after
 reviewing the semantic output and the reason for a timing change. Fixtures resolve third-party
 type definitions from the installed tree, such as `@types/react` for `base-ui-component`, so a
 dependency bump that moves a deterministic counter is an input change, not an extractor regression.

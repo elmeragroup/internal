@@ -10,6 +10,7 @@ import { definedFields, flagFields } from "../optional-fields.ts";
 import type { ResolveSemanticType, ResolverContext } from "./contracts.ts";
 import {
   declarationProvenance,
+  memberTypeOf,
   omitTypeParameterSourceNode,
   propertyTypeNode,
   recordProvenance,
@@ -144,8 +145,7 @@ function extractMembers(
       declarationFacts.declarationFlags?.some((flag) => flag === "private" || flag === "protected") === true
     )
       continue;
-    const memberType =
-      context.operations.propertyType(member) ?? context.operations.typeOfSymbol(member, false);
+    const memberType = memberTypeOf(member, context.operations);
     const signatures = memberType === undefined ? [] : context.operations.signaturesOfType(memberType);
     // Upstream classifies a member as a method from either declaration kind —
     // MethodDeclaration or MethodSignature — so a signature merged in from

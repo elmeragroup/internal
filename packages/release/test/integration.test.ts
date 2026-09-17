@@ -1,4 +1,4 @@
-import { Effect, Schema } from "effect";
+import { Effect, Redacted, Schema } from "effect";
 import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { verifyReleaseArchive } from "../src/archive.ts";
-import type { EngineDeps, PackAndVerify } from "../src/engine.ts";
+import type { CheckedCommitDeps, PackAndVerify } from "../src/engine.ts";
 import { executeCheckedCommit } from "../src/engine.ts";
 import { createStableReleaseGate } from "../src/gate.ts";
 import { createCommitAncestry, createGitPort } from "../src/git.ts";
@@ -209,10 +209,10 @@ writeFileSync(file, JSON.stringify({ releases: [] }));
         throw new Error(`unexpected fetch: ${method} ${href}`);
       };
 
-      const environment = { repository, token: "test-token", fetch: fixtureFetch };
+      const environment = { repository, token: Redacted.make("test-token"), fetch: fixtureFetch };
       const client = createGitHubClient(environment);
       const ancestry = createCommitAncestry(root);
-      const deps: EngineDeps = {
+      const deps: CheckedCommitDeps = {
         git: createGitPort(root, "packages/ui/package.json", "origin/main"),
         ancestry,
         store: createReleaseStore(client, packageName),

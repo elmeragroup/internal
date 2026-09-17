@@ -2,6 +2,8 @@ import { defineRule } from "@oxlint/plugins";
 
 import { normalizeFilename } from "../filename-normalizer.js";
 
+/** @import { ESTree } from "@oxlint/plugins" */
+
 const BANNED_PARTS = new Set(["Label", "Description", "Error", "Root", "Set", "Legend"]);
 
 const LABELED_COMPOSITES = [
@@ -22,7 +24,7 @@ function isLabeledComposite(filename) {
 }
 
 /**
- * @param {import("estree").Node | null | undefined} nameNode
+ * @param {ESTree.Node | null | undefined} nameNode
  * @returns {string | null}
  */
 function fieldPartName(nameNode) {
@@ -30,14 +32,10 @@ function fieldPartName(nameNode) {
     return null;
   }
   const object = nameNode.object;
-  const property = nameNode.property;
-  if (object?.type !== "JSXIdentifier" || object.name !== "Field") {
+  if (object.type !== "JSXIdentifier" || object.name !== "Field") {
     return null;
   }
-  if (property?.type !== "JSXIdentifier") {
-    return null;
-  }
-  return property.name;
+  return nameNode.property.name;
 }
 
 export default defineRule({
@@ -53,7 +51,6 @@ export default defineRule({
     },
     schema: [],
   },
-  defaultOptions: [],
   createOnce(context) {
     let skipFile = true;
 

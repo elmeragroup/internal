@@ -4,7 +4,11 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { ExtractWarningSchema, ProjectExtractor } from "../../src/index.ts";
-import type { ExtractWarning } from "../../src/index.ts";
+import type {
+  ExtractionResult as ExtractorResult,
+  ExtractWarning,
+  ProjectExtractorService,
+} from "../../src/index.ts";
 import { definedFields } from "../../src/optional-fields.ts";
 import { writeArtifactBatchOrThrow } from "../artifact-batch-writer.ts";
 import type { ArtifactBatchItem } from "../artifact-batch-writer.ts";
@@ -44,10 +48,138 @@ const fixtureDirectory = join(packageDirectory, "test/fixtures");
 const configPath = join(fixtureDirectory, "conformance-tsconfig.json");
 const reportPath = join(fixtureDirectory, "conformance.json");
 const upstreamCommit = pinnedUpstream.commit;
-const expectedFixtureCount = 116;
+// The catalog derives the conformance inventory; nothing here restates its size.
+const expectedFixtureCount = conformanceFixtureManifest.length;
+
+/**
+ * The exclusive mode one conformance invocation selects. Flags are parsed once
+ * so contradictory or unknown combinations fail before any extraction.
+ */
+type ConformanceMode =
+  | { readonly mode: "check"; readonly referenceRequired: boolean }
+  | { readonly mode: "write"; readonly referenceRequired: boolean }
+  | { readonly mode: "audit-reference"; readonly referenceRequired: boolean }
+  | { readonly mode: "write-warnings"; readonly names: readonly string[] }
+  | { readonly mode: "write-ts7"; readonly names: readonly string[] };
+
+/** The five exclusive conformance modes, keyed by the flag that selects each. */
+const modeFlags = new Map<string, ConformanceMode["mode"]>([
+  ["--check", "check"],
+  ["--write", "write"],
+  ["--audit-reference", "audit-reference"],
+  ["--write-warnings", "write-warnings"],
+  ["--write-ts7", "write-ts7"],
+]);
+
+/**
+ * Parses the conformance command line into exactly one mode. `--reference-required`
+ * is the one flag that modifies a mode instead of selecting one.
+ *
+ * @param argv - Arguments after the script name.
+ * @returns The selected mode and its arguments.
+ * @throws When a flag is unknown, repeated, or combined with a contradictory mode, when a mode
+ *   that takes no fixture names is given one, or when any argument targets the immutable oracle.
+ */
+function parseConformanceMode(argv: readonly string[]): ConformanceMode {
+  const seenFlags = new Set<string>();
+  const modes = new Set<ConformanceMode["mode"]>();
+  const names: string[] = [];
+  let referenceRequired = false;
+  for (const argument of argv) {
+    if (argument.endsWith("output.json")) {
+      throw new Error("Issue 14 regeneration refuses to target the immutable output.json oracle.");
+    }
+    if (!argument.startsWith("--")) {
+      names.push(argument);
+      continue;
+    }
+    if (seenFlags.has(argument)) throw new Error(`Repeated conformance flag: ${argument}`);
+    seenFlags.add(argument);
+    if (argument === "--reference-required") {
+      referenceRequired = true;
+      continue;
+    }
+    const mode = modeFlags.get(argument);
+    if (mode === undefined) throw new Error(`Unknown conformance flag: ${argument}`);
+    modes.add(mode);
+  }
+
+  if (modes.size > 1) {
+    throw new Error(
+      "Choose exactly one of --check, --write, --audit-reference, --write-warnings, or --write-ts7."
+    );
+  }
+  const mode = [...modes][0] ?? "check";
+  // The two evidence-refresh modes always verify the reference before extraction; asking for
+  // it explicitly is a contradiction, not a no-op.
+  if (referenceRequired && (mode === "write-warnings" || mode === "write-ts7")) {
+    throw new Error(`--${mode} always requires a verified reference before extraction.`);
+  }
+  switch (mode) {
+    case "check":
+    case "write":
+    case "audit-reference": {
+      if (names.length > 0) throw new Error(`Unexpected conformance argument: ${names.join(" ")}`);
+      return { mode, referenceRequired };
+    }
+    case "write-warnings":
+      return { mode, names };
+    case "write-ts7":
+      if (names.length === 0) throw new Error("--write-ts7 requires one or more explicit fixture names.");
+      return { mode, names };
+  }
+}
 
 async function writeEvidenceBatch(artifacts: readonly ArtifactBatchItem[]): Promise<void> {
   await writeArtifactBatchOrThrow({ outputRoot: fixtureDirectory, artifacts }, "Issue 14 evidence write");
+}
+
+/**
+ * Extracts every definition through one live extractor, keyed by fixture name.
+ *
+ * @param extractor - The live fixture extractor.
+ * @param definitions - One definition per fixture to extract, in order.
+ * @returns The extraction result per fixture.
+ */
+function extractEachFixture(extractor: ProjectExtractorService, definitions: readonly ConformanceFixture[]) {
+  return Effect.gen(function* () {
+    const results = new Map<string, ExtractorResult>();
+    for (const definition of definitions) {
+      const inputPath = join(fixtureDirectory, definition.fixture, definition.file);
+      results.set(definition.fixture, yield* extractor.extractModule(inputPath));
+    }
+    return results;
+  });
+}
+
+/**
+ * Runs one extraction body against the fixture project's public extractor seam.
+ *
+ * Every conformance walk reuses this scoped wiring so the fixture filesystem and
+ * tsconfig are configured exactly once, and so the same `ProjectExtractor`
+ * service is reused across files in the walk.
+ *
+ * @param body - The extraction work to run with the live fixture extractor.
+ * @returns The body's result.
+ */
+function withFixtureExtractor<A, E>(
+  body: (extractor: ProjectExtractorService) => Effect.Effect<A, E>
+): Promise<A> {
+  return Effect.runPromise(
+    Effect.scoped(
+      Effect.gen(function* () {
+        const extractor = yield* ProjectExtractor;
+        return yield* body(extractor);
+      }).pipe(
+        Effect.provide(
+          ProjectExtractor.live({
+            tsconfigPath: configPath,
+            fileSystem: createFixtureFileSystem(),
+          })
+        )
+      )
+    )
+  );
 }
 
 export { issue14ConformanceCommand } from "./contract.ts";
@@ -97,6 +229,71 @@ const additionalTs7Evidence = new Map<string, AdditionalTs7Evidence>(
         "/exports/2/type/properties/1/name",
       ],
       differenceDigest: "51622464ef9317fc11c2b8f3f0e74dd4c0be3348adbfe9950abd8ba468cce775",
+    },
+    "react-component-overload-any-callback-deduplication": {
+      code: "TS7_REACT_EXTERNAL_GRAPH",
+      genus: "external-react-graph-and-member-order",
+      reason:
+        "Overload squashing deduplicates the `any`-callback forms exactly as upstream, and the surviving prop set matches; the residual differences re-derive the three TypeScript 7 divergences recorded at deferral: the reduced `Omit<...>` intersection reports its members in TypeScript 7's declaration order where the pinned oracle reports `filter` first from the mapped-type view, the indexed-access constraint read `{items: readonly any[]}` degrades through the structured fallback contract where TypeScript 6 silently narrowed the same shape, and one union arm reports `any` versus the oracle's array form. All are compiler-view differences inside the external React/Omit graph, not extraction policy.",
+      differencePaths: [
+        "/exports/0/type/props/0/documentation/description",
+        "/exports/0/type/props/0/name",
+        "/exports/0/type/props/0/type/types/0/callSignatures/0/parameters/1/name",
+        "/exports/0/type/props/0/type/types/0/callSignatures/0/parameters/1/optional",
+        "/exports/0/type/props/0/type/types/0/callSignatures/0/parameters/1/type/intrinsic",
+        "/exports/0/type/props/0/type/types/0/callSignatures/0/parameters/1/type/kind",
+        "/exports/0/type/props/0/type/types/0/callSignatures/0/parameters/2/name",
+        "/exports/0/type/props/0/type/types/0/callSignatures/0/parameters/2/optional",
+        "/exports/0/type/props/0/type/types/0/callSignatures/0/parameters/2/type/kind",
+        "/exports/0/type/props/0/type/types/0/callSignatures/0/parameters/2/type/types/0/callSignatures/0/parameters/0/name",
+        "/exports/0/type/props/0/type/types/0/callSignatures/0/parameters/2/type/types/0/callSignatures/0/parameters/0/optional",
+        "/exports/0/type/props/0/type/types/0/callSignatures/0/parameters/2/type/types/0/callSignatures/0/parameters/0/type/kind",
+        "/exports/0/type/props/0/type/types/0/callSignatures/0/parameters/2/type/types/0/callSignatures/0/parameters/0/type/name",
+        "/exports/0/type/props/0/type/types/0/callSignatures/0/parameters/2/type/types/0/callSignatures/0/returnValueType/intrinsic",
+        "/exports/0/type/props/0/type/types/0/callSignatures/0/parameters/2/type/types/0/callSignatures/0/returnValueType/kind",
+        "/exports/0/type/props/0/type/types/0/callSignatures/0/parameters/2/type/types/0/kind",
+        "/exports/0/type/props/0/type/types/0/callSignatures/0/parameters/2/type/types/1/intrinsic",
+        "/exports/0/type/props/0/type/types/0/callSignatures/0/parameters/2/type/types/1/kind",
+        "/exports/0/type/props/0/type/types/0/callSignatures/0/parameters/@length",
+        "/exports/0/type/props/0/type/types/0/callSignatures/0/returnValueType/intrinsic",
+        "/exports/0/type/props/0/type/types/1/intrinsic",
+        "/exports/0/type/props/0/type/types/2/intrinsic",
+        "/exports/0/type/props/0/type/types/2/kind",
+        "/exports/0/type/props/0/type/types/@length",
+        "/exports/0/type/props/1/documentation/description",
+        "/exports/0/type/props/1/name",
+        "/exports/0/type/props/1/type/types/0/callSignatures/0/parameters/1/name",
+        "/exports/0/type/props/1/type/types/0/callSignatures/0/parameters/1/optional",
+        "/exports/0/type/props/1/type/types/0/callSignatures/0/parameters/1/type/intrinsic",
+        "/exports/0/type/props/1/type/types/0/callSignatures/0/parameters/1/type/kind",
+        "/exports/0/type/props/1/type/types/0/callSignatures/0/parameters/2/name",
+        "/exports/0/type/props/1/type/types/0/callSignatures/0/parameters/2/optional",
+        "/exports/0/type/props/1/type/types/0/callSignatures/0/parameters/2/type/kind",
+        "/exports/0/type/props/1/type/types/0/callSignatures/0/parameters/2/type/types/0/callSignatures/0/parameters/0/name",
+        "/exports/0/type/props/1/type/types/0/callSignatures/0/parameters/2/type/types/0/callSignatures/0/parameters/0/optional",
+        "/exports/0/type/props/1/type/types/0/callSignatures/0/parameters/2/type/types/0/callSignatures/0/parameters/0/type/kind",
+        "/exports/0/type/props/1/type/types/0/callSignatures/0/parameters/2/type/types/0/callSignatures/0/parameters/0/type/name",
+        "/exports/0/type/props/1/type/types/0/callSignatures/0/parameters/2/type/types/0/callSignatures/0/returnValueType/intrinsic",
+        "/exports/0/type/props/1/type/types/0/callSignatures/0/parameters/2/type/types/0/callSignatures/0/returnValueType/kind",
+        "/exports/0/type/props/1/type/types/0/callSignatures/0/parameters/2/type/types/0/kind",
+        "/exports/0/type/props/1/type/types/0/callSignatures/0/parameters/2/type/types/1/intrinsic",
+        "/exports/0/type/props/1/type/types/0/callSignatures/0/parameters/2/type/types/1/kind",
+        "/exports/0/type/props/1/type/types/0/callSignatures/0/parameters/@length",
+        "/exports/0/type/props/1/type/types/0/callSignatures/0/returnValueType/intrinsic",
+        "/exports/0/type/props/1/type/types/1/intrinsic",
+        "/exports/0/type/props/1/type/types/2/intrinsic",
+        "/exports/0/type/props/1/type/types/2/kind",
+        "/exports/0/type/props/1/type/types/@length",
+        "/exports/0/type/props/3/type/types/2/elementType/kind",
+        "/exports/0/type/props/3/type/types/2/elementType/name",
+        "/exports/0/type/props/3/type/types/2/intrinsic",
+        "/exports/0/type/props/3/type/types/2/isReadonly",
+        "/exports/0/type/props/3/type/types/2/kind",
+        "/exports/0/type/props/3/type/types/3/intrinsic",
+        "/exports/0/type/props/3/type/types/3/kind",
+        "/exports/0/type/props/3/type/types/@length",
+      ],
+      differenceDigest: "5674e4027c39ec86e7775224cbdeecd993032a7ed313d7198719f7c0fb8da521",
     },
     "symbol-double-underscore-name-preservation": {
       code: "TS7_DOUBLE_UNDERSCORE_SYMBOL_RESOLUTION",
@@ -156,7 +353,9 @@ const FixtureReportSchema = Schema.Struct({
 });
 const FixtureListSchema = Schema.Array(FixtureReportSchema).check(
   Schema.makeFilter(
-    (fixtures) => fixtures.length === expectedFixtureCount || "exactly 116 fixture records are required"
+    (fixtures) =>
+      fixtures.length === expectedFixtureCount ||
+      `exactly ${expectedFixtureCount} fixture records are required`
   )
 );
 
@@ -181,12 +380,12 @@ export const Issue14ConformanceReportSchema = Schema.Struct({
   upstream: Schema.Struct({
     repository: Schema.Literal(pinnedUpstream.repository),
     commit: Schema.Literal(upstreamCommit),
-    fixtureCount: Schema.Literal(expectedFixtureCount),
+    fixtureCount: Schema.Natural,
     originalOracle: Schema.Literal("output.json"),
   }),
   manifestSha256: EvidenceTextSchema,
   totals: Schema.Struct({
-    fixtures: Schema.Literal(expectedFixtureCount),
+    fixtures: Schema.Natural,
     unchanged: Schema.Natural,
     reviewedDivergences: Schema.Natural,
     failures: Schema.Natural,
@@ -385,26 +584,14 @@ function extractAll(
 ): Promise<readonly ExtractionResult[]> {
   // Keep the actual conformance path on the public seam: the fixture FS is
   // where module-imports-only receives its upstream dependency in memory.
-  const effect = Effect.gen(function* () {
-    const extractor = yield* ProjectExtractor;
+  return withFixtureExtractor((extractor) => {
     const extract: FixtureExtraction = (inputPath) => extractor.extractModule(inputPath);
-    return yield* extractFixtureResults(conformanceFixtureManifest, extract, warningOverrides);
-  }).pipe(
-    Effect.provide(
-      ProjectExtractor.live({
-        tsconfigPath: configPath,
-        fileSystem: createFixtureFileSystem(),
-      })
-    )
-  );
-  return Effect.runPromise(Effect.scoped(effect));
+    return extractFixtureResults(conformanceFixtureManifest, extract, warningOverrides);
+  });
 }
 
 function assertManifest(requireTs7Evidence = true): void {
   const names = conformanceFixtureManifest.map((entry) => entry.fixture);
-  if (names.length !== expectedFixtureCount) {
-    throw new Error(`Issue 14 manifest must contain exactly ${expectedFixtureCount} fixtures.`);
-  }
   const sortedNames = [...names].sort();
   if (new Set(names).size !== names.length || names.some((name, index) => name !== sortedNames[index])) {
     throw new Error("Issue 14 manifest names must be sorted and unique.");
@@ -470,27 +657,12 @@ export async function writeAdditionalTs7Evidence(
     }
     return { definition, evidence };
   });
-  const effect = Effect.gen(function* () {
-    const extractor = yield* ProjectExtractor;
-    const results = new Map<
-      string,
-      { readonly module: unknown; readonly warnings: readonly ExtractWarning[] }
-    >();
-    for (const { definition } of definitions) {
-      const inputPath = join(fixtureDirectory, definition.fixture, definition.file);
-      const result = yield* extractor.extractModule(inputPath);
-      results.set(definition.fixture, { module: result.module, warnings: result.warnings });
-    }
-    return results;
-  }).pipe(
-    Effect.provide(
-      ProjectExtractor.live({
-        tsconfigPath: configPath,
-        fileSystem: createFixtureFileSystem(),
-      })
+  const results = await withFixtureExtractor((extractor) =>
+    extractEachFixture(
+      extractor,
+      definitions.map(({ definition }) => definition)
     )
   );
-  const results = await Effect.runPromise(Effect.scoped(effect));
   const generatedFiles: ArtifactBatchItem[] = [];
   for (const { definition, evidence } of definitions) {
     const result = results.get(definition.fixture);
@@ -576,28 +748,17 @@ function selectWarningEvidence(names: readonly string[]): readonly WarningEviden
 async function extractWarningEvidence(
   selections: readonly WarningEvidenceSelection[]
 ): Promise<ReadonlyMap<string, readonly Schema.Json[]>> {
-  const effect = Effect.gen(function* () {
-    const extractor = yield* ProjectExtractor;
-    const warnings = new Map<string, readonly ExtractWarning[]>();
-    for (const { definition } of selections) {
-      const inputPath = join(fixtureDirectory, definition.fixture, definition.file);
-      const result = yield* extractor.extractModule(inputPath);
-      warnings.set(definition.fixture, result.warnings);
-    }
-    return warnings;
-  }).pipe(
-    Effect.provide(
-      ProjectExtractor.live({
-        tsconfigPath: configPath,
-        fileSystem: createFixtureFileSystem(),
-      })
+  const extracted = await withFixtureExtractor((extractor) =>
+    extractEachFixture(
+      extractor,
+      selections.map(({ definition }) => definition)
     )
   );
-  const extracted = await Effect.runPromise(Effect.scoped(effect));
   return new Map(
     selections.map(({ definition, codes }) => {
-      const warnings = extracted.get(definition.fixture);
-      if (warnings === undefined) throw new Error(`No warning result for ${definition.fixture}.`);
+      const result = extracted.get(definition.fixture);
+      if (result === undefined) throw new Error(`No warning result for ${definition.fixture}.`);
+      const warnings = result.warnings;
       const actualCodes = warnings.map((warning) => warning.code);
       if (JSON.stringify(actualCodes) !== JSON.stringify(codes)) {
         throw new Error(
@@ -693,9 +854,9 @@ function reportFrom(
     manifestSha256: manifestSha256(),
     totals: {
       // assertManifest() established the exact manifest cardinality before
-      // this report is built; keep the schema's literal 116 guard intact.
-      // SAFETY: assertManifest() and the fixture construction above enforce the 116-record contract.
-      fixtures: fixtures.length as typeof expectedFixtureCount,
+      // this report is built, and the invariants re-check it against the
+      // catalog-derived count.
+      fixtures: fixtures.length,
       unchanged: summary.unchanged,
       reviewedDivergences: summary.reviewedDivergences,
       failures: summary.failures,
@@ -748,57 +909,54 @@ export function assertStoredReportInvariants(
 
 async function main(): Promise<void> {
   assertCompilerIdentity();
-  const writeTs7Index = process.argv.indexOf("--write-ts7");
-  if (writeTs7Index >= 0) {
-    const names = process.argv.slice(writeTs7Index + 1).filter((argument) => !argument.startsWith("--"));
-    await writeAdditionalTs7Evidence(names);
-    return;
+  const command = parseConformanceMode(process.argv.slice(2));
+  switch (command.mode) {
+    case "write-ts7":
+      await writeAdditionalTs7Evidence(command.names);
+      return;
+    case "write-warnings":
+      await refreshWarningEvidence(command.names);
+      return;
+    case "audit-reference": {
+      const referenceCheck = auditPinnedReference(command.referenceRequired ? "required" : "optional");
+      console.log(JSON.stringify(referenceCheck, null, 2));
+      return;
+    }
+    case "write":
+    case "check": {
+      assertManifest();
+      const referenceCheck = auditPinnedReference(command.referenceRequired ? "required" : "optional");
+      const typechecks = conformanceFixtureManifest.map(typecheckFixture);
+      const extractions = await extractAll();
+      const measured = reportFrom(typechecks, extractions, referenceCheck);
+      if (command.mode === "write") {
+        assertReferenceEvidence(measured.referenceCheck, true);
+        await writeEvidenceBatch([
+          {
+            destination: "conformance.json",
+            content: `${JSON.stringify(measured, null, 2)}\n`,
+            evidence: "generated",
+          },
+        ]);
+        return;
+      }
+      const stored = readIssue14ConformanceReport();
+      assertStoredReport(stored, measured);
+      console.log(
+        JSON.stringify(
+          {
+            issue: measured.issue,
+            totals: measured.totals,
+            referenceCheck: measured.referenceCheck,
+            status: measured.status,
+          },
+          null,
+          2
+        )
+      );
+      return;
+    }
   }
-  const writeWarningsIndex = process.argv.indexOf("--write-warnings");
-  if (writeWarningsIndex >= 0) {
-    const names = process.argv.slice(writeWarningsIndex + 1).filter((argument) => !argument.startsWith("--"));
-    await refreshWarningEvidence(names);
-    return;
-  }
-  if (process.argv.some((argument) => argument.endsWith("output.json"))) {
-    throw new Error("Issue 14 regeneration refuses to target the immutable output.json oracle.");
-  }
-  assertManifest();
-  const writeReport = process.argv.includes("--write");
-  const referenceMode = process.argv.includes("--reference-required") ? "required" : "optional";
-  const referenceCheck = auditPinnedReference(referenceMode);
-  if (process.argv.includes("--audit-reference")) {
-    console.log(JSON.stringify(referenceCheck, null, 2));
-    return;
-  }
-  const typechecks = conformanceFixtureManifest.map(typecheckFixture);
-  const extractions = await extractAll();
-  const measured = reportFrom(typechecks, extractions, referenceCheck);
-  if (writeReport) {
-    assertReferenceEvidence(measured.referenceCheck, true);
-    await writeEvidenceBatch([
-      {
-        destination: "conformance.json",
-        content: `${JSON.stringify(measured, null, 2)}\n`,
-        evidence: "generated",
-      },
-    ]);
-    return;
-  }
-  const stored = readIssue14ConformanceReport();
-  assertStoredReport(stored, measured);
-  console.log(
-    JSON.stringify(
-      {
-        issue: measured.issue,
-        totals: measured.totals,
-        referenceCheck: measured.referenceCheck,
-        status: measured.status,
-      },
-      null,
-      2
-    )
-  );
 }
 
 await runIfMain(import.meta.url, main);

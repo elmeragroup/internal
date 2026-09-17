@@ -4,6 +4,7 @@ import { isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import { readJson } from "./json.ts";
 
+/** A resolved release target: the checkout root, the package directory inside it, and its name. */
 export type ReleasePackage = {
   checkoutRoot: string;
   packageDirectory: string;
@@ -33,6 +34,10 @@ function isInsideCheckout(checkoutRoot: string, packageDirectory: string): boole
   return inside === "" || (!inside.startsWith(`..${sep}`) && inside !== ".." && !isAbsolute(inside));
 }
 
+/**
+ * Resolves a release target from caller-supplied paths. Throws when the checkout root is not a
+ * directory, the package directory escapes it, `package.json` is absent, or its `name` differs.
+ */
 export function resolveReleasePackage(
   checkoutRoot: string,
   packageDirectory: string,

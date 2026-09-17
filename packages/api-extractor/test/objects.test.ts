@@ -575,6 +575,12 @@ describe("synthesized properties and missing enums through a replacement backend
       expect.objectContaining({ ...warning, parsedSymbolStack: [fakeInputPath, "First"] }),
       expect.objectContaining({ ...warning, parsedSymbolStack: [fakeInputPath, "Second"] }),
     ]);
+    // The centrally rendered prose names the enum member, which the structured
+    // fields alone would not prove.
+    const enumMessage =
+      `Could not resolve enum "SharedMode" member "Unknown" at "${fakeInputPath}:7:3". ` +
+      "The extractor omitted it. Check that the enum declaration is included in the configured TypeScript project.";
+    expect(result.warnings.map((entry) => entry.message)).toEqual([enumMessage, enumMessage]);
     expect(facts.warnings).toEqual([warning]);
     expect(warning.parsedSymbolStack).toEqual([]);
     expect(Schema.decodeUnknownSync(ExtractionResultSchema)(result)).toEqual(result);

@@ -98,5 +98,19 @@ tester.run("elmera/no-rac-outside-quarantine", noRacOutsideQuarantine, {
 `,
       errors: [error],
     },
+    {
+      name: "a react-aria directory outside packages/ui is not the quarantine",
+      filename: "packages/site/src/react-aria/widget.ts",
+      code: `import { useFocusable } from "react-aria";
+`,
+      errors: [error],
+    },
+    {
+      name: "a bare src/react-aria path is not the quarantine without the package root",
+      filename: "src/react-aria/widget.ts",
+      code: `import { useFocusable } from "react-aria";
+`,
+      errors: [error],
+    },
   ],
 });

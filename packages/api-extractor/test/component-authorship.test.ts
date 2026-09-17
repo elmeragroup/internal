@@ -7,10 +7,9 @@ import type {
   BackendTypeNodeHandle,
 } from "../src/backend/contracts.ts";
 import { openTsgoProject } from "../src/backend/ts7/project.ts";
-import { defaultExtractorOptions } from "../src/options.ts";
 import { recoverAuthoredComponent } from "../src/parse/component-authorship.ts";
 import type { ResolverContext } from "../src/parse/contracts.ts";
-import { normalizeExternalTypeSelection } from "../src/parse/external-type-selection.ts";
+import { parseExtractorOptions } from "../src/parse/options.ts";
 import { extractFixture } from "./support/extract.ts";
 
 const fixtureDirectory = resolve(import.meta.dirname, "fixtures/component-authorship");
@@ -26,15 +25,11 @@ function authorshipContext(operations: BackendCompilerOperations): ResolverConte
     provenancePath: [],
     provenancePropertyContainer: "object",
     symbolStack: ["TripleWrapped"],
-    options: {
-      shouldResolveObject: defaultExtractorOptions.shouldResolveObject,
-    },
-    externalTypes: normalizeExternalTypeSelection(false),
+    options: parseExtractorOptions(),
     substitutions: new Map(),
     active: new Set(),
     propertyDepth: 0,
-    pureTypeExport: false,
-    authoredIntersectionMember: false,
+    exportRoot: undefined,
   };
 }
 
@@ -72,7 +67,7 @@ function propsTypeText(
 }
 
 describe("component authorship signature zip", () => {
-  it("keeps each wrapper overload's first parameter when an earlier signature has no declaration", async () => {
+  it("keeps each wrapper overload's props type when an earlier signature has no declaration", async () => {
     const extracted = await extractFixture({ tsconfigPath }, inputPath);
     const component = extracted.module.exports.find((entry) => entry.name === "TripleWrapped")?.type;
     expect(component).toMatchObject({
@@ -93,7 +88,7 @@ describe("component authorship signature zip", () => {
       if (symbol === undefined) throw new Error("Missing TripleWrapped export");
       const compiler = session.compiler;
       const baseline = recoverAuthoredComponent(symbol, authorshipContext(compiler));
-      expect(baseline.parameters.map((entry) => propsTypeText(compiler, entry.propsType))).toEqual([
+      expect(baseline.propNodes.map((node) => propsTypeText(compiler, node))).toEqual([
         "TextProps",
         "CountProps",
         "FlagProps",
@@ -101,10 +96,8 @@ describe("component authorship signature zip", () => {
 
       const compressed = omitFirstDeclarationWhenCompressed(compiler);
       const recovered = recoverAuthoredComponent(symbol, authorshipContext(compressed));
-      expect(recovered.parameters.map((entry) => entry.parameter.id)).toEqual(
-        baseline.parameters.map((entry) => entry.parameter.id)
-      );
-      expect(recovered.parameters.map((entry) => propsTypeText(compressed, entry.propsType))).toEqual([
+      expect(recovered.propNodes.map((node) => node.id)).toEqual(baseline.propNodes.map((node) => node.id));
+      expect(recovered.propNodes.map((node) => propsTypeText(compressed, node))).toEqual([
         "TextProps",
         "CountProps",
         "FlagProps",

@@ -10,7 +10,9 @@ import { ExtractWarningSchema } from "../src/warnings.ts";
 import type { ExtractWarning } from "../src/warnings.ts";
 import { pinnedTypeScript7Compiler } from "./fixture-catalog.ts";
 
+/** The package's fixture root. */
 export const fixtureDirectory = resolve(import.meta.dirname, "../test/fixtures");
+/** The package root; the base for workspace-relative paths. */
 export const packageDirectory = resolve(import.meta.dirname, "..");
 
 export { decodeJson, packageVersion, posixRelative, sha256File } from "./files.ts";
@@ -62,6 +64,7 @@ const TimingIpcStopConditionEvidenceSchema = Schema.Struct({
   evidence: EvidenceTextSchema,
 });
 
+/** The Issue 02 boundary timing report: its samples, stop conditions, and go/no-go decision. */
 export const TimingReportSchema = Schema.Struct({
   issue: Schema.Literal("02-prove-compiler-boundary"),
   command: Schema.String,
@@ -78,6 +81,7 @@ export const TimingReportSchema = Schema.Struct({
   decision: DecisionSchema,
 });
 
+/** One persisted Issue 02 timing report. */
 export type TimingReport = Schema.Schema.Type<typeof TimingReportSchema>;
 
 type NodeTimingCounters = {
@@ -85,6 +89,14 @@ type NodeTimingCounters = {
   readonly nodesMaterialized: number;
 };
 
+/**
+ * The boundary's fetch amplification: nodes fetched over IPC per node materialized.
+ *
+ * @param counters - The IPC node counters to compare.
+ * @returns `nodesFetched / nodesMaterialized`.
+ * @throws When either counter is non-finite, `nodesFetched` is negative, or the denominator
+ *   is not positive.
+ */
 export function fetchedToMaterializedRatio(counters: NodeTimingCounters): number {
   if (
     !Number.isFinite(counters.nodesFetched) ||
@@ -99,6 +111,33 @@ export function fetchedToMaterializedRatio(counters: NodeTimingCounters): number
   return counters.nodesFetched / counters.nodesMaterialized;
 }
 
+/** Whether a recorded duration or byte observation is finite and non-negative. */
+function isTimingObservation(value: number): boolean {
+  return Number.isFinite(value) && value >= 0;
+}
+
+/**
+ * Validates one measured or stored sample as an observation: the measurement
+ * ran, made at least one request, and every recorded duration and byte count is
+ * finite and non-negative. Live and stored samples share this predicate.
+ */
+export function assertTimingObservation(sample: TimingReport["samples"][number]): void {
+  const totals = sample.totals;
+  if (
+    !sample.enabled ||
+    !Number.isSafeInteger(totals.requestCount) ||
+    totals.requestCount <= 0 ||
+    !isTimingObservation(totals.roundTripMs) ||
+    !isTimingObservation(totals.serverTimeMs) ||
+    !isTimingObservation(totals.transportOverheadMs) ||
+    !isTimingObservation(totals.bytesSent) ||
+    !isTimingObservation(totals.bytesReceived)
+  ) {
+    throw new Error(`Timing observation is invalid for ${sample.fixture}.`);
+  }
+}
+
+/** Validates the recorded ratio against its counters and its budget metadata. */
 export function assertFetchedToMaterializedRatioEvidence(sample: TimingReport["samples"][number]): void {
   const expectedRatio = fetchedToMaterializedRatio(sample.totals);
   const reportedRatio = sample.fetchedToMaterializedRatio;
@@ -124,6 +163,7 @@ export function assertFetchedToMaterializedRatioEvidence(sample: TimingReport["s
   }
 }
 
+/** Asserts a sample's recorded ratio is coherent and within its budget ceiling. */
 export function assertFetchedToMaterializedRatioBudget(sample: TimingReport["samples"][number]): void {
   assertFetchedToMaterializedRatioEvidence(sample);
   const reportedRatio = sample.fetchedToMaterializedRatio;
@@ -135,6 +175,7 @@ export function assertFetchedToMaterializedRatioBudget(sample: TimingReport["sam
   }
 }
 
+/** Asserts a stored sample's request count is valid and within its budget ceiling. */
 export function assertRequestCountBudget(sample: TimingReport["samples"][number]): void {
   assertRequestCountCeiling({
     fixture: sample.fixture,
@@ -143,6 +184,10 @@ export function assertRequestCountBudget(sample: TimingReport["samples"][number]
   });
 }
 
+/**
+ * The bytes-received ceiling a budget allows, including its recorded path-length headroom.
+ * `bytesReceived` varies with checkout paths, so the headroom absorbs that variance.
+ */
 export function bytesReceivedCeiling(budget: {
   readonly maxBytesReceived: number;
   readonly bytesReceivedPathLengthHeadroom?: number;
@@ -158,6 +203,7 @@ export function isWithinIpcBudget(sample: TimingReport["samples"][number]): bool
   );
 }
 
+/** Asserts a stored sample's bytes received is valid and within its budget ceiling. */
 export function assertBytesReceivedBudget(sample: TimingReport["samples"][number]): void {
   assertBytesReceivedCeiling({
     fixture: sample.fixture,
@@ -166,6 +212,7 @@ export function assertBytesReceivedBudget(sample: TimingReport["samples"][number
   });
 }
 
+/** Asserts a request count is a positive integer and does not exceed its recorded ceiling. */
 export function assertRequestCountCeiling(evidence: {
   readonly fixture: string;
   readonly requestCount: number;
@@ -183,6 +230,7 @@ export function assertRequestCountCeiling(evidence: {
   }
 }
 
+/** Asserts a bytes-received observation is a non-negative integer within its ceiling. */
 export function assertBytesReceivedCeiling(evidence: {
   readonly fixture: string;
   readonly bytesReceived: number;
@@ -259,41 +307,64 @@ function isJsonObject(value: Schema.Json): value is Schema.JsonObject {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+/**
+ * Parses an already-decoded JSON value as a timing report.
+ *
+ * @param value - The decoded JSON to validate.
+ * @returns The report.
+ * @throws When the value does not match the report schema.
+ */
 export function decodeTimingReport(value: Schema.Json): TimingReport {
   return Schema.decodeUnknownSync(TimingReportSchema)(value);
 }
 
+/**
+ * Reads and validates one persisted timing report.
+ *
+ * @param path - The report file path.
+ * @returns The decoded report.
+ * @throws When the file is unreadable or invalid.
+ */
 export function readTimingReport(path: string): TimingReport {
   return decodeTimingReport(decodeJson(path));
 }
 
+/** The absolute path of one fixture's input file. */
 export function fixtureInputPath(definition: TimingFixture | SupplementalBoundaryFixture): string {
   return fixtureFile(definition.fixture, definition.file);
 }
 
+/** Reads and validates a fixture's selected module oracle. */
 export function readModuleOracle(definition: TimingFixture): ModuleNode {
   return Schema.decodeUnknownSync(ModuleNodeSchema)(
     decodeJson(fixtureFile(definition.fixture, definition.oracleFile))
   );
 }
 
+/** Reads and validates a fixture's warning oracle. */
 export function readWarningOracle(definition: TimingFixture): readonly ExtractWarning[] {
   return Schema.decodeUnknownSync(Schema.Array(ExtractWarningSchema))(
     decodeJson(fixtureFile(definition.fixture, definition.warningOracle))
   );
 }
 
+/**
+ * Normalizes one path for durable warning evidence: TypeScript library paths become
+ * `node_modules/typescript/lib/…`, workspace paths become package-relative, and anything
+ * outside the package becomes `external/…`, so oracle bytes do not depend on checkout location.
+ */
 export function stableWarningPath(filePath: string): string {
   const normalized = filePath.replaceAll("\\", "/");
-  const libMarker = "/lib/";
-  const libIndex = normalized.lastIndexOf(libMarker);
-  if (normalized.includes("/node_modules/") && libIndex >= 0) {
-    return `node_modules/typescript/lib/${normalized.slice(libIndex + libMarker.length)}`;
+  const typescriptLibMarker = "/node_modules/typescript/lib/";
+  const libIndex = normalized.lastIndexOf(typescriptLibMarker);
+  if (libIndex >= 0) {
+    return `node_modules/typescript/lib/${normalized.slice(libIndex + typescriptLibMarker.length)}`;
   }
   const workspaceRelative = posixRelative(packageDirectory, filePath);
   return workspaceRelative.startsWith("../") ? "external/" + workspaceRelative : workspaceRelative;
 }
 
+/** Rewrites each warning's paths and message through `stableWarningPath` for byte comparison. */
 export function normalizeWarnings(warnings: readonly ExtractWarning[]): readonly ExtractWarning[] {
   return warnings.map((warning) => {
     const normalizedFilePath = stableWarningPath(warning.filePath);
@@ -350,6 +421,7 @@ function differencePaths(
   return [...keys].flatMap((key) => differencePaths(left[key], right[key], `${path}/${key}`));
 }
 
+/** The sorted, de-duplicated JSON leaf paths at which two decoded values differ. */
 export function canonicalDifferencePaths(left: Schema.Json, right: Schema.Json): readonly string[] {
   return [...new Set(differencePaths(left, right))].sort();
 }
@@ -367,6 +439,14 @@ function readReactDivergenceArtifact(fixtureRoot = fixtureDirectory): ReactDiver
   );
 }
 
+/**
+ * Verifies the `base-ui-component` TS7 divergence record against the two oracles: the record
+ * must retain a nonzero upstream difference, and its count, digest, and optional paths must
+ * match the canonical difference exactly.
+ *
+ * @param fixtureRoot - The fixture root holding the oracles.
+ * @throws When the difference is empty or the record is stale, incomplete, or unexplained.
+ */
 export function assertReactDivergenceEvidence(fixtureRoot = fixtureDirectory): void {
   const artifact = readReactDivergenceArtifact(fixtureRoot);
   const upstream = decodeJson(fixtureFile("base-ui-component", "output.json", fixtureRoot));
@@ -431,10 +511,15 @@ export function assertTs7DivergenceEvidence(fixture: string, fixtureRoot = fixtu
   }
 }
 
+/** Reads and validates one named oracle file of a fixture as a module model. */
 export function readFixtureOracle(fixture: string, oracleFile: string): ModuleNode {
   return Schema.decodeUnknownSync(ModuleNodeSchema)(decodeJson(fixtureFile(fixture, oracleFile)));
 }
 
+/**
+ * Asserts a warning oracle file contains no host-dependent paths (absolute paths, drive
+ * letters, or pnpm store paths), so the evidence stays comparable across checkouts.
+ */
 export function assertStableWarningOracle(definition: TimingFixture): void {
   const source = readFileSync(fixtureFile(definition.fixture, definition.warningOracle), "utf8");
   if (
@@ -446,6 +531,15 @@ export function assertStableWarningOracle(definition: TimingFixture): void {
   }
 }
 
+/**
+ * Compares a live extraction against a fixture's reviewed module and warning oracles, after
+ * normalizing paths. Also re-checks the React divergence record for its fixture.
+ *
+ * @param definition - The fixture and oracle files to compare against.
+ * @param result - The live extraction result.
+ * @throws When the module or normalized warnings differ from the checked-in oracle, or the
+ *   warning oracle contains an unstable path.
+ */
 export function assertFixtureOracle(definition: TimingFixture, result: ExtractionResult): void {
   if (definition.fixture === "base-ui-component") assertReactDivergenceEvidence();
   if (JSON.stringify(result.module) !== JSON.stringify(readModuleOracle(definition))) {
@@ -459,6 +553,14 @@ export function assertFixtureOracle(definition: TimingFixture, result: Extractio
   }
 }
 
+/**
+ * Asserts a public-seam regression fixture still exports exactly its expected names, as
+ * objects, with no warnings.
+ *
+ * @param definition - The fixture and its expected export names.
+ * @param result - The live extraction result.
+ * @throws When the exports, their kinds, or the warning set changed.
+ */
 export function assertSupplementalFixture(
   definition: SupplementalBoundaryFixture,
   result: ExtractionResult

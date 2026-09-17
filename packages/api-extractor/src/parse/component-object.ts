@@ -1,9 +1,14 @@
 import type { BackendSymbolHandle, BackendTypeHandle } from "../backend/contracts.ts";
 import type { PropertyNode, SemanticType } from "../model.ts";
 import type { ProvenanceEntry } from "../provenance.ts";
-import { componentNode } from "./component.ts";
+import { componentNode, isComponentMemberName } from "./component.ts";
 import type { ResolveSemanticType, ResolverContext } from "./contracts.ts";
-import { declarationProvenance, propertyTypeNode, recordProvenance } from "./object-resolver.ts";
+import {
+  declarationProvenance,
+  memberTypeOf,
+  propertyTypeNode,
+  recordProvenance,
+} from "./object-resolver.ts";
 import { componentPropSemanticPathFromProvenancePath, objectPropertySemanticPath } from "./semantic-paths.ts";
 
 type Context = ResolverContext;
@@ -21,7 +26,12 @@ export function componentObjectNode(
   context: Context,
   resolve: ResolveSemanticType
 ): SemanticType | undefined {
-  if (context.provenancePath.length !== 1 || context.propertyDepth !== 0) return undefined;
+  // Only the export's own value is described by its members (`export const
+  // Menu = { Root, Item }`). Identity is sound because type handles are
+  // interned per session, and it says exactly what the old position heuristic
+  // approximated: a nested occurrence — a union arm included — is ordinary
+  // structure, never the anonymous module value.
+  if (type !== context.exportRoot) return undefined;
   const members = context.operations.propertiesOfType(type);
   if (members.length === 0) return undefined;
   const properties: PropertyNode[] = [];
@@ -42,9 +52,8 @@ function componentMember(
   provenance: ProvenanceEntry[]
 ): PropertyNode | undefined {
   const info = context.operations.symbolFacts(member);
-  if (!/^[A-Z]/u.test(info.name)) return undefined;
-  const memberType =
-    context.operations.propertyType(member) ?? context.operations.typeOfSymbol(member, false);
+  if (!isComponentMemberName(info.name)) return undefined;
+  const memberType = memberTypeOf(member, context.operations);
   if (memberType === undefined) return undefined;
   const memberPath = objectPropertySemanticPath(context.provenancePath, info.name);
   const memberProvenance: ProvenanceEntry[] = [];

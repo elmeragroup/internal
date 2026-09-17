@@ -2,6 +2,7 @@ import { createRuleTester } from "../rule-tester.js";
 import noFieldPartJsx from "./no-field-part-jsx.js";
 
 const tester = createRuleTester("tsx");
+/** @param {string} part */
 const error = (part) => ({ messageId: "fieldPart", data: { part } });
 const textField = "packages/ui/src/components/text-field/text-field.tsx";
 const checkbox = "packages/ui/src/components/checkbox/checkbox.tsx";

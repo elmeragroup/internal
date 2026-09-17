@@ -2,6 +2,7 @@ import { createRuleTester } from "../rule-tester.js";
 import restrictBrowserHelperCopy from "./restrict-browser-helper-copy.js";
 
 const tester = createRuleTester("tsx");
+/** @param {string} helper */
 const error = (helper) => ({ messageId: "localCopy", data: { helper } });
 const owner = "packages/ui/test/themed-browser-render.tsx";
 const suite = "packages/ui/src/components/show/show.browser.test.tsx";

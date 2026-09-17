@@ -1,12 +1,11 @@
 import { runIfMain } from "./cli.ts";
-import { fixtureEvidenceCatalog } from "./fixture-catalog.ts";
 import { packageFixtureExecutionPlan, packageFixtureTypecheckPlan } from "./fixture-plans.ts";
 
-/** Importing the catalog validates it; this reports what the derivation found. */
+/**
+ * Reports the derived fixture inventory. The catalog validates itself when it is derived, so
+ * this entry point only summarizes what it found.
+ */
 export function checkFixtureCatalog() {
-  if (packageFixtureExecutionPlan.length !== fixtureEvidenceCatalog.length) {
-    throw new Error("Package fixture execution plan is incomplete.");
-  }
   return {
     fixtures: packageFixtureExecutionPlan.length,
     conformance: packageFixtureExecutionPlan.filter((entry) => entry.conformance).length,

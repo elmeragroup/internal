@@ -209,14 +209,54 @@ undocumented?: string;
       allowedWarningCodes: ["unsupported-type-fallback"],
     });
     expect(result.diagnostics.some(({ warning }) => warning.code === "unsupported-type-fallback")).toBe(true);
-    expect(result.components[0]?.parts[0]?.props.map((prop) => prop.name)).toEqual(["label", "external"]);
-    expect(result.components[0]?.parts[0]?.props[1]).toMatchObject({
+    expect(result.components[0]?.parts[0]?.props.map((prop) => prop.name)).toEqual(["external", "label"]);
+    expect(result.components[0]?.parts[0]?.props[0]).toMatchObject({
       origin: { packageName: "fixture-dependency" },
       description: "External description.",
       defaultValue: "false",
       required: false,
     });
     expect(result.components[0]?.parts[0]?.forwardedCount).toBe(1);
+  });
+
+  it("fails with the typed error when a selected dependency prop has an unresolvable type", async () => {
+    const root = await fixture(`import type { ExternalProps } from "fixture-dependency";
+export type Props = ExternalProps & {
+/** Local label. */
+label: string;
+};
+export function Button(props: Props) { return props.label; }
+`);
+    const dependency = path.join(root, "node_modules/fixture-dependency");
+    await mkdir(dependency, { recursive: true });
+    await writeFile(
+      path.join(dependency, "package.json"),
+      JSON.stringify({ name: "fixture-dependency", version: "1.0.0", types: "index.d.ts" })
+    );
+    await writeFile(
+      path.join(dependency, "index.d.ts"),
+      `export type ExternalProps = {
+/** External description. */
+external?: MissingType;
+};`
+    );
+    const generation = generateApiArtifacts({
+      ...options(root),
+      components: [
+        {
+          slug: "button",
+          entryFile: "button.ts",
+          exportNames: ["Button"],
+          outputFile: "docs/button/api.json",
+        },
+      ],
+      includeExternalTypes: ["fixture-dependency"],
+    });
+    await expect(generation).rejects.toBeInstanceOf(ApiArtifactsError);
+    await expect(generation).rejects.toMatchObject({
+      _tag: "ApiArtifactsError",
+      problems: ["Button.external: selected dependency prop has an unresolvable type"],
+    });
   });
 
   it("classifies a client module when a trailing comment follows the directive", async () => {

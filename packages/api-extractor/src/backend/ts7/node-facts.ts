@@ -278,12 +278,6 @@ export function nodeFacts(
         isFunctionLikeDeclaration(node) && node.type !== undefined
           ? session.typeNodeHandle(node.type)
           : undefined,
-      heritageTypes:
-        isInterfaceDeclaration(node) || isClassDeclaration(node)
-          ? node.heritageClauses?.flatMap((clause) =>
-              clause.types.map((typeNode) => session.nodeReference(typeNode))
-            )
-          : undefined,
       declarationFlags: modifierFlags(node),
       ...definedFields({
         hasImplementationBody:

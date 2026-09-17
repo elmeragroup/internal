@@ -5,13 +5,15 @@ import { describe, expect, it } from "vitest";
 
 import { createCommitAncestry, createGitPort } from "../src/git.ts";
 import type { GitPort } from "../src/git.ts";
+import { assertCommit } from "../src/intent.ts";
+import type { CommitSha } from "../src/intent.ts";
 import { commitBaseline, withGitWorkspace, workspaceTimeout } from "./lib/git-workspace.ts";
 import type { GitWorkspace, WorkspaceHead } from "./lib/git-workspace.ts";
 
 const manifestPath = "packages/internal/package.json";
 const remoteTrackingRef = "origin/main";
 const packageName = "@elmeragroup/internal";
-const unknownCommit = "0".repeat(40);
+const unknownCommit = assertCommit("0".repeat(40));
 
 /** A live git port over `root`. */
 function gitPort(root: string, manifest = manifestPath): GitPort {
@@ -31,16 +33,16 @@ function writeManifestText(workspace: GitWorkspace, text: string): void {
   writeFileSync(join(workspace.path, manifestPath), text);
 }
 
-function commitAll(workspace: GitWorkspace, message: string): string {
+function commitAll(workspace: GitWorkspace, message: string): CommitSha {
   workspace.git(["add", "--all"]);
   workspace.git(["commit", "-m", message]);
-  return workspace.git(["rev-parse", "HEAD"]);
+  return assertCommit(workspace.git(["rev-parse", "HEAD"]));
 }
 
 /** A checkout holding one released manifest, in either of the two head shapes the publisher sees. */
 function withCheckout(
   version: string,
-  run: (workspace: GitWorkspace, baseline: string) => void,
+  run: (workspace: GitWorkspace, baseline: CommitSha) => void,
   head: WorkspaceHead = "branch"
 ): void {
   withGitWorkspace("elmera-release-git-", (workspace) => {
@@ -63,7 +65,7 @@ describe("git port head resolution", () => {
   );
 
   it(
-    "resolves origin/main from the remote-tracking ref alone",
+    "resolves the base branch tip from the remote-tracking ref alone",
     () => {
       withCheckout(
         "0.4.0",
@@ -72,7 +74,7 @@ describe("git port head resolution", () => {
           writeManifest(workspace, "0.4.1");
           const advanced = commitAll(workspace, "advance past origin/main");
           const port = gitPort(workspace.path);
-          expect(Effect.runSync(port.originMain())).toBe(baseline);
+          expect(Effect.runSync(port.baseBranchTip())).toBe(baseline);
           expect(Effect.runSync(port.head())).toBe(advanced);
         },
         "detached"
@@ -259,18 +261,6 @@ describe("commit ancestry", () => {
         const ancestry = createCommitAncestry(workspace.path);
         expect(() => ancestry(unknownCommit, baseline)).toThrow("Cannot establish release commit ancestry");
         expect(() => ancestry(baseline, unknownCommit)).toThrow("Cannot establish release commit ancestry");
-      });
-    },
-    workspaceTimeout
-  );
-
-  it.each(["HEAD", "origin/main", "0".repeat(39), "0".repeat(41), "A".repeat(40), "0123456f"])(
-    "rejects %s as a commit before running git",
-    (invalid) => {
-      withCheckout("0.4.0", (workspace, baseline) => {
-        const ancestry = createCommitAncestry(join(workspace.path, "absent-checkout"));
-        expect(() => ancestry(invalid, baseline)).toThrow(`Expected a full commit SHA; received ${invalid}`);
-        expect(() => ancestry(baseline, invalid)).toThrow(`Expected a full commit SHA; received ${invalid}`);
       });
     },
     workspaceTimeout

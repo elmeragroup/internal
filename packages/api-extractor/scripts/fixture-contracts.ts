@@ -41,7 +41,6 @@ export type TimingMetadata =
     };
 
 export type BoundaryTimingMetadata = Extract<TimingMetadata, { readonly plan: "issue02" }>;
-export type ConformanceTimingMetadata = Extract<TimingMetadata, { readonly plan: "issue14" }>;
 export type ExternalSelectionTimingMetadata = Extract<TimingMetadata, { readonly plan: "externalSelection" }>;
 
 export type FixtureEvidenceRecord = {
@@ -66,9 +65,6 @@ export type FixtureEvidenceRecord = {
     readonly compiler: typeof pinnedTypeScript7Compiler;
   };
 };
-
-/** Path-length slack for the boundary plan's small bytes-received budgets. */
-export const boundaryBytesReceivedPathLengthHeadroom = 32_768;
 
 type BoundaryBudget = Omit<BoundaryTimingMetadata, "plan" | "order"> & { readonly fixture: string };
 type ExternalSelectionBudget = Omit<ExternalSelectionTimingMetadata, "plan" | "order"> & {

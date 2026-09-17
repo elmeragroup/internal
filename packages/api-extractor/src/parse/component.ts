@@ -26,6 +26,7 @@ type ComponentRecognition =
   | { readonly outcome: "notAComponent" }
   | { readonly outcome: "uncertain"; readonly reason: "mixed-component-union" };
 
+/** The result of the component transform: the output type and what recognition decided. */
 export type ComponentTransformResult = {
   readonly type: SemanticType;
   readonly recognition: ComponentRecognition;
@@ -110,9 +111,24 @@ function passThrough(type: SemanticType, outcome: "notAComponent"): ComponentTra
   return { type, recognition: { outcome } };
 }
 
-/** Upstream's `isComponentExportName`: capitalized, or the default export. */
-function isComponentExportName(name: string): boolean {
+/**
+ * Upstream's `isComponentExportName`: capitalized, or the default export.
+ *
+ * @param name - The public export name.
+ * @returns Whether the name can identify a React component export.
+ */
+export function isComponentExportName(name: string): boolean {
   return /^[A-Z]/u.test(name) || name === "default";
+}
+
+/**
+ * A component's exported member object key: capitalized, never `default`.
+ *
+ * @param name - The member name.
+ * @returns Whether the name can identify a component declared as a member.
+ */
+export function isComponentMemberName(name: string): boolean {
+  return /^[A-Z]/u.test(name);
 }
 
 /**
@@ -249,6 +265,7 @@ function intersectionPropsEntries(
   return memberObjects.map((object) => [...object, ...uncovered]);
 }
 
+/** Wraps a type in a union with `undefined`, unless it already includes `undefined`. */
 export function addUndefined(type: SemanticType): SemanticType {
   if (
     type.kind === "union" &&

@@ -5,7 +5,10 @@ declare const backendHandleBrand: unique symbol;
 
 /**
  * Compiler entities never cross the backend boundary as compiler objects.
- * Handles are created and dereferenced by one extraction session only.
+ * Handles are created and dereferenced by one extraction session only, and are
+ * interned per session and kind, so identity equality between two handles is a
+ * supported semantic: the parser relies on it to recognize an export's own
+ * type (`object-resolver.ts`).
  */
 export type BackendHandle<Tag extends string> = {
   readonly [backendHandleBrand]: Tag;
@@ -14,11 +17,17 @@ export type BackendHandle<Tag extends string> = {
   readonly session: symbol;
 };
 
+/** An opaque handle to a checker symbol; valid only in the session that created it. */
 export type BackendSymbolHandle = BackendHandle<"symbol">;
+/** An opaque handle to a checker type; valid only in the session that created it. */
 export type BackendTypeHandle = BackendHandle<"type">;
+/** An opaque handle to a materialized declaration node; valid only in the session that created it. */
 export type BackendNodeHandle = BackendHandle<"node">;
+/** An opaque handle to a materialized type-syntax node; valid only in the session that created it. */
 export type BackendTypeNodeHandle = BackendHandle<"type-node">;
+/** An opaque handle to a signature; valid only in the session that created it. */
 export type BackendSignatureHandle = BackendHandle<"signature">;
+/** A declaration node or an authored type-syntax node, the two node kinds the parser resolves. */
 export type BackendNodeReference = BackendNodeHandle | BackendTypeNodeHandle;
 
 type BackendSymbolFlag = "alias" | "class" | "typeParameter" | "optional";
@@ -88,6 +97,7 @@ export type BackendTypeFacts = {
   readonly aliasTypeArguments?: readonly BackendTypeHandle[];
 };
 
+/** One normalized enum member: its public name, constant value, and declaration anchor. */
 export type BackendEnumMemberFacts = {
   readonly name: string;
   readonly value: string | number;
@@ -96,6 +106,7 @@ export type BackendEnumMemberFacts = {
   readonly documentation?: BackendDocumentation;
 };
 
+/** A normalized enum: its name, namespace chain, members, and recovery warnings. */
 export type BackendEnumFacts = {
   readonly name: string;
   readonly namespaces: readonly string[];
@@ -105,6 +116,12 @@ export type BackendEnumFacts = {
   readonly warnings?: readonly BackendWarningFact[];
 };
 
+/**
+ * Normalized identity and declaration anchors for a checker symbol.
+ *
+ * `declarations` may be empty for synthesized symbols; `repositoryRelativeDeclarationPaths`
+ * is present only when the backend can express the paths in the caller's repository.
+ */
 export type BackendSymbolFacts = {
   readonly name: string;
   readonly flags: readonly BackendSymbolFlag[];
@@ -171,6 +188,7 @@ export function externalTypeSelectionAllowsOwnership(
   );
 }
 
+/** The authored or checker-resolved public name of a type reference. */
 export type BackendTypeNameFacts = {
   readonly name: string;
   readonly namespaces: readonly string[];
@@ -188,6 +206,12 @@ export type BackendTypeNameFacts = {
   readonly builtInArray?: "Array" | "ReadonlyArray";
 };
 
+/**
+ * Normalized facts for one compiler node, used by the parser without compiler objects.
+ *
+ * Optional fields are present exactly for the kinds that carry them; callers must consult
+ * `kind` before reading a kind-specific field.
+ */
 export type BackendNodeFacts = {
   readonly kind:
     | "unknown"
@@ -265,7 +289,6 @@ export type BackendNodeFacts = {
   readonly mappedValueType?: BackendTypeNodeHandle;
   /** A mapped type's `as` clause, which renames keys away from the constraint. */
   readonly mappedNameType?: BackendTypeNodeHandle;
-  readonly heritageTypes?: readonly BackendNodeReference[];
   readonly declarationFlags?: readonly ("readonly" | "private" | "protected" | "static")[];
   /** Defaults authored on object-binding elements, normalized at the backend seam. */
   readonly bindingDefaults?: readonly BackendBindingDefaultFact[];
@@ -290,6 +313,7 @@ type BackendBindingDefaultFact = {
   readonly initializerText: string;
 };
 
+/** Normalized call, construct, or method signature: its parameters, return type, and declaration. */
 export type BackendSignatureFacts = {
   readonly parameters: readonly BackendSymbolHandle[];
   readonly returnType?: BackendTypeHandle;
@@ -297,6 +321,7 @@ export type BackendSignatureFacts = {
   readonly declaration?: BackendNodeHandle;
 };
 
+/** One index signature a type declares, including key domains the semantic model cannot carry. */
 export type BackendIndexSignatureFacts = {
   readonly keyName?: string;
   /**
@@ -310,13 +335,19 @@ export type BackendIndexSignatureFacts = {
   readonly declaration?: BackendNodeHandle;
 };
 
+/**
+ * One normalized module export before semantic resolution: the public name, the symbol it
+ * names, and the authored facts resolution needs.
+ */
 export type BackendExportDraft = {
   readonly name: string;
   readonly symbol: BackendSymbolHandle;
   readonly symbolStack?: readonly string[];
   readonly documentation?: BackendDocumentation;
   readonly declarationSourcePath?: string;
+  /** Whether the export is a type-only declaration (interface, alias, or enum). */
   readonly pureType?: boolean;
+  /** Whether a non-type-only statement introduced this name as a value. */
   readonly explicitValueReExport?: boolean;
   /** The original authored name of a renamed module re-export (`export { A as B }`). */
   readonly reexportedFrom?: string;
@@ -427,6 +458,7 @@ export function isInternalSymbolName(name: string): boolean {
   return name.startsWith("__");
 }
 
+/** Normalized JSDoc: its description, default, visibility, and remaining tags. */
 export type BackendDocumentation = {
   readonly description?: string;
   readonly defaultValue?: string;
@@ -434,6 +466,7 @@ export type BackendDocumentation = {
   readonly tags: readonly { readonly name: string; readonly value?: string }[];
 };
 
+/** One module's normalized export surface, ready for semantic resolution. */
 export type BackendModuleDraft = {
   readonly name: string;
   readonly exports: readonly BackendExportDraft[];
@@ -443,6 +476,10 @@ export type BackendModuleDraft = {
   readonly warnings?: readonly BackendWarningFact[];
 };
 
+/**
+ * One extraction's view of the compiler. Handles are valid only in the session that created
+ * them; `close` releases every session-owned resource and is idempotent.
+ */
 export type BackendExtractionSession = {
   /** Validates project membership and module-ness before returning normalized facts. */
   readonly readModule: (filePath: string) => BackendModuleDraft;
@@ -462,12 +499,14 @@ export type BackendExtractionOptions = {
   readonly componentSources?: boolean;
 };
 
+/** An opened compiler project: it owns its sessions and releases them all on `close`. */
 export type BackendProject = {
   readonly openExtraction: (options?: BackendExtractionOptions) => BackendExtractionSession;
   readonly getTimingInfo?: () => BackendTiming;
   readonly close: () => void;
 };
 
+/** The compiler path a module specifier resolved to. */
 export type BackendResolvedModule = { readonly filePath: string };
 
 type BackendTimingRequest = {
@@ -479,6 +518,14 @@ type BackendTimingRequest = {
   readonly transportOverheadMs?: number;
 };
 
+/**
+ * Compiler IPC timing either disabled or collected during one session.
+ *
+ * `totals.nodesMaterialized` counts materialized compiler nodes,
+ * `sourceFilesFetched` counts fetched source files, and `nodesFetched` counts nodes fetched over
+ * IPC; the fetched-to-materialized ratio is the dense-walk evidence the timing plans gate on,
+ * beside the request-count and byte ceilings.
+ */
 export type BackendTiming = {
   readonly enabled: boolean;
   readonly totals: {

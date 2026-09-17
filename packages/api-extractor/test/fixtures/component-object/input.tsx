@@ -41,3 +41,10 @@ export const mixed = {
 	Root: MenuRoot,
 	count: helper(),
 };
+
+/**
+ * A union at the export root is ordinary structure: only the export's own type
+ * is the anonymous module value, so an arm keeps its members as resolved
+ * functions instead of re-entering the object-of-components treatment.
+ */
+export const MenuUnion = Math.random() > 0.5 ? Menu : { Item: MenuItem };

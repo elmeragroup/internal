@@ -39,6 +39,16 @@ tester.run(
         code: 'const node = <svg {...(label ? { role: "img", "aria-label": label } : {})} />;',
         errors: [error],
       },
+      {
+        name: "an asserted empty object branch is still an empty object",
+        code: "const result = { ...(condition ? ({} as Record<string, string>) : { value }) };",
+        errors: [error],
+      },
+      {
+        name: "an asserted conditional is still a conditional",
+        code: "const result = { ...((condition ? {} : { value }) as Record<string, unknown>) };",
+        errors: [error],
+      },
     ],
   },
 );

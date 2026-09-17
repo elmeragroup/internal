@@ -12,6 +12,7 @@ import type {
   BackendSymbolOrigin,
 } from "../src/backend/contracts.ts";
 import { openTsgoProject } from "../src/backend/ts7/project.ts";
+import { parseExtractorOptions } from "../src/parse/options.ts";
 import { resolveModuleDraft } from "../src/parser.ts";
 import { extractFixture } from "./support/extract.ts";
 
@@ -499,7 +500,12 @@ describe("lazy TypeScript declaration handles", () => {
           kind: "dependency",
           packageName: "@fixture/selected",
         });
-        const result = resolveModuleDraft(session, { ...draft, exports: [entry] }, packageInputPath, options);
+        const result = resolveModuleDraft(
+          session,
+          { ...draft, exports: [entry] },
+          packageInputPath,
+          parseExtractorOptions(options)
+        );
         const beforeBodyRead = project.getTimingInfo?.().totals.nodesMaterialized;
         if (beforeBodyRead === undefined) throw new Error("Timing evidence is unavailable");
         const declarationText = session.compiler.nodeFacts(propertyDeclaration).text;
@@ -585,10 +591,15 @@ describe("lazy TypeScript declaration handles", () => {
         packageName: "@fixture/selected",
       });
 
-      const result = resolveModuleDraft(session, { ...draft, exports: [entry] }, packageInputPath, {
-        includeExternalTypes: true,
-        shouldResolveObject: ({ name }) => (name === "WrapperProps" ? false : undefined),
-      });
+      const result = resolveModuleDraft(
+        session,
+        { ...draft, exports: [entry] },
+        packageInputPath,
+        parseExtractorOptions({
+          includeExternalTypes: true,
+          shouldResolveObject: ({ name }) => (name === "WrapperProps" ? false : undefined),
+        })
+      );
       expect(result.module.exports[0]?.type).toEqual({
         kind: "object",
         typeName: { name: "WrapperProps" },

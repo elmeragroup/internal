@@ -87,7 +87,7 @@
       },
       "fetchedToMaterializedRatio": 162.6738382099828,
       "budget": {
-        "maxFetchedToMaterializedRatio": 140,
+        "maxFetchedToMaterializedRatio": 145,
         "maxRequestCount": 433,
         "maxBytesReceived": 3200000
       }

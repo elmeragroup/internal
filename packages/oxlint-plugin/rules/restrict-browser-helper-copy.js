@@ -2,6 +2,8 @@ import { defineRule } from "@oxlint/plugins";
 
 import { normalizeFilename } from "../filename-normalizer.js";
 
+/** @import { ESTree } from "@oxlint/plugins" */
+
 const HELPERS = new Set([
   "roleNamed",
   "headingNamed",
@@ -21,7 +23,7 @@ function isOwner(filename) {
 }
 
 /**
- * @param {import("estree").Node | null | undefined} id
+ * @param {ESTree.Node | null | undefined} id
  * @returns {string | null}
  */
 function helperName(id) {
@@ -44,7 +46,6 @@ export default defineRule({
     },
     schema: [],
   },
-  defaultOptions: [],
   createOnce(context) {
     let skipFile = false;
 
@@ -56,11 +57,15 @@ export default defineRule({
         if (skipFile) {
           return;
         }
-        const helper = helperName(node.id);
+        const id = node.id;
+        if (id === null) {
+          return;
+        }
+        const helper = helperName(id);
         if (helper === null) {
           return;
         }
-        context.report({ node: node.id, messageId: "localCopy", data: { helper } });
+        context.report({ node: id, messageId: "localCopy", data: { helper } });
       },
       VariableDeclarator(node) {
         if (skipFile) {

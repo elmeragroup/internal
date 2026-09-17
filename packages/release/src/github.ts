@@ -1,15 +1,30 @@
-import { Schema } from "effect";
+import { Brand, Redacted, Schema } from "effect";
 
 import { decodeJson } from "./json.ts";
 
+/** GitHub release identity; distinct from a release asset identity even though both are numbers. */
+export type ReleaseId = Brand.Branded<number, "ReleaseId">;
+
+/** Brands a decoded GitHub release id; the two id spaces are nominal, so they must not mix. */
+export const releaseId = Brand.nominal<ReleaseId>();
+
+/** GitHub release asset identity; distinct from a release identity even though both are numbers. */
+export type ReleaseAssetId = Brand.Branded<number, "ReleaseAssetId">;
+
+/** Brands a decoded GitHub release asset id; the two id spaces are nominal, so they must not mix. */
+export const releaseAssetId = Brand.nominal<ReleaseAssetId>();
+
+/** One asset attached to a GitHub release, as the API returns it. */
 export const GitHubReleaseAsset = Schema.Struct({
   name: Schema.String,
   id: Schema.Number,
   state: Schema.String,
   size: Schema.Number,
 });
+/** Decoded shape of {@link GitHubReleaseAsset}. */
 export type GitHubReleaseAsset = typeof GitHubReleaseAsset.Type;
 
+/** One GitHub release, as the API returns it; `body` carries the serialized intent. */
 export const GitHubRelease = Schema.Struct({
   id: Schema.Number,
   tag_name: Schema.String,
@@ -17,16 +32,20 @@ export const GitHubRelease = Schema.Struct({
   draft: Schema.optionalKey(Schema.Boolean),
   assets: Schema.Array(GitHubReleaseAsset),
 });
+/** Decoded shape of {@link GitHubRelease}. */
 export type GitHubRelease = typeof GitHubRelease.Type;
 
+/** A git ref lookup; release tags must resolve to a `commit` object. */
 export const GitHubTagRef = Schema.Struct({
   object: Schema.Struct({
     type: Schema.String,
     sha: Schema.String,
   }),
 });
+/** Decoded shape of {@link GitHubTagRef}. */
 export type GitHubTagRef = typeof GitHubTagRef.Type;
 
+/** The pull-request fields the stable gate reads to prove a release PR was merged. */
 export const GitHubPullRequest = Schema.Struct({
   merged_at: Schema.NullOr(Schema.String),
   merge_commit_sha: Schema.NullOr(Schema.String),
@@ -40,8 +59,10 @@ export const GitHubPullRequest = Schema.Struct({
     ref: Schema.String,
   }),
 });
+/** Decoded shape of {@link GitHubPullRequest}. */
 export type GitHubPullRequest = typeof GitHubPullRequest.Type;
 
+/** Request options for one GitHub call; `allow404` is added by the requester overload. */
 export type GitHubRequest = {
   method?: string;
   body?: string | Blob;
@@ -66,7 +87,7 @@ export type GitHubClient = {
 /** Repository and credentials shared by every production port; `fetch` is the injectable transport. */
 export type ReleaseEnvironment = {
   repository: string;
-  token: string;
+  token: Redacted.Redacted<string>;
   fetch: typeof fetch;
 };
 
@@ -74,13 +95,19 @@ export type ReleaseEnvironment = {
 export function releaseEnvironment(): ReleaseEnvironment {
   return {
     repository: process.env.GITHUB_REPOSITORY ?? "",
-    token: process.env.GH_TOKEN ?? "",
+    token: Redacted.make(process.env.GH_TOKEN ?? ""),
     fetch: (input, init) => globalThis.fetch(input, init),
   };
 }
 
+/**
+ * Builds the authenticated GitHub transport. Throws when the repository does not look like
+ * `owner/name` or the token is empty; non-2xx responses fail with the method, status, and URL.
+ */
 export function createGitHubClient(environment: ReleaseEnvironment): GitHubClient {
-  const { repository, token, fetch: fetcher } = environment;
+  const { repository, fetch: fetcher } = environment;
+  // The token is unwrapped here and only reaches the Authorization header of this client.
+  const token = Redacted.value(environment.token);
   if (!/^[\w.-]+\/[\w.-]+$/.test(repository) || token === "")
     throw new Error("GitHub repository and token are required");
 

@@ -1,6 +1,9 @@
 import { defineRule } from "@oxlint/plugins";
 
+import { classTokens } from "../class-tokens.js";
 import { extractStrings, isNamedCall } from "../extract-strings.js";
+
+/** @import { ESTree } from "@oxlint/plugins" */
 
 const CONTROL_VAR_RE = /--control-(?:h|px-icon|px|gap)-|--control-(?:text|leading)\b/;
 
@@ -63,9 +66,9 @@ const BUTTON_SIZE_KEYS = new Set([
 ]);
 
 /**
- * @param {import("estree").ObjectExpression} obj
+ * @param {ESTree.ObjectExpression} obj
  * @param {string} name
- * @returns {import("estree").Node | null}
+ * @returns {ESTree.Node | null}
  */
 function objectPropValue(obj, name) {
   for (const prop of obj.properties) {
@@ -78,7 +81,7 @@ function objectPropValue(obj, name) {
 }
 
 /**
- * @param {import("estree").Property} prop
+ * @param {ESTree.ObjectProperty} prop
  * @returns {string | null}
  */
 function propertyName(prop) {
@@ -269,13 +272,6 @@ function isControlBoxHeightClass(className) {
 }
 
 /**
- * @param {string} utility
- */
-function isOpticalArbitrary(utility) {
-  return /^(?:h|w|size|min-h|min-w|px|pl|pr|ps|pe|gap(?:-[xy])?)-\[\d+(?:\.\d+)?px\]$/.test(utility);
-}
-
-/**
  * @param {string} className
  */
 function isDataSizeToken(className) {
@@ -292,10 +288,11 @@ function densityOwnedFamily(className, checkType) {
   const utility = stripImportant(stripVariantPrefixes(className));
   if (!utility) return null;
   if (readsDensityVariable(utility)) return null;
-  // Token reads (any custom property) and arbitrary values are not the numeric ladder.
+  // Token reads (any custom property) and arbitrary values are not the numeric
+  // ladder. The blanket arbitrary-value guard also covers optical pixel tracks
+  // such as `h-[18.4px]`, so no narrower optical-value check is needed.
   if (/\(--[\w-]+\)/.test(utility) || /var\(--/.test(utility)) return null;
   if (/^(?:h|w|size|min-h|min-w|px|pl|pr|ps|pe|gap(?:-[xy])?)-\[/.test(utility)) return null;
-  if (isOpticalArbitrary(utility)) return null;
   const box = boxFamily(utility);
   if (box) return box;
   if (!checkType) return null;
@@ -303,18 +300,10 @@ function densityOwnedFamily(className, checkType) {
 }
 
 /**
- * @param {string} str
- * @returns {string[]}
- */
-function classTokens(str) {
-  return str.split(/\s+/).filter(Boolean);
-}
-
-/**
  * Class tokens from a tv/cn/record arm, excluding `data-[size=…]` tokens
  * which are reported from the literal/template visitors instead.
  *
- * @param {import("estree").Node | null | undefined} node
+ * @param {ESTree.Node | null | undefined} node
  * @returns {string[]}
  */
 function recipeTokens(node) {
@@ -324,7 +313,7 @@ function recipeTokens(node) {
 }
 
 /**
- * @param {import("estree").Node | null | undefined} node
+ * @param {ESTree.Node | null | undefined} node
  * @param {string} name
  */
 function isInsideNamedCall(node, name) {
@@ -358,11 +347,11 @@ function checkTypeForTokens(tokens) {
 }
 
 /**
- * @param {import("estree").ObjectExpression} obj
- * @returns {Array<{ key: string; value: import("estree").Node }> | null}
+ * @param {ESTree.ObjectExpression} obj
+ * @returns {Array<{ key: string; value: ESTree.Node }> | null}
  */
 function recordArms(obj) {
-  /** @type {Array<{ key: string; value: import("estree").Node }>} */
+  /** @type {Array<{ key: string; value: ESTree.Node }>} */
   const arms = [];
   for (const prop of obj.properties) {
     if (prop.type !== "Property") return null;
@@ -374,12 +363,37 @@ function recordArms(obj) {
 }
 
 /**
- * @param {import("estree").ObjectExpression} obj
+ * @param {ESTree.ObjectExpression} obj
  */
 function isButtonSizeKeyedRecord(obj) {
   const arms = recordArms(obj);
   if (arms === null || arms.length === 0) return false;
   return arms.every((arm) => BUTTON_SIZE_KEYS.has(arm.key));
+}
+
+/**
+ * Whether the file pins `--control-h-` in real code rather than in a comment.
+ * Comments document the pin (`field box pins h-(--control-h-md)`), and treating
+ * a documentation mention as a pin would switch the file-wide `cn()` and
+ * Button-size record checks on for files that never read the variable.
+ *
+ * @param {{ getText: () => string, getAllComments: () => ReadonlyArray<{ start: number, end: number }> }} sourceCode - The rule's source-code accessor.
+ * @returns {boolean} `true` when a non-comment `--control-h-` occurrence exists.
+ */
+function hasControlHeightPin(sourceCode) {
+  const text = sourceCode.getText();
+  if (!text.includes("--control-h-")) return false;
+
+  // `getAllComments` returns comments in source order, so one forward pass
+  // drops every comment range from the raw text.
+  let code = "";
+  let cursor = 0;
+  for (const comment of sourceCode.getAllComments()) {
+    code += text.slice(cursor, comment.start);
+    cursor = comment.end;
+  }
+  code += text.slice(cursor);
+  return code.includes("--control-h-");
 }
 
 export default defineRule({
@@ -395,12 +409,11 @@ export default defineRule({
     },
     schema: [],
   },
-  defaultOptions: [],
   createOnce(context) {
     let fileHasControlH = false;
 
     /**
-     * @param {import("estree").Node} node
+     * @param {ESTree.Node} node
      * @param {string[]} tokens
      * @param {boolean} checkType
      */
@@ -417,7 +430,7 @@ export default defineRule({
     }
 
     /**
-     * @param {import("estree").Node} node
+     * @param {ESTree.Node} node
      * @param {string} value
      */
     function reportDataSizeLiterals(node, value) {
@@ -425,7 +438,7 @@ export default defineRule({
     }
 
     /**
-     * @param {import("estree").CallExpression} node
+     * @param {ESTree.CallExpression} node
      */
     function reportCnLiterals(node) {
       if (isInsideNamedCall(node, "tv")) return;
@@ -435,7 +448,7 @@ export default defineRule({
     }
 
     /**
-     * @param {import("estree").ObjectExpression} recipe
+     * @param {ESTree.ObjectExpression} recipe
      */
     function reportTvSlots(recipe) {
       const slots = objectPropValue(recipe, "slots");
@@ -451,7 +464,7 @@ export default defineRule({
     }
 
     /**
-     * @param {import("estree").ObjectExpression} node
+     * @param {ESTree.ObjectExpression} node
      */
     function reportSizeKeyedRecord(node) {
       if (isInsideNamedCall(node, "tv")) return;
@@ -478,7 +491,7 @@ export default defineRule({
 
     return {
       Program() {
-        fileHasControlH = context.sourceCode.getText().includes("--control-h-");
+        fileHasControlH = hasControlHeightPin(context.sourceCode);
       },
       Literal(node) {
         if (typeof node.value === "string") {
@@ -503,7 +516,7 @@ export default defineRule({
         if (!isNamedCall(node.callee, "tv")) return;
         if (node.arguments.length === 0) return;
         const recipe = node.arguments[0];
-        if (recipe.type !== "ObjectExpression") return;
+        if (recipe?.type !== "ObjectExpression") return;
         const variants = objectPropValue(recipe, "variants");
         const size = variants?.type === "ObjectExpression" ? objectPropValue(variants, "size") : null;
 
@@ -524,7 +537,7 @@ export default defineRule({
           // on a `box` axis (field-box's control/content height model). Decorative
           // variant axes (e.g. media image sizes) are not density rungs, so only
           // base and the `box` axis are scanned.
-          /** @type {Array<{ node: import("estree").Node; tokens: string[] }>} */
+          /** @type {Array<{ node: ESTree.Node; tokens: string[] }>} */
           const groups = [];
           const base = objectPropValue(recipe, "base");
           if (base) {

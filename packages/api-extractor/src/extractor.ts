@@ -17,28 +17,64 @@ import { ExtractionResultSchema } from "./model.ts";
 import { definedFields } from "./optional-fields.ts";
 import type { ExtractorOptions, OpenProjectOptions } from "./options.ts";
 import { inspectRequestedComponentSources } from "./parse/component-source.ts";
-import { normalizeExternalTypeSelection } from "./parse/external-type-selection.ts";
+import { parseExtractorOptions } from "./parse/options.ts";
+import type { ResolvedExtractorOptions } from "./parse/options.ts";
 import { ResolverFailure } from "./parse/resolver-failure.ts";
 import { readModuleDraft, resolveModuleDraft } from "./parser.ts";
 
+/** One extracted module: its semantic model, warnings, and provenance. */
 export type ExtractionResult = typeof ExtractionResultSchema.Type;
 
 type ExtractionErrors = BackendError | FileNotInProgramError | ExtractError;
 
+/**
+ * The package's extraction service: it owns the semantic model and never exposes compiler
+ * objects.
+ */
 export type ProjectExtractorService = {
+  /**
+   * Extracts one file that belongs to the configured project.
+   *
+   * @param filePath - The file to extract.
+   * @param options - Per-extraction options; every field has a documented default.
+   * @returns An effect that succeeds with the module model, warnings, and provenance, or fails
+   *   with a typed `BackendError`, `FileNotInProgramError`, or `ExtractError`.
+   */
   readonly extractModule: (
     filePath: string,
     options?: ExtractorOptions
   ) => Effect.Effect<ExtractionResult, ExtractionErrors>;
+  /**
+   * Recovers authored implementation sources and destructuring defaults for requested
+   * components, without running semantic extraction.
+   *
+   * @param filePath - The project file holding the requested values.
+   * @param requests - One request per source to recover; an empty list returns immediately.
+   * @returns One result per request, in request order.
+   */
   readonly inspectComponentSources: (
     filePath: string,
     requests: readonly ComponentSourceRequest[]
   ) => Effect.Effect<readonly ComponentSourceResult[], ExtractionErrors>;
 };
 
+/**
+ * The public extraction service tag.
+ *
+ * Build it once per project with `live`; the layer owns the native compiler process for the
+ * caller's scope, so reuse one service for every file in the same project.
+ */
 export class ProjectExtractor extends Context.Service<ProjectExtractor, ProjectExtractorService>()(
   "elmera/api-extractor/ProjectExtractor"
 ) {
+  /**
+   * Builds the live service for one TypeScript project.
+   *
+   * @param options - The tsconfig path plus optional cwd and filesystem seams.
+   * @returns A scoped layer that opens the project when provided and closes it on release. Its
+   *   error channel carries a `ConfigError` for invalid configuration and a `BackendError` when
+   *   the compiler cannot start the project.
+   */
   static live(options: OpenProjectOptions): Layer.Layer<ProjectExtractor, ConfigError | BackendError> {
     return projectExtractorLayer(options).pipe(Layer.provide(CompilerBackend.layer));
   }
@@ -98,14 +134,14 @@ export function projectExtractorLayerWithTiming(
 
 function openExtraction(
   project: BackendProject,
-  options: ExtractorOptions | undefined,
+  externalTypes: ResolvedExtractorOptions["externalTypes"],
   componentSources = false
 ) {
   return Effect.acquireRelease(
     Effect.try({
       try: () =>
         project.openExtraction({
-          externalTypes: normalizeExternalTypeSelection(options?.includeExternalTypes ?? false),
+          externalTypes,
           ...definedFields({ componentSources: componentSources ? true : undefined }),
         }),
       catch: (cause) => classifyThrown(cause, { filePath: "<session>", operation: "openExtraction" }),
@@ -119,7 +155,10 @@ const inspectComponentSources = Effect.fn("ProjectExtractor.inspectComponentSour
   filePath: string,
   requests: readonly ComponentSourceRequest[]
 ) {
-  const session = guardedExtractionSession(yield* openExtraction(project, undefined, true), filePath);
+  const session = guardedExtractionSession(
+    yield* openExtraction(project, parseExtractorOptions().externalTypes, true),
+    filePath
+  );
   const draft = yield* Effect.try({
     try: () => readModuleDraft(session, filePath),
     catch: (cause) => classifyThrown(cause, { filePath, operation: "readModule" }),
@@ -141,13 +180,17 @@ const extractModule = Effect.fn("ProjectExtractor.extractModule")(function* (
   filePath: string,
   options: ExtractorOptions | undefined
 ) {
-  const session = guardedExtractionSession(yield* openExtraction(project, options), filePath);
+  const parsedOptions = parseExtractorOptions(options);
+  const session = guardedExtractionSession(
+    yield* openExtraction(project, parsedOptions.externalTypes),
+    filePath
+  );
   const draft = yield* Effect.try({
     try: () => readModuleDraft(session, filePath),
     catch: (cause) => classifyThrown(cause, { filePath, operation: "readModule" }),
   });
   const resolved = yield* Effect.try({
-    try: () => resolveModuleDraft(session, draft, filePath, options),
+    try: () => resolveModuleDraft(session, draft, filePath, parsedOptions),
     catch: (cause) => classifyThrown(cause, { filePath, operation: "resolveModule", fallback: "extract" }),
   });
   // The resolver violating its own schema is a bug, not user input.

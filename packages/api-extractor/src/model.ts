@@ -18,12 +18,16 @@ export const intrinsicNames = [
   "void",
 ] as const;
 
+/** One entry of `intrinsicNames`. */
 export type IntrinsicName = (typeof intrinsicNames)[number];
 
+/** The public name of a type reference: its name, namespace chain, and resolved type arguments. */
 export type TypeName = typeof TypeNameSchema.Type;
 
+/** One resolved type argument of a `TypeName`. */
 export type TypeArgument = {
   readonly type: SemanticType;
+  /** Whether the argument equals the referenced type parameter's declared default. */
   readonly equalToDefault: boolean;
 };
 
@@ -31,6 +35,7 @@ const DocumentationTagSchema = Schema.Struct({
   name: Schema.String,
   value: Schema.optionalKey(Schema.String),
 });
+/** One additional JSDoc tag beyond description, default value, and visibility. */
 export type DocumentationTag = typeof DocumentationTagSchema.Type;
 
 const DocumentationSchema = Schema.Struct({
@@ -39,22 +44,27 @@ const DocumentationSchema = Schema.Struct({
   visibility: Schema.optionalKey(Schema.Literals(["public", "private", "internal"] as const)),
   tags: Schema.Array(DocumentationTagSchema),
 });
+/** Normalized documentation attached to a model node. */
 export type Documentation = typeof DocumentationSchema.Type;
 
+/** A TypeScript intrinsic type such as `string`, `never`, or `unknown`. */
 export type IntrinsicNode = {
   readonly kind: "intrinsic";
   readonly typeName?: TypeName;
   readonly intrinsic: IntrinsicName;
 };
 
+/** One call or construct signature parameter. */
 export type ParameterNode = {
   readonly type: SemanticType;
   readonly name: string;
   readonly documentation?: Documentation;
   readonly optional: boolean;
+  /** The parameter's rendered default initializer, when it has one. */
   readonly defaultValue?: string;
 };
 
+/** A generic parameter of a signature, with its constraint and default when declared. */
 export type TypeParameterNode = {
   readonly name: string;
   readonly constraint?: SemanticType;
@@ -62,18 +72,21 @@ export type TypeParameterNode = {
   readonly kind: "typeParameter";
 };
 
+/** One call signature: its parameters, generic parameters, and return type. */
 export type CallSignatureNode = {
   readonly parameters: readonly ParameterNode[];
   readonly returnValueType: SemanticType;
   readonly typeParameters?: readonly TypeParameterNode[];
 };
 
+/** A callable shape; each call signature is a distinct call form. */
 export type FunctionNode = {
   readonly kind: "function";
   readonly typeName?: TypeName;
   readonly callSignatures: readonly CallSignatureNode[];
 };
 
+/** One named member of an object, component, or class. */
 export type PropertyNode = {
   readonly name: string;
   readonly type: SemanticType;
@@ -81,12 +94,14 @@ export type PropertyNode = {
   readonly optional: boolean;
 };
 
+/** The single index signature the model can carry. */
 export type IndexSignatureNode = {
   readonly keyName?: string;
   readonly keyType: "string" | "number";
   readonly valueType: SemanticType;
 };
 
+/** An object shape with named properties and at most one index signature. */
 export type ObjectNode = {
   readonly kind: "object";
   readonly typeName?: TypeName;
@@ -95,23 +110,27 @@ export type ObjectNode = {
   readonly indexSignature?: IndexSignatureNode;
 };
 
+/** A recognizable React component: its merged public props. */
 export type ComponentNode = {
   readonly kind: "component";
   readonly typeName?: TypeName;
   readonly props: readonly PropertyNode[];
 };
 
+/** A reference to a type the extractor did not expand: only its public name is reported. */
 export type ExternalTypeNode = {
   readonly kind: "external";
   readonly typeName: TypeName;
 };
 
+/** A union of member types, ordered as the model canonicalizes it. */
 export type UnionNode = {
   readonly kind: "union";
   readonly typeName?: TypeName;
   readonly types: readonly SemanticType[];
 };
 
+/** An intersection, with both its member types and the checker's merged property view. */
 export type IntersectionNode = {
   readonly kind: "intersection";
   readonly typeName?: TypeName;
@@ -119,8 +138,14 @@ export type IntersectionNode = {
   readonly properties: readonly PropertyNode[];
 };
 
+/**
+ * How a preserved type operator resolved its key set: `exact` from the operand itself,
+ * `baseConstraint` from the operand's constraint, or `fallback` when neither produced a
+ * representable key set.
+ */
 export type TypeOperatorResolutionKind = "exact" | "baseConstraint" | "fallback";
 
+/** A preserved `keyof` operator carrying both the authored operand and the resolved key set. */
 export type TypeOperatorNode = {
   readonly kind: "typeOperator";
   readonly typeName?: TypeName;
@@ -131,6 +156,7 @@ export type TypeOperatorNode = {
   readonly resolutionKind: TypeOperatorResolutionKind;
 };
 
+/** A string, number, or boolean literal; booleans are stored as their rendered text. */
 export type LiteralNode = {
   readonly kind: "literal";
   readonly typeName?: TypeName;
@@ -138,12 +164,14 @@ export type LiteralNode = {
   readonly documentation?: Documentation;
 };
 
+/** One enum member. */
 export type EnumMember = {
   readonly name: string;
   readonly value: string | number;
   readonly documentation?: Documentation;
 };
 
+/** An enum with its constant members. */
 export type EnumNode = {
   readonly kind: "enum";
   readonly typeName: TypeName;
@@ -151,6 +179,7 @@ export type EnumNode = {
   readonly documentation?: Documentation;
 };
 
+/** An array container; members hang below `elementType` in the path grammar. */
 export type ArrayNode = {
   readonly kind: "array";
   readonly typeName?: TypeName;
@@ -158,6 +187,7 @@ export type ArrayNode = {
   readonly isReadonly?: true;
 };
 
+/** A tuple container; members hang below `types` in the path grammar. */
 export type TupleNode = {
   readonly kind: "tuple";
   readonly typeName?: TypeName;
@@ -165,21 +195,25 @@ export type TupleNode = {
   readonly isReadonly?: true;
 };
 
+/** A `typeof` query, stored verbatim as the authored expression name. */
 export type TypeQueryNode = {
   readonly kind: "typeQuery";
   readonly expressionName: string;
 };
 
+/** A class member property, with the modifier facts the model publishes. */
 export type ClassProperty = PropertyNode & {
   readonly readonly: boolean;
   readonly isStatic?: boolean;
 };
 
+/** One class construct signature. */
 export type ConstructSignatureNode = {
   readonly parameters: readonly ParameterNode[];
   readonly documentation?: Documentation;
 };
 
+/** One class method, with every overload's call signature. */
 export type ClassMethod = {
   readonly name: string;
   readonly documentation?: Documentation;
@@ -187,6 +221,7 @@ export type ClassMethod = {
   readonly callSignatures: readonly CallSignatureNode[];
 };
 
+/** A class: its construct signatures, properties, methods, and declared type parameter names. */
 export type ClassNode = {
   readonly kind: "class";
   readonly typeName?: TypeName;
@@ -196,6 +231,7 @@ export type ClassNode = {
   readonly typeParameters?: readonly TypeName[];
 };
 
+/** Every semantic node the model can resolve a TypeScript type to. */
 export type SemanticType =
   | ArrayNode
   | ClassNode
@@ -382,6 +418,7 @@ const ClassNodeSchema: Schema.Codec<ClassNode> = Schema.Struct({
   typeParameters: Schema.optionalKey(Schema.Array(TypeNameSchema)),
 });
 
+/** Schema for `SemanticType`, discriminated by `kind` (and container shape). */
 export const SemanticTypeSchema: Schema.Codec<SemanticType> = Schema.Union([
   ArrayNodeSchema,
   ClassNodeSchema,
@@ -415,15 +452,19 @@ const ExportNodeSchema = Schema.Struct({
   ),
 });
 
+/** One public export of a module: its name, resolved type, and authored facts. */
 export type ExportNode = typeof ExportNodeSchema.Type;
 
+/** Schema for `ModuleNode`: a module name, its exports in public order, and its imports. */
 export const ModuleNodeSchema = Schema.Struct({
   name: Schema.String,
   exports: Schema.Array(ExportNodeSchema),
   imports: Schema.optionalKey(Schema.Array(Schema.String)),
 });
+/** One module's public API surface. */
 export type ModuleNode = typeof ModuleNodeSchema.Type;
 
+/** Schema for one extraction result: the module model, warnings, and provenance sidecar. */
 export const ExtractionResultSchema = Schema.Struct({
   module: ModuleNodeSchema,
   warnings: Schema.Array(ExtractWarningSchema),

@@ -9,6 +9,7 @@ import { lift } from "./errors.ts";
 import type { ReleaseError } from "./errors.ts";
 import { readJson } from "./json.ts";
 import { assertStableReleaseVersion, nextPatchVersion } from "./version.ts";
+import type { StableVersion } from "./version.ts";
 
 // The plan file lives inside the ignored scratch directory.
 const planFileName = ".artifacts/changeset-release-plan.json";
@@ -34,6 +35,10 @@ function changesetBin(checkoutRoot: string): string {
   return createRequire(resolve(checkoutRoot, "package.json")).resolve("@changesets/cli/bin.js");
 }
 
+/**
+ * Reads the Changesets base branch from the consuming checkout. Throws when the config is absent,
+ * invalid, or names a local branch instead of a remote-tracking `origin/<branch>` ref.
+ */
 export function changesetBaseBranch(checkoutRoot: string): string {
   const base = readJson(resolve(checkoutRoot, ".changeset/config.json"), ChangesetConfig).baseBranch;
   if (!base.startsWith("origin/")) {
@@ -64,6 +69,7 @@ export function readReleasePlan(checkoutRoot: string): readonly PlannedRelease[]
   try {
     execFileSync(process.execPath, [changesetBin(checkoutRoot), "status", "--output", planPath], {
       cwd: checkoutRoot,
+      encoding: "utf8",
       stdio: "pipe",
     });
     return readJson(planPath, ChangesetPlan).releases;
@@ -79,10 +85,10 @@ export function readReleasePlan(checkoutRoot: string): readonly PlannedRelease[]
 
 /** The stable version a fresh canary counts up from: the planned release, else the next patch. */
 export function plannedCanaryBase(
-  current: string,
+  current: StableVersion,
   packageName: string,
   checkoutRoot: string
-): Effect.Effect<string, ReleaseError> {
+): Effect.Effect<StableVersion, ReleaseError> {
   return lift(() => {
     const planned = readReleasePlan(checkoutRoot).filter(
       (release) => release.name === packageName && release.type !== "none"

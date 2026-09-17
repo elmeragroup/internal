@@ -2,6 +2,6 @@ import { Effect } from "effect";
 
 import { checkReleasePr } from "@elmeragroup/release";
 
-import { releasePackage } from "./release.ts";
+import { releaseLayout } from "./release.ts";
 
-await Effect.runPromise(checkReleasePr(releasePackage));
+await Effect.runPromise(checkReleasePr(releaseLayout()));

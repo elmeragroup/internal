@@ -15,10 +15,10 @@ import { describe, expect, it } from "vitest";
 
 import { verifyReleaseArchive } from "../src/archive.ts";
 import type { ReleaseIntent } from "../src/intent.ts";
+import { commit, releaseIntent } from "./lib/release-fixtures.ts";
 
-const commit = "a".repeat(40);
 const packageName = "@acme/app";
-const intent: ReleaseIntent = { channel: "canary", version: "0.2.0-canary.1", commit };
+const intent: ReleaseIntent = releaseIntent("0.2.0-canary.1");
 
 type TestManifest = {
   name: string;

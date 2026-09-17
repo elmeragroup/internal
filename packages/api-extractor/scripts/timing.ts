@@ -1,7 +1,7 @@
 /**
  * Timing evidence entry point.
  *
- *   node scripts/timing.ts --plan issue02 [--check|--write]
+ *   node scripts/timing.ts --plan issue02 [--check]
  *   node scripts/timing.ts --plan issue14 [--check|--check-portability|--write]
  *   node scripts/timing.ts --plan externalSelection [--check]
  *
@@ -51,8 +51,9 @@ async function main(): Promise<void> {
   const { plan, mode } = parseArguments(process.argv.slice(2));
   switch (plan) {
     case "issue02":
-      if (mode === "--check-portability") throw new Error("The issue02 plan has no portability mode.");
-      await runIssue02Timing(mode === "--write" ? "write" : "check");
+      if (mode !== "--check")
+        throw new Error("The issue02 plan only supports --check; its baseline is immutable.");
+      await runIssue02Timing();
       return;
     case "issue14":
       await runIssue14Timing(
@@ -67,6 +68,11 @@ async function main(): Promise<void> {
       if (mode !== "--check") throw new Error("The externalSelection plan only supports --check.");
       await runExternalSelectionTiming();
       return;
+    default: {
+      // A new plan must not exit successfully without running anything.
+      const unhandled: never = plan;
+      throw new Error(`Unhandled timing plan: ${String(unhandled)}`);
+    }
   }
 }
 

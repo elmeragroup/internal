@@ -41,6 +41,22 @@ import { signatureTypeParameter } from "./type-parameter.ts";
 
 type Context = ResolverContext;
 
+/**
+ * Base UI's `render` prop is the one mixin member kept even when its declaring
+ * package is not selected: dropping it falls the whole
+ * `{ render?: ComponentRenderFn | ReactElement }` shape back to `any`.
+ *
+ * @param name - The member name.
+ * @returns Whether the member is the `render` prop.
+ */
+function isRenderProp(name: string): boolean {
+  return name === "render";
+}
+
+/**
+ * Converts normalized enum facts into an enum node, recording one provenance entry per member
+ * and forwarding the backend's own recovery warnings.
+ */
 export function resolveEnumNode(facts: BackendEnumFacts, context: Context): SemanticType {
   const typeName: TypeName = { name: facts.name };
   if (facts.namespaces.length > 0) Object.assign(typeName, { namespaces: facts.namespaces });
@@ -72,6 +88,10 @@ export function resolveEnumNode(facts: BackendEnumFacts, context: Context): Sema
   return result;
 }
 
+/**
+ * Resolves one signature: its parameters, return type, and generic parameters, with each
+ * position's provenance recorded under the signature's semantic path.
+ */
 export function resolveSignatureNode(
   signature: BackendSignatureHandle,
   context: Context,
@@ -115,8 +135,7 @@ export function resolveParameter(
   const info = context.operations.symbolFacts(parameter);
   const declaration = primaryDeclaration(info);
   const node = declaration === undefined ? undefined : context.operations.nodeFacts(declaration);
-  const parameterType =
-    context.operations.propertyType(parameter) ?? context.operations.typeOfSymbol(parameter, false);
+  const parameterType = memberTypeOf(parameter, context.operations);
   // A generic signature's authored parameter node names the DECLARATION's type
   // parameter (`props: P`), not the instantiated argument. Replaying that node
   // would name and shape the resolved type after a parameter of the declaring
@@ -152,6 +171,21 @@ export function resolveParameter(
   return output;
 }
 
+/**
+ * Resolves an object-typed shape into an object node.
+ *
+ * Consults `shouldResolveObject` and, for each member, `shouldInclude`; declined named shapes
+ * still return their shell (name, index signature) while anonymous shapes with no semantic
+ * anchor return `undefined` so the caller can take its module-value fallback. Member reads
+ * record provenance and warnings as they go.
+ *
+ * @param type - The checker type to resolve.
+ * @param typeNameValue - The public name already resolved for the type, when one exists.
+ * @param sourceNode - The authored syntax node, when the type has one.
+ * @param context - The resolver state, including callbacks and collector arrays.
+ * @param resolveType - The shared recursive resolver for member types.
+ * @returns An object node, or `undefined` when the shape is an anonymous value with no anchor.
+ */
 export function resolveObjectNode(
   type: BackendTypeHandle,
   typeNameValue: TypeName | undefined,
@@ -171,7 +205,7 @@ export function resolveObjectNode(
   };
   let callbackDecision: boolean | undefined;
   try {
-    callbackDecision = context.options.shouldResolveObject?.(resolveData);
+    callbackDecision = context.options.shouldResolveObject(resolveData);
   } catch (cause) {
     throw new ResolverFailure({
       message: `shouldResolveObject failed while resolving ${typeNameValue?.name ?? "an object"}`,
@@ -209,9 +243,9 @@ export function resolveObjectNode(
   const hasExpandableCandidate = properties.some((property) => {
     const info = context.operations.symbolFacts(property);
     return (
-      info.name === "render" ||
+      isRenderProp(info.name) ||
       info.declarations.length === 0 ||
-      externalTypeSelectionAllowsSymbol(property, context.operations, context.externalTypes)
+      externalTypeSelectionAllowsSymbol(property, context.operations, context.options.externalTypes)
     );
   });
   const objectSymbol = facts.symbol === undefined ? undefined : context.operations.symbolFacts(facts.symbol);
@@ -229,11 +263,9 @@ export function resolveObjectNode(
   // survives that classification. It is therefore the one post-gate shape
   // fact read for both expanded and declined anonymous objects.
   const indexSignature = selectIndexSignature(type, context);
-  // Each predicate records a different reason an anonymous object has no
-  // anchor in the model. The compiler-internal predicate adds to the module
-  // value one only while resolving a member of an authored intersection:
-  // `authoredIntersectionMember` suppresses that one, and otherwise the first
-  // predicate's every condition is implied by it.
+  // The two predicates record independent reasons an anonymous object has no
+  // anchor in the model: an internal compiler-generated shape at the top level,
+  // and the export's own value (identity-based; see below).
   const isAnonymousCompilerObject =
     typeNameValue === undefined &&
     context.propertyDepth === 0 &&
@@ -243,15 +275,19 @@ export function resolveObjectNode(
     !hasExpandableCandidate &&
     !hasAuthoredObjectSyntax;
   const isAnonymousModuleValue =
-    typeNameValue === undefined &&
     // Only the export's OWN value declines here (`export const value = { … }`).
-    // An unnamed object in a nested position — an inferred function return, for
-    // example — is ordinary structure to describe, not a module value, and
-    // upstream resolves such shapes (`namespace-export-resolution`'s useHook).
-    context.provenancePath.length === 1 &&
-    context.propertyDepth === 0 &&
-    !hasAuthoredObjectSyntax &&
-    !context.authoredIntersectionMember;
+    // Identity is sound because type handles are interned per session, and it
+    // says exactly what the old position heuristics approximated: every nested
+    // occurrence — a member, element, type argument, or union arm — is ordinary
+    // structure to describe, including an inferred function return such as the
+    // useHook fixture in namespace-export-resolution.
+    type === context.exportRoot &&
+    // A union or intersection reaches this call as its own merged view; only a
+    // bare object type is the export's anonymous value.
+    facts.isUnion !== true &&
+    facts.isIntersection !== true &&
+    typeNameValue === undefined &&
+    !hasAuthoredObjectSyntax;
   const isEmptyUnanchored =
     properties.length === 0 &&
     indexSignature === undefined &&
@@ -279,8 +315,7 @@ export function resolveObjectNode(
   // under another object that is already being described.
   const resolvedProperties = includedProperties.map((property) => {
     const info = context.operations.symbolFacts(property);
-    const propertyType =
-      context.operations.propertyType(property) ?? context.operations.typeOfSymbol(property, false);
+    const propertyType = memberTypeOf(property, context.operations);
     const docs = context.operations.documentationOfSymbol(property);
     const declarationHandles = symbolDeclarations(info);
     const readonly = declarationHandles.some((declaration) => isReadonlyDeclaration(declaration, context));
@@ -338,7 +373,7 @@ export function omitTypeParameterSourceNode(
   return context.substitutions.has(authoredSymbol) ? sourceNode : undefined;
 }
 
-export function declarationPathsFor(info: {
+function declarationPathsFor(info: {
   readonly declarationPaths: readonly string[];
   readonly repositoryRelativeDeclarationPaths?: readonly string[];
 }): readonly string[] {
@@ -388,6 +423,11 @@ function provenanceIndex(entries: ProvenanceEntry[]): Map<string, number> {
   return index;
 }
 
+/**
+ * Records one provenance entry, merging it with any existing entry at the same semantic path:
+ * declaration paths union and sort, `synthesized` survives only when both entries are
+ * synthesized, and `readonly`/`defaultInitializer`/`reexportChain` keep their first value.
+ */
 export function recordProvenance(context: Context, entry: ProvenanceEntry): void {
   const index = provenanceIndex(context.provenance);
   const key = JSON.stringify(entry.path);
@@ -421,6 +461,7 @@ export function recordProvenance(context: Context, entry: ProvenanceEntry): void
   context.provenance[position] = merged;
 }
 
+/** Orders provenance entries deterministically by their semantic path segments. */
 export function canonicalizeProvenance(entries: readonly ProvenanceEntry[]): readonly ProvenanceEntry[] {
   return [...entries].sort((left, right) => comparePaths(left.path, right.path));
 }
@@ -506,17 +547,16 @@ function propertyEligible(
     const ownerSymbol = ownerFacts.aliasSymbol ?? ownerFacts.symbol;
     return (
       ownerSymbol === undefined ||
-      externalTypeSelectionAllowsSymbol(ownerSymbol, context.operations, context.externalTypes)
+      externalTypeSelectionAllowsSymbol(ownerSymbol, context.operations, context.options.externalTypes)
     );
   }
   // Ownership/package selection is a cheap declaration-path fact. Consult it
   // before any declaration node is materialized; a declined dependency
   // property must not pay for its modifier/kind subtree merely to be dropped.
-  // `render` is the exception: dropping it from an unselected mixin object
-  // falls the whole `{ render?: ComponentRenderFn | ReactElement }` shape
-  // back to `any`.
-  if (!externalTypeSelectionAllowsSymbol(property, context.operations, context.externalTypes)) {
-    return info.name === "render";
+  // `isRenderProp` is the single exception owner; its rationale sits with the
+  // predicate.
+  if (!externalTypeSelectionAllowsSymbol(property, context.operations, context.options.externalTypes)) {
+    return isRenderProp(info.name);
   }
   // A class instance reached as an object must not contribute its methods:
   // they belong to the class model, not to an object's property list. Upstream
@@ -753,12 +793,31 @@ function objectResult(
   return result;
 }
 
+/** Reads a member's authored type node from its primary declaration, when one exists. */
 export function propertyTypeNode(
   property: BackendSymbolHandle,
   context: Context
 ): BackendNodeReference | undefined {
   const declaration = primaryDeclaration(context.operations.symbolFacts(property));
   return declaration === undefined ? undefined : context.operations.nodeFacts(declaration).type;
+}
+
+/**
+ * The value type of one object or class member: the checker's direct symbol
+ * type when it exposes one, otherwise the alias-resolved read that also
+ * recovers a variable declaration's inferred type. Methods, properties, and
+ * parameters all have a symbol type; the fallback covers symbols the direct
+ * read does not resolve.
+ *
+ * @param member - The member symbol to read.
+ * @param operations - Compiler operations exposing member value types.
+ * @returns The member's value type, or `undefined` when neither read yields one.
+ */
+export function memberTypeOf(
+  member: BackendSymbolHandle,
+  operations: Context["operations"]
+): BackendTypeHandle | undefined {
+  return operations.propertyType(member) ?? operations.typeOfSymbol(member, false);
 }
 
 function returnTypeNode(

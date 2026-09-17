@@ -1,5 +1,5 @@
 import { Schema } from "effect";
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import type {
@@ -60,6 +60,14 @@ function readJson(path: string): Schema.Json {
   return Schema.decodeUnknownSync(Schema.Json)(JSON.parse(readFileSync(path, "utf8")));
 }
 
+/**
+ * Reads and decodes the hand-maintained fixture facts (`fixtures.json`): IPC ceilings and the
+ * recorded per-fixture exceptions no filename can state.
+ *
+ * @param root - The fixture root directory.
+ * @returns The decoded budgets.
+ * @throws When the file is unreadable or does not match the schema.
+ */
 export function readFixtureBudgets(root: string): FixtureBudgets {
   return Schema.decodeUnknownSync(FixtureBudgetsSchema)(readJson(join(root, "fixtures.json")));
 }
@@ -91,19 +99,34 @@ export function fixtureDirectories(root: string): readonly { readonly id: string
   return readdirSync(root, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
     .flatMap((entry) => {
-      const file = readdirSync(join(root, entry.name))
-        .sort()
-        .find((name) => name.startsWith("input."));
+      const inputs = readdirSync(join(root, entry.name))
+        .filter((name) => name.startsWith("input."))
+        .sort();
+      if (inputs.length > 1) {
+        throw new Error(`Fixture ${entry.name} has more than one input.* file: ${inputs.join(", ")}`);
+      }
+      const file = inputs[0];
       return file === undefined ? [] : [{ id: entry.name, file }];
     })
     .sort((left, right) => (left.id < right.id ? -1 : 1));
 }
 
+/**
+ * Derives the complete fixture catalog from the fixture tree: one evidence record per
+ * directory holding an `input.*` file, classified by the oracle files it contains and the
+ * budgets keyed by fixture id.
+ *
+ * @param root - The fixture root directory.
+ * @param budgets - The hand-maintained facts from `fixtures.json`.
+ * @returns Records ordered by fixture id.
+ * @throws When a fixture directory holds more than one input file, a derived record violates the
+ *   evidence contract, or a budget names a missing fixture or type-check project.
+ */
 export function deriveFixtureCatalog(
   root: string,
   budgets: FixtureBudgets
 ): readonly FixtureEvidenceRecord[] {
-  return fixtureDirectories(root).map(({ id, file }) => {
+  const records: FixtureEvidenceRecord[] = fixtureDirectories(root).map(({ id, file }) => {
     const contents = readdirSync(join(root, id));
     const locallyGenerated = budgets.locallyGeneratedOracles.includes(id);
     const upstream = contents.includes("output.json") && !locallyGenerated;
@@ -145,8 +168,55 @@ export function deriveFixtureCatalog(
       },
     };
   });
+  validateFixtureEvidenceCatalog(records);
+  validateBudgetFixtures(records, root, budgets);
+  return records;
 }
 
+/**
+ * Cross-checks the hand-maintained `fixtures.json` budgets against the derived inventory, so a
+ * rename or removal cannot silently drop a timing ceiling, a virtual dependency, a
+ * generated-oracle exemption, or a type-check exclusion.
+ *
+ * @param records - The derived fixture records.
+ * @param root - The fixture root directory.
+ * @param budgets - The hand-maintained facts from `fixtures.json`.
+ * @throws When a budget names a fixture that does not exist, or excludes a project that is not on disk.
+ */
+function validateBudgetFixtures(
+  records: readonly FixtureEvidenceRecord[],
+  root: string,
+  budgets: FixtureBudgets
+): void {
+  const ids = new Set(records.map((record) => record.id));
+  const groups = [
+    ["timing.boundary", budgets.timing.boundary.map((entry) => entry.fixture)],
+    ["timing.externalSelection", budgets.timing.externalSelection.map((entry) => entry.fixture)],
+    ["virtualUpstreamDependency", budgets.virtualUpstreamDependency],
+    ["locallyGeneratedOracles", budgets.locallyGeneratedOracles],
+  ] as const;
+  for (const [group, names] of groups) {
+    for (const name of names) {
+      if (!ids.has(name))
+        throw new Error(`fixtures.json ${group} names a fixture that does not exist: ${name}`);
+    }
+  }
+  for (const project of budgets.excludedTypecheckProjects) {
+    if (!existsSync(join(root, project))) {
+      throw new Error(`fixtures.json excludes a type-check project that does not exist: ${project}`);
+    }
+  }
+}
+
+/**
+ * Checks a derived catalog against the invariants the gates rely on: stable ordering, valid
+ * input ids, evidence ids that match the record's conformance class, compatible oracle
+ * dispositions, a type-check strategy for every conformance fixture, a divergence record for
+ * every reviewed divergence, and non-negative timing orders.
+ *
+ * @param catalog - The catalog to validate.
+ * @throws When any invariant is violated.
+ */
 export function validateFixtureEvidenceCatalog(catalog: readonly FixtureEvidenceRecord[]): void {
   let previous = "";
   for (const record of catalog) {
@@ -188,9 +258,10 @@ export function validateFixtureEvidenceCatalog(catalog: readonly FixtureEvidence
 /** The fixture tree this package's own gates read. */
 export const fixtureTreeRoot = fixtureRoot;
 
+/** The decoded `test/fixtures/fixtures.json` facts for this package's own fixture tree. */
 export const fixtureBudgets = readFixtureBudgets(fixtureRoot);
+/**
+ * The derived catalog for this package's own fixture tree. Derivation validates every record, so
+ * an importer can never observe an invalid catalog.
+ */
 export const fixtureEvidenceCatalog = deriveFixtureCatalog(fixtureRoot, fixtureBudgets);
-
-// The catalog validates itself once, here, when this module loads. Plans and
-// gates project it afterwards and never re-validate.
-validateFixtureEvidenceCatalog(fixtureEvidenceCatalog);

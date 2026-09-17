@@ -117,6 +117,11 @@ tester.run("elmera/no-tailwind-dark-variant", noTailwindDarkVariant, {
       errors: [error],
     },
     {
+      name: `two dark literals in one className expression report once per literal`,
+      code: `const el = <div className={cn("dark:bg-red-500", "dark:!text-red-500")} />;\n`,
+      errors: [error, error],
+    },
+    {
       name: `\`flex \${gap} dark:-mt-1\` template literal`,
       code: "const x = `flex ${gap} dark:-mt-1`;\n",
       errors: [error],

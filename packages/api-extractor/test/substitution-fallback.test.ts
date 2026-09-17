@@ -16,6 +16,7 @@ import type {
   BackendTypeNodeHandle,
   BackendWarningFact,
 } from "../src/backend/contracts.ts";
+import { parseExtractorOptions } from "../src/parse/options.ts";
 import { resolveModule } from "../src/parse/resolver.ts";
 
 const filePath = "/virtual/input.ts";
@@ -151,7 +152,7 @@ function session(operations: BackendCompilerOperations): BackendExtractionSessio
 }
 
 function resolveGraph(graph: CompilerGraph, draft: BackendModuleDraft) {
-  return resolveModule(session(compiler(graph)), draft, filePath);
+  return resolveModule(session(compiler(graph)), draft, filePath, parseExtractorOptions());
 }
 
 function symbolFacts(

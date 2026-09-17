@@ -6,9 +6,8 @@ import type {
   BackendWarningFact,
 } from "../backend/contracts.ts";
 import type { SemanticType } from "../model.ts";
-import type { ExtractorOptions } from "../options.ts";
 import type { ProvenanceEntry } from "../provenance.ts";
-import type { ExternalTypeSelection } from "./external-type-selection.ts";
+import type { ResolvedExtractorOptions } from "./options.ts";
 
 /** Resolver state shared by the synchronous semantic resolver modules. */
 export type ResolverContext = {
@@ -21,15 +20,17 @@ export type ResolverContext = {
   /** Selects the final collection shape for properties at the current node. */
   readonly provenancePropertyContainer: "object" | "componentProps";
   readonly symbolStack: readonly string[];
-  readonly options: Pick<ExtractorOptions, "shouldInclude" | "shouldResolveObject">;
-  readonly externalTypes: ExternalTypeSelection;
+  readonly options: ResolvedExtractorOptions;
   readonly substitutions: ReadonlyMap<BackendSymbolHandle, BackendTypeHandle>;
   readonly active: ReadonlySet<BackendTypeHandle>;
   readonly propertyDepth: number;
-  /** True only while resolving the root of a pure type-only export. */
-  readonly pureTypeExport: boolean;
-  /** True for anonymous members of an authored intersection shape. */
-  readonly authoredIntersectionMember: boolean;
+  /**
+   * The type resolved as one export's root value, or `undefined` when no export
+   * root is being resolved. Only that exact type takes the anonymous
+   * module-value fallback; members, elements, type arguments, and union arms are
+   * structure to describe.
+   */
+  readonly exportRoot: BackendTypeHandle | undefined;
   /** Defaults authored in an object-binding parameter, keyed by public property name. */
   readonly bindingDefaults?: ReadonlyMap<string, string>;
   /** Namespaces inherited only while descending into checker-generated type arguments. */
@@ -54,6 +55,10 @@ export function warningLocation(
   };
 }
 
+/**
+ * Resolves one checker type, its authored syntax, and its symbol into a semantic node.
+ * Threaded through the resolver modules so every recursive resolution shares one entry point.
+ */
 export type ResolveSemanticType = (
   type: BackendTypeHandle | undefined,
   sourceNode: BackendNodeReference | undefined,

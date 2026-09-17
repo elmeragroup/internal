@@ -22,6 +22,18 @@ tester.run("elmera/no-primitive-colors", noPrimitiveColors, {
       name: "documented disabledHatch texture",
       code: `const x = "bg-[repeating-linear-gradient(45deg,transparent,transparent_8px,rgb(0_0_0/0.02)_8px,rgb(0_0_0/0.02)_16px)]";\n`,
     },
+    {
+      name: "role tokens in a className attribute",
+      code: `const x = <div className="bg-background text-foreground" />;\n`,
+    },
+    {
+      name: "role tokens in a cn call inside a className attribute",
+      code: `const x = <div className={cn("bg-background", "text-foreground")} />;\n`,
+    },
+    {
+      name: "role tokens in a template expression inside a className attribute",
+      code: 'const x = <div className={`${cond ? "bg-background" : "text-foreground"}`} />;\n',
+    },
   ],
   invalid: [
     {
@@ -42,6 +54,46 @@ tester.run("elmera/no-primitive-colors", noPrimitiveColors, {
     {
       name: "raw palette",
       code: `const x = "bg-white text-slate-500";\n`,
+      errors: [error],
+    },
+    {
+      name: "raw palette literal in a className attribute reports once",
+      code: `const x = <div className="bg-white" />;\n`,
+      errors: [error],
+    },
+    {
+      name: "raw palette expression in a className attribute reports once",
+      code: `const x = <div className={"bg-white text-slate-500"} />;\n`,
+      errors: [error],
+    },
+    {
+      name: "raw palette template in a className attribute reports once",
+      code: "const x = <div className={`bg-white ${label}`} />;\n",
+      errors: [error],
+    },
+    {
+      name: "raw palette cn call in a className attribute reports once",
+      code: `const x = <div className={cn("bg-white")} />;\n`,
+      errors: [error],
+    },
+    {
+      name: "raw palette cn call outside JSX reports per literal",
+      code: `const x = cn("bg-white", "text-slate-500");\n`,
+      errors: [error, error],
+    },
+    {
+      name: "raw palette string inside a className template expression reports",
+      code: 'const x = <div className={`${cond ? "bg-white" : "bg-card"}`} />;\n',
+      errors: [error],
+    },
+    {
+      name: "raw palette template literal reports once",
+      code: "const x = `text-slate-500 ${label}`;\n",
+      errors: [error],
+    },
+    {
+      name: "raw palette tv call reports once",
+      code: `const x = tv({ base: "bg-white" });\n`,
       errors: [error],
     },
   ],

@@ -1,21 +1,9 @@
 import { defineRule } from "@oxlint/plugins";
 
 import { isNamedCall } from "../extract-strings.js";
-import { normalizeFilename } from "../filename-normalizer.js";
+import { isTestFile, normalizeFilename } from "../filename-normalizer.js";
 
 const ALLOWED_SUFFIXES = ["/src/styles/utils.ts", "/src/react-aria/link/link.tsx"];
-
-/**
- * @param {string} filename
- */
-function isTestFile(filename) {
-  return (
-    filename.endsWith(".test.ts") ||
-    filename.endsWith(".test.tsx") ||
-    filename.endsWith(".browser.test.tsx") ||
-    filename.endsWith(".test-d.tsx")
-  );
-}
 
 /**
  * @param {string} filename
@@ -41,7 +29,6 @@ export default defineRule({
     },
     schema: [],
   },
-  defaultOptions: [],
   createOnce(context) {
     let skipFile = false;
 

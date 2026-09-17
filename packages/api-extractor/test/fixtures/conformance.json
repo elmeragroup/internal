@@ -1684,25 +1684,9 @@
         "differenceDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
         "upstreamDifferenceCount": 56,
         "upstreamDifferenceDigest": "5674e4027c39ec86e7775224cbdeecd993032a7ed313d7198719f7c0fb8da521",
-        "warningCount": 1,
-        "warningDetails": [
-          {
-            "message": "Could not extract type \"{ items: readonly any[]; }\" at \"test/fixtures/react-component-overload-any-callback-deduplication/input.tsx:1:1\". The extractor used any. Review this API or add support for this type.",
-            "filePath": "test/fixtures/react-component-overload-any-callback-deduplication/input.tsx",
-            "line": 1,
-            "column": 1,
-            "parsedSymbolStack": [
-              "test/fixtures/react-component-overload-any-callback-deduplication/input.tsx",
-              "GenericComponent"
-            ],
-            "code": "unsupported-type-fallback",
-            "typeFlags": [
-              "Object"
-            ],
-            "typeText": "{ items: readonly any[]; }"
-          }
-        ],
-        "warningDigest": "7ffedc894e138fee5c2dd2736e910e27dd29374264635ef54b41e3c17c9834a4",
+        "warningCount": 0,
+        "warningDetails": [],
+        "warningDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
         "warningOracle": "react-component-overload-any-callback-deduplication/warnings.tsgo.json",
         "divergenceRecord": "react-component-overload-any-callback-deduplication/ts7-oracle.json"
       }

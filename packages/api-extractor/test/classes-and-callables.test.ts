@@ -3,6 +3,7 @@ import { describe, expect, it, beforeAll } from "vitest";
 
 import type { ExtractionResult, ExtractorOptions } from "../src/index.ts";
 import type { ClassMethod, ClassProperty, SemanticType } from "../src/model.ts";
+import { exportedType } from "./support/exports.ts";
 import { extractFixture, fixtureRoot } from "./support/extract.ts";
 
 const tsconfigPath = resolve(fixtureRoot, "classes-and-callables-tsconfig.json");
@@ -109,14 +110,8 @@ beforeAll(async () => {
   result = await extract();
 });
 
-function exportedType(name: string): SemanticType {
-  const entry = result.module.exports.find((candidate) => candidate.name === name);
-  if (entry === undefined) throw new Error(`The fixture does not export ${name}`);
-  return entry.type;
-}
-
 function classMember(name: string): Extract<SemanticType, { kind: "class" }> {
-  const type = exportedType(name);
+  const type = exportedType(result, name);
   if (type.kind !== "class") throw new Error(`${name} is a ${type.kind}, not a class`);
   return type;
 }
@@ -193,7 +188,7 @@ describe("class and callable review regressions", () => {
   });
 
   it("extracts a callable interface as its call signatures and reports the dropped members", () => {
-    const counter = exportedType("makeCounter");
+    const counter = exportedType(result, "makeCounter");
     expect(counter.kind).toBe("function");
     if (counter.kind !== "function") return;
     expect(counter.callSignatures[0]?.parameters[0]?.type).toMatchObject({
@@ -216,7 +211,7 @@ describe("class and callable review regressions", () => {
   });
 
   it("reports the construct signatures of non-class shapes with their structural path", () => {
-    const point = exportedType("ConstructablePoint");
+    const point = exportedType(result, "ConstructablePoint");
     // Upstream reports such shapes as bare objects; so does the model.
     expect(point).toMatchObject({ kind: "object" });
     const warning = result.warnings.find(
@@ -232,7 +227,7 @@ describe("class and callable review regressions", () => {
   });
 
   it("preserves materially different overloads in source order without collapsing them", () => {
-    const parseValue = exportedType("parseValue");
+    const parseValue = exportedType(result, "parseValue");
     if (parseValue.kind !== "function") throw new Error("parseValue is not a function");
     expect(parseValue.callSignatures).toHaveLength(2);
     const first = parseValue.callSignatures[0];
@@ -245,7 +240,7 @@ describe("class and callable review regressions", () => {
   });
 
   it("keeps optional and rest parameters with their optionality and types", () => {
-    const emit = exportedType("emit");
+    const emit = exportedType(result, "emit");
     if (emit.kind !== "function") throw new Error("emit is not a function");
     const signature = emit.callSignatures[0];
     if (signature === undefined) throw new Error("emit has no call signature");
@@ -263,7 +258,7 @@ describe("class and callable review regressions", () => {
     // Mirrors the ported upstream fixture at the member level: object
     // resolution of the aliased instance side keeps the public state and never
     // reports the private field.
-    const registry = exportedType("RegistryAlias");
+    const registry = exportedType(result, "RegistryAlias");
     expect(registry).toMatchObject({ kind: "object" });
     if (registry.kind !== "object") return;
     expect(registry.properties.map((entry) => entry.name)).toEqual(["open"]);
@@ -275,7 +270,7 @@ describe("class and callable review regressions", () => {
     // and only a class would have been resolved through its construct side, so
     // the construct half is reported at its structural path instead of
     // vanishing silently.
-    const callable = exportedType("CallableAndConstructable");
+    const callable = exportedType(result, "CallableAndConstructable");
     expect(callable.kind).toBe("function");
     if (callable.kind !== "function") return;
     expect(callable.callSignatures[0]?.parameters[0]?.type).toMatchObject({

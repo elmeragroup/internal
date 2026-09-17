@@ -1,7 +1,10 @@
 // Adapted from kumo lint/no-primitive-colors.js (MIT, Copyright (c) 2026 Cloudflare, Inc.).
 import { defineRule } from "@oxlint/plugins";
 
-import { extractStrings, isNamedCall } from "../extract-strings.js";
+import { classTokens } from "../class-tokens.js";
+import { extractStrings } from "../extract-strings.js";
+
+/** @import { ESTree } from "@oxlint/plugins" */
 
 const RULE_NAME = "no-primitive-colors";
 const LITERAL_RULE = "color-literal";
@@ -132,10 +135,6 @@ const NON_COLOR_UTILITIES = new Set([
   "none",
   "auto",
   "color",
-  "0",
-  "2",
-  "4",
-  "8",
   "t",
   "r",
   "b",
@@ -149,18 +148,13 @@ const NON_COLOR_UTILITIES = new Set([
   "hidden",
   "collapse",
   "separate",
-  "1",
   "inset",
   "inner",
 ]);
 
-const NON_COLOR_PATTERNS = [
-  /^linear-to-[trbl]{1,2}$/,
-  /^[trblxy]-\d+$/,
-  /^offset-\d+$/,
-  /^\d+$/,
-  /^clip-.+$/,
-];
+// Numeric shades and steps are not listed above: TOKEN_RE group 3 always starts
+// with a letter, so a bare number never arrives as a family name.
+const NON_COLOR_PATTERNS = [/^linear-to-[trbl]{1,2}$/, /^[trblxy]-\d+$/, /^offset-\d+$/, /^clip-.+$/];
 
 const TOKEN_RE =
   /(?:^|[^a-zA-Z0-9-])(((?:[a-z-]+:)*)?(?:bg|border|text|ring(?:-offset)?|fill|stroke|placeholder|caret|accent|decoration|divide|outline|from|via|to)-([a-z][a-z0-9-]*)(?:-\d{2,3})?(?:\/[0-9]{1,3})?)/gim;
@@ -197,9 +191,8 @@ function isAllowedExactClass(token) {
  * @param {string} str
  */
 function stripAllowedClasses(str) {
-  return str
-    .split(/\s+/)
-    .filter((token) => token.length > 0 && !isAllowedExactClass(token))
+  return classTokens(str)
+    .filter((token) => !isAllowedExactClass(token))
     .join(" ");
 }
 
@@ -214,12 +207,14 @@ function findPrimitiveColor(str) {
     const colorFamily = match[3];
     if (!fullToken || !colorFamily) continue;
 
-    const tokenName = colorFamily.replace(/\/\d+$/, "");
-    if (isNonColorUtility(tokenName)) continue;
-    if (ROLE_TOKENS.has(tokenName)) continue;
+    // Group 3 excludes only the `/opacity` suffix: the slash is outside the
+    // capture. The group is greedy, so a shade step like `slate-500` is
+    // captured whole and stripped below before the family lookup.
+    if (isNonColorUtility(colorFamily)) continue;
+    if (ROLE_TOKENS.has(colorFamily)) continue;
 
-    const primitiveFamily = tokenName.replace(/-\d+$/, "");
-    if (TAILWIND_COLOR_FAMILIES.has(primitiveFamily) || TAILWIND_COLOR_FAMILIES.has(tokenName)) {
+    const primitiveFamily = colorFamily.replace(/-\d+$/, "");
+    if (TAILWIND_COLOR_FAMILIES.has(primitiveFamily) || TAILWIND_COLOR_FAMILIES.has(colorFamily)) {
       return fullToken;
     }
   }
@@ -246,10 +241,9 @@ export default defineRule({
     },
     schema: [],
   },
-  defaultOptions: [],
   createOnce(context) {
     /**
-     * @param {import("estree").Node} node
+     * @param {ESTree.Node} node
      * @param {string[]} collected
      */
     function reportColorIssues(node, collected) {
@@ -267,21 +261,9 @@ export default defineRule({
     }
 
     return {
-      JSXAttribute(node) {
-        const name = node.name.type === "JSXIdentifier" ? node.name.name : undefined;
-        if (name !== "className" && name !== "class") return;
-        if (node.value) {
-          reportColorIssues(node, extractStrings(node.value));
-        }
-      },
-      CallExpression(node) {
-        if (!isNamedCall(node.callee, "tv") && !isNamedCall(node.callee, "cn")) return;
-        reportColorIssues(node, extractStrings(node));
-      },
       Literal(node) {
-        if (typeof node.value === "string") {
-          reportColorIssues(node, [node.value]);
-        }
+        if (typeof node.value !== "string") return;
+        reportColorIssues(node, [node.value]);
       },
       TemplateLiteral(node) {
         reportColorIssues(node, extractStrings(node));

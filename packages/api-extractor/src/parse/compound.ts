@@ -135,10 +135,7 @@ export function intersectionNode(
 ): SemanticType {
   const members = context.operations.typeFacts(type).unionOrIntersectionTypes ?? [];
   const memberNodes = matchIntersectionMemberNodes(members, sourceNode, context);
-  const memberContext: Context = { ...context, authoredIntersectionMember: true };
-  const resolved = members.map((member, index) =>
-    resolve(member, memberNodes[index], undefined, memberContext)
-  );
+  const resolved = members.map((member, index) => resolve(member, memberNodes[index], undefined, context));
   // A callable intersection is described by its call signatures. Its extra
   // properties are deliberately dropped: the merged type is used as a function,
   // and reporting both forms would give one export two incompatible shapes.
@@ -157,7 +154,7 @@ export function intersectionNode(
   // state, and declaration documentation instead of re-deriving them from the
   // member models, and it is independent of whether the intersection was
   // authored inline or reached through an alias reference.
-  const merged = resolveObjectNode(type, undefined, sourceNode, memberContext, resolve);
+  const merged = resolveObjectNode(type, undefined, sourceNode, context, resolve);
   return intersectionType(typeNameValue, resolved, merged?.kind === "object" ? merged.properties : []);
 }
 
@@ -425,7 +422,7 @@ function aliasTypeParameterSubstitutions(
   // then matched without a substitution scope.
   const args = aliasInstantiationArguments(type, sourceNode, context);
   if (args.length === 0) return undefined;
-  return bindAliasParameters(declaration, context, (index) => args[index]);
+  return bindAliasParameters(declaration, args, context);
 }
 
 /** Flattens nested authored unions the way TypeScript flattens union types. */

@@ -47,12 +47,17 @@ export function safeCause(cause: unknown): string {
   }
 }
 
+/** The TypeScript configuration could not be read, parsed, or opened. */
 export class ConfigError extends Schema.TaggedError<ConfigError>()("ConfigError", {
   tsconfigPath: Schema.String,
   message: Schema.String,
   cause: Schema.String,
 }) {}
 
+/**
+ * A compiler operation failed outside the model: the defect fields name the operation, file,
+ * and resolver breadcrumb current when it threw.
+ */
 export class BackendError extends Schema.TaggedError<BackendError>()("BackendError", {
   message: Schema.String,
   cause: Schema.String,
@@ -61,6 +66,7 @@ export class BackendError extends Schema.TaggedError<BackendError>()("BackendErr
   symbolStack: Schema.optionalKey(Schema.Array(Schema.String)),
 }) {}
 
+/** The requested file is not a module of the configured TypeScript project. */
 export class FileNotInProgramError extends Schema.TaggedError<FileNotInProgramError>()(
   "FileNotInProgramError",
   {
@@ -69,6 +75,7 @@ export class FileNotInProgramError extends Schema.TaggedError<FileNotInProgramEr
   }
 ) {}
 
+/** The semantic resolver could not model a file, including failures thrown by user callbacks. */
 export class ExtractError extends Schema.TaggedError<ExtractError>()("ExtractError", {
   filePath: Schema.String,
   symbolStack: Schema.Array(Schema.String),

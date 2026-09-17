@@ -1,5 +1,6 @@
 import type { ESTree } from "@oxlint/plugins";
 
+/** ESTree visitor keys naming each node type's child slots. */
 export type VisitorKeys = Readonly<Record<string, readonly string[]>>;
 
 function isNode(value: unknown): value is ESTree.Node {
@@ -33,30 +34,37 @@ function collectInferTypeParameterNames(
 }
 
 /** Collect type binders that are in scope at a node and can shadow module aliases. */
-export function lexicalTypeParameterNames(
+export function typeParameterNamesAt(
 	node: ESTree.Node,
+	descendant: ESTree.Node,
 	visitorKeys: VisitorKeys,
-): ReadonlySet<string> {
+	staticMemberOwner: ESTree.Node | null = null,
+): readonly string[] {
 	const names = new Set<string>();
-	let descendant: ESTree.Node = node;
-	let current: ESTree.Node | null = node;
-	while (current !== null && current.type !== "Program") {
-		if ("typeParameters" in current) {
-			for (const parameter of current.typeParameters?.params ?? []) {
-				names.add(parameter.name.name);
-			}
+	// A class's own type parameters are not in scope inside its static members
+	// or static blocks; an enclosing class's parameters still are.
+	const classOwnsStaticMember =
+		staticMemberOwner === node &&
+		(node.type === "ClassDeclaration" || node.type === "ClassExpression");
+	if ("typeParameters" in node && !classOwnsStaticMember) {
+		for (const parameter of node.typeParameters?.params ?? []) {
+			names.add(parameter.name.name);
 		}
-		if (
-			current.type === "TSMappedType" &&
-			(descendant === current.nameType || descendant === current.typeAnnotation)
-		) {
-			names.add(current.key.name);
-		}
-		if (current.type === "TSConditionalType" && descendant === current.trueType) {
-			collectInferTypeParameterNames(current.extendsType, visitorKeys, names);
-		}
-		descendant = current;
-		current = current.parent;
 	}
-	return names;
+	if (
+		node.type === "TSMappedType" &&
+		(descendant === node.nameType || descendant === node.typeAnnotation)
+	) {
+		names.add(node.key.name);
+	}
+	if (node.type === "TSConditionalType" && descendant === node.trueType) {
+		collectInferTypeParameterNames(node.extendsType, visitorKeys, names);
+	}
+	return [...names];
+}
+
+/** Whether the node is a class member or block that cannot see the class's own type parameters. */
+export function isStaticMember(node: ESTree.Node): boolean {
+	if (node.type === "StaticBlock") return true;
+	return "static" in node && node.static === true;
 }

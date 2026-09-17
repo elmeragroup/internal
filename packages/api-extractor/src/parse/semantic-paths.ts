@@ -3,38 +3,47 @@ import type { ModuleNode, SemanticType } from "../model.ts";
 /** A structural path into the final semantic module model. */
 export type SemanticPath = readonly string[];
 
+/** The path of one top-level export. */
 export function exportSemanticPath(name: string): SemanticPath {
   return [name];
 }
 
+/** The path of one object property. */
 export function objectPropertySemanticPath(ownerPath: SemanticPath, name: string): SemanticPath {
   return [...ownerPath, "properties", name];
 }
 
+/** The path of one component prop in the final merged prop list. */
 export function componentPropSemanticPath(ownerPath: SemanticPath, name: string): SemanticPath {
   return [...ownerPath, "props", name];
 }
 
+/** The path of one class method. */
 export function methodSemanticPath(ownerPath: SemanticPath, name: string): SemanticPath {
   return [...ownerPath, "methods", name];
 }
 
+/** The path of one call signature, addressed by its position. */
 export function callSignatureSemanticPath(ownerPath: SemanticPath, index: number): SemanticPath {
   return [...ownerPath, "callSignatures", String(index)];
 }
 
+/** The path of one construct signature, addressed by its position. */
 export function constructSignatureSemanticPath(ownerPath: SemanticPath, index: number): SemanticPath {
   return [...ownerPath, "constructSignatures", String(index)];
 }
 
+/** The path of one signature parameter. */
 export function parameterSemanticPath(signaturePath: SemanticPath, name: string): SemanticPath {
   return [...signaturePath, "parameters", name];
 }
 
+/** The path of one signature's return type. */
 export function returnValueSemanticPath(signaturePath: SemanticPath): SemanticPath {
   return [...signaturePath, "returnValueType"];
 }
 
+/** The path of one enum member. */
 export function enumMemberSemanticPath(enumPath: SemanticPath, name: string): SemanticPath {
   return [...enumPath, "members", name];
 }

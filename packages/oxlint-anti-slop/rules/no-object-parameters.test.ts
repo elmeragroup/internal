@@ -21,11 +21,44 @@ tester.run("anti-slop/no-object-parameters", noObjectParametersRule, {
 		"type Value = object; function outer() { type Value = { id: string }; function inner(value: Value) {} }",
 		"function f(value: Value) {}",
 		"function outer() { function inner(value: Value) {} type Value = { id: string }; } type Value = object;",
+		{
+			name: "a self-referential alias stops the chase",
+			code: "type Alias = Alias; function f(value: Alias) {}",
+		},
 	],
 	invalid: [
-		{ code: "function f(value: object) {}", errors: [error] },
+		{
+			name: "a plain object parameter",
+			code: "function f(value: object) {}",
+			errors: [{ messageId: "objectParameter", data: { parameter: "value" } }],
+		},
 		{ code: "type Alias = object; function f(value: Alias) {}", errors: [error] },
 		{ code: "type Alias = (object); function f(value: Alias) {}", errors: [error] },
+		{
+			name: "a union member of object makes the alias an object input",
+			code: "type Alias = string | object; function f(value: Alias) {}",
+			errors: [error],
+		},
+		{
+			name: "a destructuring parameter reports the binding pattern",
+			code: "function f({ value }: object) {}",
+			errors: [{ messageId: "objectParameter", data: { parameter: "{ value }" } }],
+		},
+		{
+			name: "a parameter property reports the bound name",
+			code: "class C { constructor(private readonly value: object) {} }",
+			errors: [{ messageId: "objectParameter", data: { parameter: "value" } }],
+		},
+		{
+			name: "a defaulted parameter reports the bound name",
+			code: "function f(value: object = {}) {}",
+			errors: [{ messageId: "objectParameter", data: { parameter: "value" } }],
+		},
+		{
+			name: "a rest parameter reports the bound name",
+			code: "function f(...values: object) {}",
+			errors: [{ messageId: "objectParameter", data: { parameter: "values" } }],
+		},
 		{
 			code: "type Item = object; type Fallback<Input> = Input extends infer Item ? string : (value: Item) => void;",
 			errors: [error],

@@ -4,23 +4,23 @@ import type {
   BackendSymbolHandle,
   BackendTypeNodeHandle,
 } from "../backend/contracts.ts";
+import { isComponentExportName } from "./component.ts";
 import type { ResolverContext } from "./contracts.ts";
 import { primaryDeclaration } from "./ownership.ts";
 import { isReactWrapperCall } from "./react-policy.ts";
 
 /** One authored props parameter and the type syntax attached to it. */
-export type AuthoredComponentParameter = {
+type AuthoredComponentParameter = {
   readonly parameter: BackendNodeHandle;
   readonly propsType: BackendTypeNodeHandle | undefined;
 };
 
 /**
- * All authored evidence recovered in one graph walk. Keeping parameters,
- * props nodes, and binding defaults together prevents the component transform
- * from traversing the same declarations once for props and again for defaults.
+ * All authored evidence recovered in one graph walk: the props type nodes and
+ * binding defaults travel together so the component transform does not traverse
+ * the same declarations once for props and again for defaults.
  */
 export type AuthoredComponentRecovery = {
-  readonly parameters: readonly AuthoredComponentParameter[];
   readonly propNodes: readonly BackendTypeNodeHandle[];
   readonly bindingDefaults?: ReadonlyMap<string, string>;
 };
@@ -38,8 +38,8 @@ export function recoverAuthoredComponent(
       if (!entries.some(([name]) => name === entry.name)) entries.push([entry.name, entry.initializerText]);
     }
   }
-  if (entries.length === 0) return { parameters, propNodes };
-  return { parameters, propNodes, bindingDefaults: new Map(entries) };
+  if (entries.length === 0) return { propNodes };
+  return { propNodes, bindingDefaults: new Map(entries) };
 }
 
 /**
@@ -110,7 +110,7 @@ function inspectAuthoredSymbol(
   const nextSeenSymbols = new Set(seenSymbols);
   nextSeenSymbols.add(symbol);
   const exportName = context.symbolStack.at(-1);
-  if (exportName !== "default" && (exportName === undefined || !/^[A-Z]/u.test(exportName))) return undefined;
+  if (exportName === undefined || !isComponentExportName(exportName)) return undefined;
   context.operations.setErrorContext(context.symbolStack);
   const facts = context.operations.symbolFacts(symbol);
   const declaration = primaryDeclaration(facts);

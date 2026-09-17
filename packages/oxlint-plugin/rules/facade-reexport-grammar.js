@@ -31,7 +31,6 @@ export default defineRule({
     },
     schema: [],
   },
-  defaultOptions: [],
   createOnce(context) {
     return {
       Program(program) {

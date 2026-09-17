@@ -1,9 +1,11 @@
 import { defineRule } from "@oxlint/plugins";
 
+/** @import { ESTree } from "@oxlint/plugins" */
+
 export default defineRule({
   createOnce(context) {
     return {
-      /** @param {import("estree").ImportExpression} node */
+      /** @param {ESTree.ImportExpression} node */
       ImportExpression(node) {
         context.report({
           loc: node.loc,

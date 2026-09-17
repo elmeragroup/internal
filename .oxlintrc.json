@@ -166,24 +166,12 @@
     {
       "files": ["packages/oxlint-plugin/**"],
       "rules": {
-        "typescript/no-unsafe-assignment": "off",
-        "typescript/no-unsafe-member-access": "off",
-        "typescript/no-unsafe-call": "off",
-        "typescript/no-unsafe-return": "off",
-        "typescript/no-unsafe-argument": "off",
-        "typescript/no-redundant-type-constituents": "off",
         "anti-slop/no-runtime-typeof": "off"
       }
     },
     {
       "files": ["packages/oxlint-anti-slop/**"],
       "rules": {
-        "typescript/no-unsafe-assignment": "off",
-        "typescript/no-unsafe-member-access": "off",
-        "typescript/no-unsafe-call": "off",
-        "typescript/no-unsafe-return": "off",
-        "typescript/no-unsafe-argument": "off",
-        "typescript/no-redundant-type-constituents": "off",
         "typescript/no-unnecessary-condition": "off",
         "typescript/prefer-optional-chain": "off",
         "anti-slop/no-runtime-typeof": "off",

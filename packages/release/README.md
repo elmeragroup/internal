@@ -27,8 +27,10 @@ retryRelease(pkg: ReleasePackage, recordTag: string): Effect<void, ReleaseError>
 - `releaseCheckedCommit` publishes the checked main-branch commit. Pack-and-verify is an argument,
   used only on this path. Git, GitHub, npm, and Changesets adapters are production defaults inside
   the engine.
-- `retryRelease` finishes a prepared record from its recorded archive. It does not pack. A missing
-  or incomplete record keeps the current error: rerun the original Merge job.
+- `retryRelease` finishes a prepared record from its recorded archive. It does not pack, and it
+  does not read the Changesets configuration or the base branch. A record tag with no prepared
+  release fails naming that tag; an incomplete prepared record fails telling you to rerun the
+  original Merge job.
 
 The engine reads `repository`, `token`, and the global fetch from `GITHUB_REPOSITORY` and `GH_TOKEN`
 inside each operation. Tests build a fixture transport through the internal
@@ -68,9 +70,9 @@ Needed when operations run, not at import:
 - `git`
 - `npm` (publish and dist-tag updates)
 - `@changesets/cli` in the **consuming checkout** (`pkg.checkoutRoot`), never from this package's
-  location. Planning uses `status --output` with a relative plan file and does not pass `--since`.
-  The base branch must already be the remote-tracking name in `.changeset/config.json`
-  (`origin/main` for Internal).
+  location, for `checkReleasePr` and `releaseCheckedCommit` (not for `retryRelease`). Planning uses
+  `status --output` with a relative plan file and does not pass `--since`. The base branch must
+  already be the remote-tracking name in `.changeset/config.json` (`origin/main` for Internal).
 - GitHub repository and token (`GITHUB_REPOSITORY`, `GH_TOKEN`) for publication and retry. Not
   required for `checkReleasePr`. `GH_TOKEN` is not declared in `turbo.json`: release operations and
   the tests that clear it do not read the token inside Turbo tasks, and declaring it would hand the

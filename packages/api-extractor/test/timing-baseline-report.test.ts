@@ -8,6 +8,7 @@ import {
   assertFetchedToMaterializedRatioBudget,
   assertFetchedToMaterializedRatioEvidence,
   assertRequestCountBudget,
+  assertTimingObservation,
   bytesReceivedCeiling,
   decodeTimingReport,
   fetchedToMaterializedRatio,
@@ -74,6 +75,27 @@ describe("Issue 02 compiler timing boundary", () => {
         fetchedToMaterializedRatio: sample.fetchedToMaterializedRatio + 1,
       })
     ).toThrow(/evidence is stale/u);
+  });
+
+  it("rejects observations that are disabled or not finite and non-negative", () => {
+    const timing = readTimingReport(timingReportPath);
+    const sample = timing.samples[0];
+    if (sample === undefined) throw new Error("Missing representative timing sample.");
+
+    expect(() => assertTimingObservation(sample)).not.toThrow();
+    expect(() => assertTimingObservation({ ...sample, enabled: false })).toThrow(/observation is invalid/u);
+    expect(() =>
+      assertTimingObservation({ ...sample, totals: { ...sample.totals, requestCount: 0 } })
+    ).toThrow(/observation is invalid/u);
+    expect(() =>
+      assertTimingObservation({ ...sample, totals: { ...sample.totals, roundTripMs: Number.NaN } })
+    ).toThrow(/observation is invalid/u);
+    expect(() =>
+      assertTimingObservation({ ...sample, totals: { ...sample.totals, transportOverheadMs: -1 } })
+    ).toThrow(/observation is invalid/u);
+    expect(() =>
+      assertTimingObservation({ ...sample, totals: { ...sample.totals, bytesReceived: Number.NaN } })
+    ).toThrow(/observation is invalid/u);
   });
 
   it("keeps immutable baseline observations separate from live budget enforcement", () => {

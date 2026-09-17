@@ -19,6 +19,7 @@ export class CompilerBackend extends Context.Service<
     ) => Effect.Effect<BackendProject, ConfigError | BackendError, Scope.Scope>;
   }
 >()("elmera/api-extractor/CompilerBackend") {
+  /** The concrete TypeScript 7 backend, released through the caller's scope. */
   static readonly layer: Layer.Layer<CompilerBackend> = Layer.succeed(CompilerBackend, {
     openProject: (options) =>
       Effect.acquireRelease(

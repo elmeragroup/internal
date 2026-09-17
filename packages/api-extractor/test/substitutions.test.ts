@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
 
 import type {
-  BackendCompilerOperations,
+  BackendNodeFacts,
+  BackendNodeHandle,
+  BackendNodeReference,
   BackendSymbolHandle,
   BackendTypeHandle,
+  BackendTypeNodeHandle,
 } from "../src/backend/contracts.ts";
-import { applySubstitutions } from "../src/parse/substitutions.ts";
+import type { BindingOperations } from "../src/parse/substitutions.ts";
+import { applySubstitutions, bindAliasInstantiation } from "../src/parse/substitutions.ts";
 
 // Handles are opaque to the parse layer; the helper compares them by identity
 // alone, so a distinct empty object is a faithful stand-in for each one.
@@ -29,7 +33,7 @@ const symbolsByType = new Map<BackendTypeHandle, BackendSymbolHandle>([
 
 function operations() {
   let reads = 0;
-  const typeFacts: BackendCompilerOperations["typeFacts"] = (type) => {
+  const typeFacts: BindingOperations["typeFacts"] = (type) => {
     reads += 1;
     const symbol = symbolsByType.get(type);
     return symbol === undefined ? { flags: [] } : { flags: [], symbol };
@@ -62,5 +66,101 @@ describe("applySubstitutions", () => {
     const compiler = operations();
     expect(applySubstitutions(parameterType, new Map(), compiler)).toBe(parameterType);
     expect(compiler.reads()).toBe(0);
+  });
+});
+
+describe("bindAliasInstantiation", () => {
+  /** Builds a complete node-fact record so the fake operations need no cast. */
+  function factsFor(
+    kind: BackendNodeFacts["kind"],
+    extra: Omit<Partial<BackendNodeFacts>, "kind">
+  ): BackendNodeFacts {
+    return { kind, text: "", filePath: "", line: 1, column: 1, ...extra };
+  }
+
+  // SAFETY: backend handles are intentionally opaque sentinels here.
+  const declaration = {} as BackendNodeReference;
+  // SAFETY: backend handles are intentionally opaque sentinels here.
+  const instantiation = {} as BackendTypeHandle;
+  // SAFETY: backend handles are intentionally opaque sentinels here.
+  const sourceNode = {} as BackendNodeReference;
+  // SAFETY: backend handles are intentionally opaque sentinels here.
+  const parameterA = {} as BackendNodeHandle;
+  // SAFETY: backend handles are intentionally opaque sentinels here.
+  const parameterB = {} as BackendNodeHandle;
+  // SAFETY: backend handles are intentionally opaque sentinels here.
+  const parameterC = {} as BackendNodeHandle;
+  // SAFETY: backend handles are intentionally opaque sentinels here.
+  const symbolA = {} as BackendSymbolHandle;
+  // SAFETY: backend handles are intentionally opaque sentinels here.
+  const symbolB = {} as BackendSymbolHandle;
+  // SAFETY: backend handles are intentionally opaque sentinels here.
+  const symbolC = {} as BackendSymbolHandle;
+  // SAFETY: backend handles are intentionally opaque sentinels here.
+  const authoredA = {} as BackendTypeNodeHandle;
+  // SAFETY: backend handles are intentionally opaque sentinels here.
+  const authoredHole = {} as BackendTypeNodeHandle;
+  // SAFETY: backend handles are intentionally opaque sentinels here.
+  const authoredC = {} as BackendTypeNodeHandle;
+  // SAFETY: backend handles are intentionally opaque sentinels here.
+  const defaultBNode = {} as BackendTypeNodeHandle;
+  // SAFETY: backend handles are intentionally opaque sentinels here.
+  const argumentA = {} as BackendTypeHandle;
+  // SAFETY: backend handles are intentionally opaque sentinels here.
+  const argumentC = {} as BackendTypeHandle;
+  // SAFETY: backend handles are intentionally opaque sentinels here.
+  const defaultB = {} as BackendTypeHandle;
+
+  const nodeFactsByNode = new Map<BackendNodeReference, BackendNodeFacts>([
+    [declaration, factsFor("typeAlias", { typeParameters: [parameterA, parameterB, parameterC] })],
+    [
+      parameterA,
+      factsFor("typeParameter", { typeName: { name: "A", namespaces: [], authoredSymbol: symbolA } }),
+    ],
+    [
+      parameterB,
+      factsFor("typeParameter", {
+        typeName: { name: "B", namespaces: [], authoredSymbol: symbolB },
+        defaultType: defaultBNode,
+      }),
+    ],
+    [
+      parameterC,
+      factsFor("typeParameter", { typeName: { name: "C", namespaces: [], authoredSymbol: symbolC } }),
+    ],
+    [
+      sourceNode,
+      factsFor("typeReference", {
+        typeName: {
+          name: "PartiallyInstantiated",
+          namespaces: [],
+          authoredArguments: [authoredA, authoredHole, authoredC],
+        },
+      }),
+    ],
+  ]);
+  const typesByNode = new Map<BackendNodeReference, BackendTypeHandle>([
+    [authoredA, argumentA],
+    [defaultBNode, defaultB],
+    [authoredC, argumentC],
+  ]);
+
+  const fakeOperations: BindingOperations = {
+    // No semantic alias arguments: the authored reference is the only record.
+    typeFacts: () => ({ flags: [] }),
+    nodeFacts: (node) => nodeFactsByNode.get(node) ?? factsFor("unknown", {}),
+    typeAtNode: (node) => typesByNode.get(node),
+  };
+
+  const context = { operations: fakeOperations, substitutions: new Map() };
+
+  it("keeps a hole aligned with its parameter instead of shifting later arguments", () => {
+    const bindings = bindAliasInstantiation(declaration, instantiation, sourceNode, context);
+
+    expect(bindings.get(symbolA)).toBe(argumentA);
+    // The middle argument has no resolved type, so its parameter keeps the
+    // authored default and the third argument stays on the third parameter.
+    expect(bindings.get(symbolB)).toBe(defaultB);
+    expect(bindings.get(symbolC)).toBe(argumentC);
   });
 });

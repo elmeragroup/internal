@@ -190,6 +190,12 @@ describe("Issue 04 union and intersection canonicalization laws", () => {
     const once = canonicalizeUnionMembers(members);
     expect(canonicalizeUnionMembers(once)).toEqual(once);
 
+    const repeatedIntrinsics = [nullType, nullType, stringType, undefinedType, nullType];
+    const repeatedOnce = canonicalizeUnionMembers(repeatedIntrinsics);
+    expect(repeatedOnce).toEqual([stringType, nullType, undefinedType]);
+    expect(canonicalizeUnionMembers(repeatedOnce)).toEqual(repeatedOnce);
+    expect(canonicalizeUnionMembers([...repeatedIntrinsics].reverse())).toEqual(repeatedOnce);
+
     const intersectionMembers = [
       object("a", stringType),
       { kind: "intersection", types: [object("b", numberType)], properties: [] } satisfies SemanticType,

@@ -106,11 +106,12 @@ describe("Issue 12 React module-origin regressions", () => {
   it("keeps distinct star origins ambiguous", async () => {
     const result = await extractFixture({ tsconfigPath: ambiguousTsconfigPath }, ambiguousBarrelPath);
 
-    expect(
-      result.warnings.some(
-        (warning) => warning.code === "unresolved-re-export" && warning.reason === "ambiguous"
-      )
-    ).toBe(true);
+    const ambiguousWarnings = result.warnings.filter(
+      (warning) => warning.code === "unresolved-re-export" && warning.reason === "ambiguous"
+    );
+    expect(ambiguousWarnings.length).toBeGreaterThan(0);
+    expect(ambiguousWarnings[0]?.message).toContain('Could not resolve re-export "');
+    expect(ambiguousWarnings[0]?.message).toContain("more than one starred module exports the same name");
   });
 
   it("accepts diagnostic-free stars that resolve to the same ultimate symbol", async () => {

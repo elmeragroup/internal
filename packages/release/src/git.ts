@@ -5,30 +5,37 @@ import { lift } from "./errors.ts";
 import type { ReleaseError } from "./errors.ts";
 import { PackageManifest } from "./files.ts";
 import { assertCommit } from "./intent.ts";
+import type { CommitSha } from "./intent.ts";
 import { decodeJson } from "./json.ts";
 import type { CommitAncestry } from "./policy.ts";
 import { assertStableReleaseVersion } from "./version.ts";
+import type { StableVersion } from "./version.ts";
 
+/** Git reads the engine needs; failures surface as `ReleaseError` with the git error as `cause`. */
 export type GitPort = {
-  head: () => Effect.Effect<string, ReleaseError>;
-  originMain: () => Effect.Effect<string, ReleaseError>;
+  /** The commit currently checked out in the release checkout. */
+  head: () => Effect.Effect<CommitSha, ReleaseError>;
+  /** The tip of the remote-tracking ref Changesets names as its base branch. */
+  baseBranchTip: () => Effect.Effect<CommitSha, ReleaseError>;
+  /** Whether tracked files differ from `head`; untracked files are ignored. */
   isClean: () => Effect.Effect<boolean, ReleaseError>;
-  stableVersionAt: (revision: string) => Effect.Effect<string, ReleaseError>;
+  /** The stable manifest version recorded at `revision`. */
+  stableVersionAt: (revision: string) => Effect.Effect<StableVersion, ReleaseError>;
 };
 
 function git(cwd: string, args: readonly string[]): string {
   return execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
 }
 
-function isAncestor(cwd: string, ancestor: string, descendant: string): boolean {
-  assertCommit(ancestor);
-  assertCommit(descendant);
+function isAncestor(cwd: string, ancestor: CommitSha, descendant: CommitSha): boolean {
   const result = spawnSync("git", ["merge-base", "--is-ancestor", ancestor, descendant], {
     cwd,
     stdio: "pipe",
   });
   if (result.error !== undefined) throw result.error;
-  if (result.status !== 0 && result.status !== 1) throw new Error("Cannot establish release commit ancestry");
+  if (result.status !== 0 && result.status !== 1) {
+    throw new Error(`Cannot establish release commit ancestry between ${ancestor} and ${descendant}`);
+  }
   return result.status === 0;
 }
 
@@ -45,8 +52,8 @@ export function createCommitAncestry(cwd: string): CommitAncestry {
 export function createGitPort(cwd: string, packageManifest: string, remoteTrackingRef: string): GitPort {
   const manifest = packageManifest.replaceAll("\\", "/");
   return {
-    head: () => lift(() => git(cwd, ["rev-parse", "HEAD"])),
-    originMain: () => lift(() => git(cwd, ["rev-parse", remoteTrackingRef])),
+    head: () => lift(() => assertCommit(git(cwd, ["rev-parse", "HEAD"]))),
+    baseBranchTip: () => lift(() => assertCommit(git(cwd, ["rev-parse", remoteTrackingRef]))),
     isClean: () => lift(() => git(cwd, ["status", "--porcelain", "--untracked-files=no"]) === ""),
     stableVersionAt: (revision) =>
       lift(() => {

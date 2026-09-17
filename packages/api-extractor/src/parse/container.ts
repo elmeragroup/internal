@@ -297,16 +297,13 @@ function finiteTupleSource(
   }
   // A generic instantiation: bind the declaration's parameters to the written
   // arguments so its element nodes describe this spread.
-  const bindings = bindAliasParameters(declaration, context, (index) => {
-    const argument = authoredArguments[index];
-    return argument === undefined
-      ? undefined
-      : applySubstitutions(
-          context.operations.typeAtNode(argument),
-          context.substitutions,
-          context.operations
-        );
-  });
+  const bindings = bindAliasParameters(
+    declaration,
+    authoredArguments.map((argument) =>
+      applySubstitutions(context.operations.typeAtNode(argument), context.substitutions, context.operations)
+    ),
+    context
+  );
   if (bindings === undefined) {
     return finiteTupleSource(body, context, new Set([...visited, node]));
   }

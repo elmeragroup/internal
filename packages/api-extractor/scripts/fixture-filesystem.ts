@@ -62,8 +62,16 @@ export function createFixtureFileSystem(
       record(observer, "getAccessibleEntries", path, false);
       const entries = readdirSync(path, { withFileTypes: true });
       return {
-        files: entries.filter((entry) => entry.isFile()).map((entry) => entry.name),
-        directories: entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name),
+        // Sort both lists: the compiler's virtual filesystem seam must enumerate
+        // a directory in the same order on every platform and run.
+        files: entries
+          .filter((entry) => entry.isFile())
+          .map((entry) => entry.name)
+          .sort(),
+        directories: entries
+          .filter((entry) => entry.isDirectory())
+          .map((entry) => entry.name)
+          .sort(),
       };
     },
     readFile: (fileName) => {

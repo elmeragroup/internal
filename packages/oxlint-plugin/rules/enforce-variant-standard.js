@@ -11,7 +11,9 @@
 import { defineRule } from "@oxlint/plugins";
 
 import { normalizeFilename } from "../filename-normalizer.js";
-import { collectProvenRecipes, isModuleLevelType, recordTypeDeclaration } from "../variant-props-proof.js";
+import { isModuleLevelType, provenRecipes, recordTypeDeclaration } from "../variant-props-proof.js";
+
+/** @import { ESTree } from "@oxlint/plugins" */
 
 /**
  * Component entry: src/components/<name>/<name>.tsx
@@ -30,23 +32,23 @@ function isVariantsModule(filename) {
 }
 
 /**
- * @param {import("estree").Node | null | undefined} callee
+ * @param {ESTree.Node | null | undefined} callee
  */
 function isTvCall(callee) {
   return callee?.type === "Identifier" && callee.name === "tv";
 }
 
 /**
- * @param {import("estree").CallExpression} call
+ * @param {ESTree.CallExpression} call
  * @returns {string | null}
  */
 function recipeBindingName(call) {
   const parent = call.parent;
-  return parent?.type === "VariableDeclarator" && parent.id.type === "Identifier" ? parent.id.name : null;
+  return parent.type === "VariableDeclarator" && parent.id.type === "Identifier" ? parent.id.name : null;
 }
 
 /**
- * @param {import("estree").ObjectExpression} obj
+ * @param {ESTree.ObjectExpression} obj
  * @param {string} name
  */
 function getObjectProp(obj, name) {
@@ -67,7 +69,7 @@ function getObjectProp(obj, name) {
  * A recipe has axes when `variants` is present and not an empty object.
  * Identifiers and spreads count as axes; we cannot see through them.
  *
- * @param {import("estree").ObjectExpression} obj
+ * @param {ESTree.ObjectExpression} obj
  */
 function recipeHasAxes(obj) {
   const variants = getObjectProp(obj, "variants");
@@ -93,38 +95,38 @@ export default defineRule({
     },
     schema: [],
   },
-  defaultOptions: [],
   createOnce(context) {
     let shouldCheck = false;
     let requireVariantProps = false;
-    /** @type {import("estree").CallExpression[]} */
+    /** @type {ESTree.CallExpression[]} */
     const tvCalls = [];
     /** @type {Set<string>} */
     const helperNames = new Set();
-    /** @type {Map<string, import("estree").Node[]>} */
+    /** @type {Map<string, ESTree.Node[]>} */
     const typeDeclarations = new Map();
     /** @type {Set<string>} */
     const exportedNames = new Set();
-    /** @type {import("estree").Node[]} */
+    /** @type {ESTree.Node[]} */
     const parameterTypes = [];
 
     /**
-     * @param {import("estree").Node} node
+     * @param {ESTree.TSTypeAliasDeclaration | ESTree.TSInterfaceDeclaration} node
      */
     function visitTypeDeclaration(node) {
       if (!shouldCheck || !isModuleLevelType(node)) return;
-      const name = node.id?.name;
-      if (typeof name !== "string") return;
+      const name = node.id.name;
       recordTypeDeclaration(name, typeDeclarations, node);
-      if (node.parent?.type === "ExportNamedDeclaration") exportedNames.add(name);
+      if (node.parent.type === "ExportNamedDeclaration") exportedNames.add(name);
     }
 
     /**
-     * @param {import("estree").Node} node
+     * @param {ESTree.Function | ESTree.ArrowFunctionExpression} node
      */
     function visitFunction(node) {
       if (!shouldCheck) return;
-      const annotation = node.params?.[0]?.typeAnnotation?.typeAnnotation;
+      const firstParam = node.params[0];
+      const annotation =
+        firstParam && "typeAnnotation" in firstParam ? firstParam.typeAnnotation?.typeAnnotation : undefined;
       if (annotation) parameterTypes.push(annotation);
     }
 
@@ -176,7 +178,7 @@ export default defineRule({
       "Program:exit"() {
         if (!shouldCheck || tvCalls.length === 0) return;
 
-        /** @type {Array<{ name: string, node: import("estree").CallExpression }>} */
+        /** @type {Array<{ name: string, node: ESTree.CallExpression }>} */
         const axesRecipes = [];
         for (const node of tvCalls) {
           const named = recipeBindingName(node);
@@ -205,18 +207,12 @@ export default defineRule({
 
         if (!requireVariantProps || axesRecipes.length === 0) return;
 
-        /** @type {Set<string>} */
-        const proven = new Set();
-        const collectCtx = { helperNames, typeDeclarations };
-        for (const name of exportedNames) {
-          const decls = typeDeclarations.get(name);
-          if (!decls) continue;
-          const visited = new Set();
-          for (const decl of decls) collectProvenRecipes(decl, collectCtx, visited, proven);
-        }
-        for (const typeNode of parameterTypes) {
-          collectProvenRecipes(typeNode, collectCtx, new Set(), proven);
-        }
+        /** @type {ESTree.Node[]} */
+        const proofRoots = [
+          ...[...exportedNames].flatMap((name) => typeDeclarations.get(name) ?? []),
+          ...parameterTypes,
+        ];
+        const proven = provenRecipes(proofRoots, { helperNames, typeDeclarations });
 
         const uncovered = axesRecipes.find((entry) => !proven.has(entry.name));
         if (uncovered) {

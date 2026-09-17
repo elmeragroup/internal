@@ -12,7 +12,7 @@ import type { GitPort } from "./git.ts";
 import { createGitHubClient, releaseEnvironment } from "./github.ts";
 import type { ReleaseEnvironment } from "./github.ts";
 import { assertCommit } from "./intent.ts";
-import type { ReleaseIntent, VerifiedRelease } from "./intent.ts";
+import type { CanaryIntent, CommitSha, ReleaseIntent, StableIntent, VerifiedRelease } from "./intent.ts";
 import { createNpmPublisher, readRegistry } from "./npm.ts";
 import { changesetBaseBranch, plannedCanaryBase, trackedBranchOf } from "./plan.ts";
 import { decideCanary } from "./policy.ts";
@@ -21,6 +21,7 @@ import type { PublicationDeps } from "./publication.ts";
 import { assertReleaseTag, canaryRecordTag, releaseTag } from "./record.ts";
 import { createReleaseStore } from "./store.ts";
 import type { ReleaseStore, SavedRelease } from "./store.ts";
+import type { StableVersion } from "./version.ts";
 
 /**
  * Consumer seam: stamp packed identity, build, pack, verify, and return the archive bytes the
@@ -30,17 +31,25 @@ export type PackAndVerify = {
   pack: (intent: ReleaseIntent) => Uint8Array;
 };
 
-/** Engine dependencies; publication reads its own subset directly from these. */
-export type EngineDeps = PublicationDeps & {
-  git: GitPort;
+/**
+ * Dependencies shared by the retry and checked-commit paths: the record store, the ancestry
+ * oracle, the registry, the npm publisher, and archive verification. Deliberately free of git,
+ * the stable gate, and the Changesets base branch, so a retry never reads branch configuration.
+ */
+export type ReleaseDeps = PublicationDeps & {
   store: ReleaseStore;
-  stableGate: StableReleaseGate;
-  plannedCanaryBase: (current: string) => Effect.Effect<string, ReleaseError>;
   verifyArchive: (
     intent: ReleaseIntent,
     bytes: Uint8Array
   ) => Effect.Effect<VerifiedRelease, ReleaseError, Scope.Scope>;
   log: (message: string) => void;
+};
+
+/** `ReleaseDeps` plus the branch-scoped ports the checked-commit plan needs. */
+export type CheckedCommitDeps = ReleaseDeps & {
+  git: GitPort;
+  stableGate: StableReleaseGate;
+  plannedCanaryBase: (current: StableVersion) => Effect.Effect<StableVersion, ReleaseError>;
 };
 
 type RecordedRelease = {
@@ -52,7 +61,7 @@ type RecordedRelease = {
 function recordRelease(
   intent: ReleaseIntent,
   adapter: PackAndVerify,
-  deps: EngineDeps
+  deps: ReleaseDeps
 ): Effect.Effect<RecordedRelease, ReleaseError, Scope.Scope> {
   return Effect.gen(function* () {
     const saved = yield* deps.store.create(intent);
@@ -72,7 +81,7 @@ function finishRelease(
   saved: SavedRelease,
   release: VerifiedRelease,
   pkg: ReleasePackage,
-  deps: EngineDeps
+  deps: ReleaseDeps
 ): Effect.Effect<void, ReleaseError> {
   return Effect.gen(function* () {
     const result = yield* publishVerifiedRelease(release, deps);
@@ -88,13 +97,16 @@ function finishRelease(
 }
 
 function mainReleaseIntent(
-  commit: string,
-  deps: EngineDeps
+  commit: CommitSha,
+  deps: CheckedCommitDeps
 ): Effect.Effect<ReleaseIntent | undefined, ReleaseError> {
   return Effect.gen(function* () {
     const previous = yield* deps.git.stableVersionAt(`${commit}^1`);
     const line = yield* deps.stableGate(commit, previous);
-    if (line.channel === "stable") return { channel: "stable", version: line.version, commit } as const;
+    if (line.channel === "stable") {
+      const stable: StableIntent = { channel: "stable", version: line.version, commit };
+      return stable;
+    }
     const recorded = yield* deps.store.find(canaryRecordTag(commit));
     if (recorded !== undefined) return recorded.intent;
     const base = yield* deps.plannedCanaryBase(line.current);
@@ -107,18 +119,24 @@ function mainReleaseIntent(
       deps.log(decision.reason);
       return undefined;
     }
-    return { channel: "canary", version: decision.cut, commit } as const;
+    const canary: CanaryIntent = { channel: "canary", version: decision.cut, commit };
+    return canary;
   });
 }
 
-function assertCheckedCommit(commit: string, deps: EngineDeps): Effect.Effect<void, ReleaseError> {
+function assertCheckedCommit(commit: CommitSha, deps: CheckedCommitDeps): Effect.Effect<void, ReleaseError> {
   return Effect.gen(function* () {
-    const main = yield* deps.git.originMain();
-    if ((yield* deps.git.head()) !== commit) {
-      return yield* new ReleaseError({ message: "Checkout differs from the checked commit" });
+    const baseBranchTip = yield* deps.git.baseBranchTip();
+    const head = yield* deps.git.head();
+    if (head !== commit) {
+      return yield* new ReleaseError({
+        message: `Checkout ${head} differs from the checked commit ${commit}`,
+      });
     }
-    if (!(yield* lift(() => deps.ancestry(commit, main)))) {
-      return yield* new ReleaseError({ message: "Release source is not on main" });
+    if (!(yield* lift(() => deps.ancestry(commit, baseBranchTip)))) {
+      return yield* new ReleaseError({
+        message: `Release source ${commit} is not an ancestor of the tracked branch tip ${baseBranchTip}`,
+      });
     }
     if (!(yield* deps.git.isClean())) {
       return yield* new ReleaseError({ message: "Release requires a clean checkout" });
@@ -131,7 +149,7 @@ export function executeCheckedCommit(
   pkg: ReleasePackage,
   adapter: PackAndVerify,
   commit: string,
-  deps: EngineDeps
+  deps: CheckedCommitDeps
 ): Effect.Effect<void, ReleaseError, Scope.Scope> {
   return Effect.gen(function* () {
     const checked = yield* lift(() => assertCommit(commit));
@@ -143,17 +161,17 @@ export function executeCheckedCommit(
   });
 }
 
-/** Finish a prepared record from its saved archive bytes. Does not pack. */
+/** Finish a prepared record from its saved archive bytes. Does not pack or read branch config. */
 export function executeRetry(
   pkg: ReleasePackage,
   recordTag: string,
-  deps: EngineDeps
+  deps: ReleaseDeps
 ): Effect.Effect<void, ReleaseError, Scope.Scope> {
   return Effect.gen(function* () {
     const tag = yield* lift(() => assertReleaseTag(recordTag));
     const saved = yield* deps.store.find(tag);
     if (saved === undefined) {
-      return yield* new ReleaseError({ message: "No prepared release exists for that tag" });
+      return yield* new ReleaseError({ message: `No prepared release exists for record tag ${tag}` });
     }
     const bytes = yield* deps.store.download(saved);
     const release = yield* deps.verifyArchive(saved.intent, bytes);
@@ -177,23 +195,14 @@ function liveGit(pkg: ReleasePackage, baseBranch: string): GitPort {
   return createGitPort(pkg.checkoutRoot, packageManifestGitPath(pkg), baseBranch);
 }
 
-function liveDeps(pkg: ReleasePackage, environment: ReleaseEnvironment): EngineDeps {
-  const client = createGitHubClient(environment);
-  const baseBranch = changesetBaseBranch(pkg.checkoutRoot);
+/** Everything the retry path builds: no git, stable gate, or Changesets configuration. */
+function liveReleaseDeps(pkg: ReleasePackage, environment: ReleaseEnvironment): ReleaseDeps {
   return {
-    git: liveGit(pkg, baseBranch),
     ancestry: createCommitAncestry(pkg.checkoutRoot),
-    store: createReleaseStore(client, pkg.packageName),
+    store: createReleaseStore(createGitHubClient(environment), pkg.packageName),
     readRegistry: () => readRegistry(pkg.packageName, environment.fetch),
     npm: createNpmPublisher(pkg),
     confirmationInterval: 5_000,
-    stableGate: createStableReleaseGate(
-      client,
-      pkg.checkoutRoot,
-      pkg.packageDirectory,
-      trackedBranchOf(baseBranch)
-    ),
-    plannedCanaryBase: (current) => plannedCanaryBase(current, pkg.packageName, pkg.checkoutRoot),
     verifyArchive: (intent, bytes) => verifyReleaseArchive(intent, bytes, pkg.packageName),
     log: (message) => {
       console.log(message);
@@ -201,13 +210,32 @@ function liveDeps(pkg: ReleasePackage, environment: ReleaseEnvironment): EngineD
   };
 }
 
-function withLiveDeps<A>(
-  pkg: ReleasePackage,
-  environment: () => ReleaseEnvironment,
-  run: (deps: EngineDeps) => Effect.Effect<A, ReleaseError, Scope.Scope>
+/** The checked-commit path reads the Changesets base branch and adds the branch-scoped ports. */
+function liveCheckedCommitDeps(pkg: ReleasePackage, environment: ReleaseEnvironment): CheckedCommitDeps {
+  // `liveReleaseDeps` builds its own client for the store: the client is stateless (it
+  // captures only the environment), so one instance per port owner stays intentional.
+  const client = createGitHubClient(environment);
+  const baseBranch = changesetBaseBranch(pkg.checkoutRoot);
+  return {
+    ...liveReleaseDeps(pkg, environment),
+    git: liveGit(pkg, baseBranch),
+    stableGate: createStableReleaseGate(
+      client,
+      pkg.checkoutRoot,
+      pkg.packageDirectory,
+      trackedBranchOf(baseBranch)
+    ),
+    plannedCanaryBase: (current) => plannedCanaryBase(current, pkg.packageName, pkg.checkoutRoot),
+  };
+}
+
+/** Acquires the given deps and gives `run` their scope; every external failure stays in the channel. */
+function withLiveDeps<D, A>(
+  build: () => D,
+  run: (deps: D) => Effect.Effect<A, ReleaseError, Scope.Scope>
 ): Effect.Effect<A, ReleaseError> {
   return Effect.gen(function* () {
-    const deps = yield* lift(() => liveDeps(pkg, environment()));
+    const deps = yield* lift(build);
     return yield* run(deps);
   }).pipe(Effect.scoped);
 }
@@ -232,14 +260,37 @@ export function createReleaseOperations(environment: () => ReleaseEnvironment): 
         yield* executeCheckReleasePr(pkg, liveGit(pkg, baseBranch), baseBranch);
       }),
     releaseCheckedCommit: (pkg, adapter, commit) =>
-      withLiveDeps(pkg, environment, (deps) => executeCheckedCommit(pkg, adapter, commit, deps)),
+      withLiveDeps(
+        () => liveCheckedCommitDeps(pkg, environment()),
+        (deps) => executeCheckedCommit(pkg, adapter, commit, deps)
+      ),
     retryRelease: (pkg, recordTag) =>
-      withLiveDeps(pkg, environment, (deps) => executeRetry(pkg, recordTag, deps)),
+      withLiveDeps(
+        () => liveReleaseDeps(pkg, environment()),
+        (deps) => executeRetry(pkg, recordTag, deps)
+      ),
   };
 }
 
 const production = createReleaseOperations(releaseEnvironment);
 
+/**
+ * Asserts that the checkout is a complete stable release PR for the Changesets base branch:
+ * the version advances, every changeset is consumed, and the changelog names the version.
+ * Reads only the checkout; GitHub credentials are not required.
+ */
 export const checkReleasePr = production.checkReleasePr;
+
+/**
+ * Publishes the checked main-branch commit: verifies the checkout, plans the stable or canary
+ * release, packs through the adapter, records and verifies the archive, then publishes to npm and
+ * promotes the channel dist-tag. Requires `GITHUB_REPOSITORY` and `GH_TOKEN`, read when it runs.
+ */
 export const releaseCheckedCommit = production.releaseCheckedCommit;
+
+/**
+ * Finishes a prepared release record from its saved archive bytes, verifying them against the
+ * recorded intent before publishing. Never packs and never reads the Changesets configuration.
+ * A missing record fails naming the requested tag; an incomplete one keeps the Merge-job guidance.
+ */
 export const retryRelease = production.retryRelease;

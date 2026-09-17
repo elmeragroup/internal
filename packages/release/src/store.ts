@@ -3,8 +3,8 @@ import type { Effect } from "effect";
 
 import { liftPromise } from "./errors.ts";
 import type { ReleaseError } from "./errors.ts";
-import { GitHubRelease, GitHubReleaseAsset, GitHubTagRef } from "./github.ts";
-import type { GitHubClient } from "./github.ts";
+import { GitHubRelease, GitHubReleaseAsset, GitHubTagRef, releaseId } from "./github.ts";
+import type { GitHubClient, ReleaseId } from "./github.ts";
 import type { ReleaseIntent } from "./intent.ts";
 import {
   classifyReleaseAsset,
@@ -14,20 +14,28 @@ import {
   serializeIntent,
 } from "./record.ts";
 import type { ReleaseAsset } from "./record.ts";
+import type { CanaryVersion } from "./version.ts";
 
+/** A durable GitHub release record: its release identity, parsed intent, and archive asset state. */
 export type SavedRelease = {
-  id: number;
+  id: ReleaseId;
   intent: ReleaseIntent;
   asset: ReleaseAsset;
 };
 
+/**
+ * Record-store port. `find` throws for a damaged or foreign occupant of the requested tag and
+ * returns `undefined` for a tag with no record; `create` is idempotent for a matching record;
+ * `upload` repairs an interrupted preparation but never replaces a recorded archive; `download`
+ * refuses an incomplete record; `complete` publishes the draft release.
+ */
 export type ReleaseStore = {
   find: (tag: string) => Effect.Effect<SavedRelease | undefined, ReleaseError>;
   create: (intent: ReleaseIntent) => Effect.Effect<SavedRelease, ReleaseError>;
   upload: (release: SavedRelease, bytes: Uint8Array) => Effect.Effect<SavedRelease, ReleaseError>;
   download: (release: SavedRelease) => Effect.Effect<Uint8Array, ReleaseError>;
   complete: (release: SavedRelease) => Effect.Effect<void, ReleaseError>;
-  reservedCanaryVersions: () => Effect.Effect<string[], ReleaseError>;
+  reservedCanaryVersions: () => Effect.Effect<readonly CanaryVersion[], ReleaseError>;
 };
 
 type CatalogEntry =
@@ -57,7 +65,7 @@ function savedReleaseFrom(value: GitHubRelease, intent: ReleaseIntent): SavedRel
   const assets = value.assets.filter((asset) => asset.name === releaseArchiveName);
   if (assets.length > 1) throw new Error("Duplicate release archives");
   return {
-    id: value.id,
+    id: releaseId(value.id),
     intent,
     asset: classifyReleaseAsset(value.draft === true, assets[0]),
   };
@@ -95,6 +103,10 @@ function savedFromRecord(value: GitHubRelease): SavedRelease {
   throw new Error("A foreign GitHub release occupies the record tag");
 }
 
+/**
+ * Builds the GitHub release store for one package. The first read lists every release page once and
+ * caches the catalog for the life of the store, so later reads and writes see one consistent view.
+ */
 export function createReleaseStore(client: GitHubClient, packageName: string): ReleaseStore {
   const { root, request } = client;
   let catalog: ReleaseCatalog | undefined;
@@ -157,7 +169,7 @@ export function createReleaseStore(client: GitHubClient, packageName: string): R
     return undefined;
   }
 
-  async function readSaved(id: number): Promise<SavedRelease> {
+  async function readSaved(id: ReleaseId): Promise<SavedRelease> {
     const value = await client.jsonFrom(`${root}/releases/${String(id)}`, GitHubRelease, "GitHub release");
     const saved = savedFromRecord(value);
     await assertTagMatchesCommit(releaseTag(saved.intent), saved);
@@ -256,8 +268,8 @@ export function createReleaseStore(client: GitHubClient, packageName: string): R
     );
   }
 
-  async function reservedCanaryVersions(): Promise<string[]> {
-    const versions: string[] = [];
+  async function reservedCanaryVersions(): Promise<readonly CanaryVersion[]> {
+    const versions: CanaryVersion[] = [];
     for (const entry of (await releaseCatalog()).values()) {
       if (entry.kind === "saved" && entry.release.intent.channel === "canary") {
         versions.push(entry.release.intent.version);

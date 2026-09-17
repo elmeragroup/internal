@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, lstatSync, readdirSync, realpathSync } from "node:fs";
+import { existsSync, readdirSync, realpathSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { posixRelative, sha256File } from "./files.ts";
@@ -43,7 +43,15 @@ export type ReferenceAuditResult = {
   readonly command: string;
 };
 
-export const referenceAvailable = existsSync(pinnedUpstream.root);
+/**
+ * Whether the ignored pinned upstream checkout is present. Probed per call so
+ * importing this module performs no filesystem I/O.
+ *
+ * @returns `true` when the reference checkout root exists.
+ */
+export function referenceAvailable(): boolean {
+  return existsSync(pinnedUpstream.root);
+}
 
 const generatedFixtureFiles = new Set(["output.tsgo.json", "warnings.tsgo.json", "ts7-oracle.json"]);
 
@@ -57,8 +65,11 @@ function filesRecursively(root: string): readonly string[] {
   for (const entry of readdirSync(root, { withFileTypes: true })) {
     const path = join(root, entry.name);
     if (entry.isDirectory()) result.push(...filesRecursively(path));
-    else if (entry.isFile()) result.push(path);
-    else if (lstatSync(path).isFile()) result.push(path);
+    // `readdir` reports a symlink as neither a directory nor a file, but the
+    // recorded path universe comes from `git ls-tree`, which tracks the link
+    // itself. Classifying with the dirent counts it like any other file and
+    // never follows a target that may be absent.
+    else if (entry.isFile() || entry.isSymbolicLink()) result.push(path);
   }
   return result.sort();
 }

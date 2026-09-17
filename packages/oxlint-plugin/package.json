@@ -10,13 +10,17 @@
     }
   },
   "scripts": {
-    "test": "vitest run"
+    "test": "vitest run",
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
     "@oxlint/plugins": "catalog:"
   },
   "devDependencies": {
+    "@elmeragroup/typescript-config": "workspace:*",
+    "@types/node": "catalog:",
     "oxlint": "catalog:",
+    "typescript": "catalog:",
     "vitest": "catalog:"
   }
 }

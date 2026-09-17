@@ -1,31 +1,35 @@
-import type { ReleaseIntent, VerifiedRelease } from "./intent.ts";
+import type { CanaryIntent, CommitSha, ReleaseIntent, StableIntent, VerifiedRelease } from "./intent.ts";
 import type { Registry } from "./npm.ts";
 import {
+  assertCanaryReleaseVersion,
   compareCanaryVersions,
   compareStableVersions,
   formatCanaryVersion,
   isCanaryReleaseVersion,
   isStableReleaseVersion,
   parseCanaryVersion,
-  parseStableVersion,
 } from "./version.ts";
+import type { CanaryVersion, StableVersion } from "./version.ts";
 
-export type CommitAncestry = (ancestor: string, descendant: string) => boolean;
+/** Whether `ancestor` is an ancestor of `descendant` in the release checkout. */
+export type CommitAncestry = (ancestor: CommitSha, descendant: CommitSha) => boolean;
 
 /** Whether a commit still owns its canary channel, or which published release already covers it. */
 export type CanarySupersession = "owned" | "canary-superseded" | "stable-superseded";
 
+/** What publication should do with a verified release against one registry read. */
 export type PublicationPlan = { kind: "superseded" } | { kind: "publish"; upload: boolean; promote: boolean };
 
 const conflictingCanaryVersion =
   "Commit already has a different canary version or its durable release record is missing";
 
+/** The npm dist-tag a channel promotes: `latest` for stable, `canary` otherwise. */
 export function distTagFor(channel: ReleaseIntent["channel"]): "canary" | "latest" {
   return channel === "stable" ? "latest" : "canary";
 }
 
-function highestStableVersion(registry: Registry): string | undefined {
-  let highest: string | undefined;
+function highestStableVersion(registry: Registry): StableVersion | undefined {
+  let highest: StableVersion | undefined;
   for (const version of registry.versions.keys()) {
     if (!isStableReleaseVersion(version)) continue;
     if (highest === undefined || compareStableVersions(version, highest) > 0) highest = version;
@@ -33,8 +37,8 @@ function highestStableVersion(registry: Registry): string | undefined {
   return highest;
 }
 
-function publishedCanaryCommits(registry: Registry): { version: string; commit: string }[] {
-  const canaries: { version: string; commit: string }[] = [];
+function publishedCanaryCommits(registry: Registry): { version: CanaryVersion; commit: CommitSha }[] {
+  const canaries: { version: CanaryVersion; commit: CommitSha }[] = [];
   for (const [version, published] of registry.versions) {
     if (isCanaryReleaseVersion(version) && published.commit !== undefined) {
       canaries.push({ version, commit: published.commit });
@@ -44,12 +48,12 @@ function publishedCanaryCommits(registry: Registry): { version: string; commit: 
 }
 
 type CanaryHistory = {
-  publishedVersion: string | undefined;
+  publishedVersion: CanaryVersion | undefined;
   superseded: boolean;
 };
 
-function canaryHistory(commit: string, registry: Registry, isAncestor: CommitAncestry): CanaryHistory {
-  const versionsForCommit: string[] = [];
+function canaryHistory(commit: CommitSha, registry: Registry, isAncestor: CommitAncestry): CanaryHistory {
+  const versionsForCommit: CanaryVersion[] = [];
   let diverged = false;
   let descendant = false;
   for (const published of publishedCanaryCommits(registry)) {
@@ -70,9 +74,9 @@ function canaryHistory(commit: string, registry: Registry, isAncestor: CommitAnc
 
 /** The canary a main commit would cut: its source commit, the checked-out line, and the planned base. */
 export type CanaryTarget = {
-  commit: string;
-  current: string;
-  base: string;
+  commit: CommitSha;
+  current: StableVersion;
+  base: StableVersion;
 };
 
 /**
@@ -82,11 +86,11 @@ export type CanaryTarget = {
  * version is owned rather than a conflict.
  */
 export function canarySupersession(
-  commit: string,
-  base: string,
+  commit: CommitSha,
+  base: StableVersion,
   registry: Registry,
   isAncestor: CommitAncestry,
-  recordedVersion?: string
+  recordedVersion?: CanaryVersion
 ): CanarySupersession {
   const history = canaryHistory(commit, registry, isAncestor);
   if (history.publishedVersion !== undefined && history.publishedVersion !== recordedVersion) {
@@ -105,7 +109,7 @@ export function canarySupersession(
 export type CanarySkip = Exclude<CanarySupersession, "owned"> | "regressed-base";
 
 /** The Canary decision: the version to cut, or the skip and its sentence. */
-export type CanaryDecision = { cut: string } | { skip: CanarySkip; reason: string };
+export type CanaryDecision = { cut: CanaryVersion } | { skip: CanarySkip; reason: string };
 
 const skipReasons = {
   "canary-superseded": "Skipping a commit superseded by a published canary",
@@ -121,8 +125,7 @@ function skip(kind: CanarySkip): CanaryDecision {
  * Numbers the next canary for `base`, or reports `undefined` when a published or reserved canary
  * already belongs to a newer base. A regressed base skips; it never blocks publication.
  */
-function nextCanaryVersion(base: string, taken: readonly string[]): string | undefined {
-  parseStableVersion(base);
+function nextCanaryVersion(base: StableVersion, taken: readonly string[]): CanaryVersion | undefined {
   let highest = -1n;
   for (const version of taken) {
     if (!isCanaryReleaseVersion(version)) continue;
@@ -141,7 +144,7 @@ function nextCanaryVersion(base: string, taken: readonly string[]): string | und
 export function decideCanary(
   target: CanaryTarget,
   registry: Registry,
-  reserved: readonly string[],
+  reserved: readonly CanaryVersion[],
   isAncestor: CommitAncestry
 ): CanaryDecision {
   if (compareStableVersions(target.base, target.current) <= 0) {
@@ -167,7 +170,11 @@ export function npmIdentity(release: VerifiedRelease, registry: Registry): "abse
   return "match";
 }
 
-function descendantStableSupersedes(commit: string, registry: Registry, isAncestor: CommitAncestry): boolean {
+function descendantStableSupersedes(
+  commit: CommitSha,
+  registry: Registry,
+  isAncestor: CommitAncestry
+): boolean {
   for (const [version, published] of registry.versions) {
     if (!isStableReleaseVersion(version) || published.commit === undefined) continue;
     if (isAncestor(commit, published.commit)) return true;
@@ -175,7 +182,7 @@ function descendantStableSupersedes(commit: string, registry: Registry, isAncest
   return false;
 }
 
-function stableTakesLatest(release: ReleaseIntent, registry: Registry): boolean {
+function stableTakesLatest(release: StableIntent, registry: Registry): boolean {
   const current = registry.tags.get(distTagFor(release.channel));
   if (current === undefined) return true;
   if (current === release.version) return false;
@@ -185,16 +192,20 @@ function stableTakesLatest(release: ReleaseIntent, registry: Registry): boolean 
   return compareStableVersions(release.version, current) > 0;
 }
 
-function canaryTakesTag(release: ReleaseIntent, registry: Registry): boolean {
+function canaryTakesTag(release: CanaryIntent, registry: Registry): boolean {
   const current = registry.tags.get(distTagFor(release.channel));
   if (current === undefined) return true;
   if (current === release.version) return false;
   // Reachable only once canarySupersession accepted this commit's ancestry, so a tagged canary that
   // records its source commit is behind us. Versions predating that metadata fall back to suffix order.
   if (registry.versions.get(current)?.commit !== undefined) return true;
-  return compareCanaryVersions(release.version, current) > 0;
+  return compareCanaryVersions(release.version, assertCanaryReleaseVersion(current)) > 0;
 }
 
+/**
+ * Decides what `release` needs against the registry: upload a missing archive, promote a dist-tag,
+ * both, or nothing because a newer release supersedes it. A same-version identity mismatch throws.
+ */
 export function planPublication(
   release: VerifiedRelease,
   registry: Registry,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { assertCommit } from "../src/intent.ts";
+import { assertCommit, isCommit } from "../src/intent.ts";
 import type { ReleaseIntent } from "../src/intent.ts";
 import {
   assertReleaseTag,
@@ -12,10 +12,10 @@ import {
   releaseTag,
   serializeIntent,
 } from "../src/record.ts";
+import { commit, releaseIntent } from "./lib/release-fixtures.ts";
 
-const commit = "a".repeat(40);
-const stable: ReleaseIntent = { channel: "stable", version: "0.2.0", commit };
-const canary: ReleaseIntent = { channel: "canary", version: "0.3.0-canary.0", commit };
+const stable: ReleaseIntent = releaseIntent("0.2.0");
+const canary: ReleaseIntent = releaseIntent("0.3.0-canary.0");
 
 describe("release record identity", () => {
   it("parses unmarked schema-1 and marked owned schema-1", () => {
@@ -61,8 +61,15 @@ describe("release record identity", () => {
     expect(assertReleaseTag("v0.2.0")).toBe("v0.2.0");
     expect(() => assertReleaseTag("v1")).toThrow("record tag");
     expect(assertCommit(commit)).toBe(commit);
-    expect(() => assertCommit("HEAD")).toThrow("full commit SHA");
   });
+
+  it.each(["HEAD", "origin/main", "0".repeat(39), "0".repeat(41), "A".repeat(40), "0123456f"])(
+    "rejects %s as a commit SHA",
+    (invalid) => {
+      expect(isCommit(invalid)).toBe(false);
+      expect(() => assertCommit(invalid)).toThrow(`Expected a full commit SHA; received ${invalid}`);
+    }
+  );
 });
 
 describe("release record classification", () => {

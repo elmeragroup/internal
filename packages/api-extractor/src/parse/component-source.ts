@@ -12,6 +12,7 @@ import type {
   ComponentSourceResult,
   ComponentSourceUnresolvedReason,
 } from "../component-sources.ts";
+import { primaryDeclaration, symbolDeclarations } from "./ownership.ts";
 import { isReactWrapperCall } from "./react-policy.ts";
 
 type SourceOperations = Pick<
@@ -108,7 +109,7 @@ function followSymbol(
   if (implementation !== undefined) {
     return followNode(operations, implementation, walk);
   }
-  const declaration = facts.valueDeclaration ?? facts.declarations[0];
+  const declaration = primaryDeclaration(facts);
   if (declaration === undefined) return unresolved("no-implementation");
   return followNode(operations, declaration, walk);
 }
@@ -172,11 +173,7 @@ function functionImplementations(
   operations: SourceOperations,
   facts: BackendSymbolFacts
 ): readonly BackendNodeHandle[] {
-  const declarations = [
-    ...facts.declarations,
-    ...(facts.valueDeclaration === undefined ? [] : [facts.valueDeclaration]),
-  ].filter((declaration, index, all) => all.indexOf(declaration) === index);
-  return declarations.filter((declaration) => {
+  return symbolDeclarations(facts).filter((declaration) => {
     const nodeFacts = operations.nodeFacts(declaration);
     return isFunctionKind(nodeFacts) && nodeFacts.hasImplementationBody === true;
   });

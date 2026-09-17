@@ -17,6 +17,10 @@ type FallbackWarning = Omit<
   sourceText?: string;
 };
 
+/**
+ * Renders the human-readable `message` for one structured warning, once at the package
+ * boundary. Consumers should branch on `code` and its fields, not on this text.
+ */
 export function warningMessage(warning: BackendWarningFact): ExtractWarning {
   if (warning.code === "missing-enum-declaration") {
     return {

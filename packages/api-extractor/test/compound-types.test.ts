@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { ExtractionResultSchema, ProjectExtractor } from "../src/index.ts";
 import type { ExtractionResult, PropertyNode, SemanticType } from "../src/index.ts";
+import { exportedType } from "./support/exports.ts";
 import { extractFixture } from "./support/extract.ts";
 
 const fixtureDirectory = resolve(import.meta.dirname, "fixtures/canonical-cycles-and-ordering");
@@ -21,12 +22,6 @@ function runTwiceInOneProject(): Promise<readonly [ExtractionResult, ExtractionR
       }).pipe(Effect.provide(ProjectExtractor.live({ tsconfigPath })))
     )
   );
-}
-
-function exportedType(result: ExtractionResult, name: string): SemanticType {
-  const entry = result.module.exports.find((candidate) => candidate.name === name);
-  if (entry === undefined) throw new Error(`Missing export: ${name}`);
-  return entry.type;
 }
 
 /** The public name a compound member carries, if its model kind has one. */
