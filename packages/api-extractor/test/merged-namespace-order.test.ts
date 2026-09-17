@@ -31,7 +31,7 @@ describe("Merged value and namespace exports", () => {
     expect(namesUnder("EnumNamespaceFirst")).toEqual(["", ".A", ".member"]);
     expect(namesUnder("EnumValueFirst")).toEqual(["", ".A", ".member"]);
     expect(namesUnder("ValueFirst")).toEqual(["", ".member"]);
-    expect(namesUnder("ClassValueFirst")).toEqual(["", ".member", ".prototype"]);
+    expect(namesUnder("ClassValueFirst")).toEqual(["", ".member"]);
 
     // The enum reports both its own member and the namespace's const, in the
     // checker's declaration order for each merge form.
@@ -51,5 +51,9 @@ describe("Merged value and namespace exports", () => {
     });
     expect(exportedType(result, "ValueFirst")).toMatchObject({ kind: "function" });
     expect(exportedType(result, "ClassValueFirst")).toMatchObject({ kind: "class" });
+
+    // A merged namespace const resolves to its literal value, so it is a
+    // recovered member, not a lost declaration: the merge must be warning-free.
+    expect(result.warnings).toEqual([]);
   });
 });

@@ -1,6 +1,7 @@
 import {
   chmodSync,
   existsSync,
+  linkSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -378,10 +379,16 @@ describe("artifact batch writer", () => {
         outputRoot: root,
         artifacts: [{ destination: "linked/escaped.json", content: "escaped\n", evidence: "generated" }],
       });
-      expect(symlinkEscape.status).toBe("failure");
-      if (symlinkEscape.status === "failure") {
-        expect(symlinkEscape.error.category).toBe("symlink-escape");
-      }
+      // A prepare-stage rejection never staged or swapped a file, so it must
+      // not claim a recovery state for a transaction that never existed.
+      expect(symlinkEscape).toEqual({
+        status: "failure",
+        error: {
+          category: "symlink-escape",
+          message: "Artifact destination passes through a symlink.",
+          destination: "linked/escaped.json",
+        },
+      });
 
       expect(readFileSync(join(root, "fixture/output.json"), "utf8")).toBe("upstream oracle\n");
       expect(existsSync(join(root, "fixture/generated.json"))).toBe(false);
@@ -391,6 +398,82 @@ describe("artifact batch writer", () => {
     } finally {
       rmSync(root, { recursive: true, force: true });
       rmSync(outside, { recursive: true, force: true });
+    }
+  });
+
+  it("reports prepare-stage rejections without claiming restored state", async () => {
+    const root = mkdtempSync(join(tmpdir(), "api-extractor-artifact-prepare-"));
+    try {
+      mkdirSync(join(root, "fixture"));
+      writeFileSync(join(root, "fixture/output.json"), "upstream oracle\n");
+      writeFileSync(join(root, "existing-file"), "file\n");
+      writeFileSync(join(root, "linked-a.json"), "linked\n");
+      linkSync(join(root, "linked-a.json"), join(root, "linked-b.json"));
+      symlinkSync(join(root, "linked-a.json"), join(root, "linked-directory"));
+
+      const immutable = await writeArtifactBatch({
+        outputRoot: root,
+        artifacts: [{ destination: "fixture/output.json", content: "replacement\n", evidence: "generated" }],
+      });
+      expect(immutable).toEqual({
+        status: "failure",
+        error: {
+          category: "immutable-oracle",
+          message: "Immutable upstream output.json evidence cannot be overwritten.",
+          destination: "fixture/output.json",
+        },
+      });
+
+      const fileDirectoryConflict = await writeArtifactBatch({
+        outputRoot: root,
+        artifacts: [{ destination: "existing-file/nested.json", content: "nested\n", evidence: "generated" }],
+      });
+      expect(fileDirectoryConflict).toEqual({
+        status: "failure",
+        error: {
+          category: "file-directory-conflict",
+          message: "Artifact destination requires a directory where a file already exists.",
+          destination: "existing-file/nested.json",
+        },
+      });
+
+      const duplicate = await writeArtifactBatch({
+        outputRoot: root,
+        artifacts: [
+          { destination: "linked-a.json", content: "first\n", evidence: "generated" },
+          { destination: "linked-b.json", content: "second\n", evidence: "generated" },
+        ],
+      });
+      expect(duplicate).toEqual({
+        status: "failure",
+        error: {
+          category: "duplicate-destination",
+          message: "Artifact destination aliases linked-a.json.",
+          destination: "linked-b.json",
+        },
+      });
+
+      const symlinkEscape = await writeArtifactBatch({
+        outputRoot: root,
+        artifacts: [
+          { destination: "linked-directory/escaped.json", content: "escaped\n", evidence: "generated" },
+        ],
+      });
+      expect(symlinkEscape).toEqual({
+        status: "failure",
+        error: {
+          category: "symlink-escape",
+          message: "Artifact destination passes through a symlink.",
+          destination: "linked-directory/escaped.json",
+        },
+      });
+
+      expect(readFileSync(join(root, "fixture/output.json"), "utf8")).toBe("upstream oracle\n");
+      expect(readFileSync(join(root, "linked-a.json"), "utf8")).toBe("linked\n");
+      expect(readFileSync(join(root, "linked-b.json"), "utf8")).toBe("linked\n");
+      expect(transactionEntries(root)).toEqual([]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
     }
   });
 

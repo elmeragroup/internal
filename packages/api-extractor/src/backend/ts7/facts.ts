@@ -1,6 +1,7 @@
 /**
- * SIZE CEILING: 665. Nothing more lands here before the node-facts or
- * type-name machinery splits into its own sibling (`class-facts.ts` style).
+ * SIZE CEILING: 680. The enum-member recovery and the TypeScript 7 fact surface
+ * need this headroom today; the node-facts or type-name machinery must split
+ * into its own sibling (`class-facts.ts` style) before anything else lands here.
  */
 
 import type { InterfaceDeclaration, Node, TypeNode } from "typescript/unstable/ast";
@@ -98,6 +99,7 @@ export type TsgoFactsSession = {
   readonly resolveNode: (node: {
     readonly index: number;
     readonly path: string;
+    readonly kind: Node["kind"];
     readonly resolve: () => Node | undefined;
   }) => Node | undefined;
   readonly nodePath: (node: BackendNodeReference) => string;
@@ -322,15 +324,15 @@ function enumFacts(
     const inferredValue =
       value ??
       (memberType?.isLiteralType() === true && isLiteral(memberType.value) ? memberType.value : undefined);
-    if (
-      declaration === undefined ||
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- literal values are narrowed at the compiler boundary.
-      (typeof inferredValue !== "string" && typeof inferredValue !== "number")
-    ) {
-      warnings.push(enumWarning(session, symbol, member.name));
-    }
+    // A merged namespace member (the namespace's `const` in an enum merge) has
+    // no enum-member declaration, yet it resolves to its literal value and is
+    // emitted below. Warn only when no literal value could be recovered, which
+    // is exactly the case where the member is lost.
     // oxlint-disable-next-line anti-slop/no-runtime-typeof -- literal values are narrowed at the compiler boundary.
-    if (typeof inferredValue !== "string" && typeof inferredValue !== "number") continue;
+    if (typeof inferredValue !== "string" && typeof inferredValue !== "number") {
+      warnings.push(enumWarning(session, symbol, member.name));
+      continue;
+    }
     const memberDocumentation = documentationOf(session.symbolHandle(member));
     members.push({
       name: member.name,
