@@ -11,7 +11,7 @@
 import { defineRule } from "@oxlint/plugins";
 
 import { normalizeFilename } from "../filename-normalizer.js";
-import { collectProvenRecipes, isModuleLevelType, recordTypeDeclaration } from "../variant-props-proof.js";
+import { isModuleLevelType, provenRecipes, recordTypeDeclaration } from "../variant-props-proof.js";
 
 /** @import { ESTree } from "@oxlint/plugins" */
 
@@ -115,7 +115,6 @@ export default defineRule({
     function visitTypeDeclaration(node) {
       if (!shouldCheck || !isModuleLevelType(node)) return;
       const name = node.id.name;
-      if (typeof name !== "string") return;
       recordTypeDeclaration(name, typeDeclarations, node);
       if (node.parent.type === "ExportNamedDeclaration") exportedNames.add(name);
     }
@@ -208,21 +207,12 @@ export default defineRule({
 
         if (!requireVariantProps || axesRecipes.length === 0) return;
 
-        /** @type {Set<string>} */
-        const proven = new Set();
-        const collectCtx = { helperNames, typeDeclarations };
-        for (const name of exportedNames) {
-          const decls = typeDeclarations.get(name);
-          if (!decls) continue;
-          /** @type {Set<ESTree.Node>} */
-          const visited = new Set();
-          for (const decl of decls) collectProvenRecipes(decl, collectCtx, visited, proven);
-        }
-        for (const typeNode of parameterTypes) {
-          /** @type {Set<ESTree.Node>} */
-          const visited = new Set();
-          collectProvenRecipes(typeNode, collectCtx, visited, proven);
-        }
+        /** @type {ESTree.Node[]} */
+        const proofRoots = [
+          ...[...exportedNames].flatMap((name) => typeDeclarations.get(name) ?? []),
+          ...parameterTypes,
+        ];
+        const proven = provenRecipes(proofRoots, { helperNames, typeDeclarations });
 
         const uncovered = axesRecipes.find((entry) => !proven.has(entry.name));
         if (uncovered) {

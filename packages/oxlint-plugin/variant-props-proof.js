@@ -88,15 +88,29 @@ function heritageReferenceOf(heritage) {
 }
 
 /**
- * Collect every recipe name proven by a type node, following module-level aliases
+ * Collect every recipe name proven by the given type roots, following module-level aliases
  * and interface heritage until a VariantProps helper is found or the chain ends.
  *
- * @param {ESTree.Node | null | undefined} typeNode - The type node to walk.
+ * @param {readonly (ESTree.Node | null | undefined)[]} roots - The type nodes to walk.
  * @param {{ helperNames: Set<string>, typeDeclarations: Map<string, ESTree.Node[]> }} ctx - Module-level proof context.
- * @param {Set<ESTree.Node>} visited - Declarations already walked, to break cycles.
- * @param {Set<string>} out - Accumulator for proven recipe names.
+ * @returns {Set<string>} The proven recipe names.
  */
-export function collectProvenRecipes(typeNode, ctx, visited, out) {
+export function provenRecipes(roots, ctx) {
+  /** @type {Set<ESTree.Node>} */
+  const visited = new Set();
+  /** @type {Set<string>} */
+  const out = new Set();
+  for (const root of roots) collectProvenRecipes(root, ctx, visited, out);
+  return out;
+}
+
+/**
+ * @param {ESTree.Node | null | undefined} typeNode
+ * @param {{ helperNames: Set<string>, typeDeclarations: Map<string, ESTree.Node[]> }} ctx
+ * @param {Set<ESTree.Node>} visited
+ * @param {Set<string>} out
+ */
+function collectProvenRecipes(typeNode, ctx, visited, out) {
   if (!typeNode) return;
 
   if (typeNode.type === "TSTypeAliasDeclaration") {

@@ -1,6 +1,7 @@
 // Lifted from kumo lint/no-tailwind-dark-variant.js (MIT, Copyright (c) 2026 Cloudflare, Inc.).
 import { defineRule } from "@oxlint/plugins";
 
+import { classTokens } from "../class-tokens.js";
 import { extractStrings } from "../extract-strings.js";
 
 /** @import { ESTree } from "@oxlint/plugins" */
@@ -47,19 +48,7 @@ function tokenHasDarkVariant(token) {
  * @param {string} str
  */
 function hasDarkVariant(str) {
-  return str.split(/\s+/).some((token) => token !== "" && tokenHasDarkVariant(token));
-}
-
-/**
- * @param {ESTree.Node} node
- */
-function isInsideJsxAttribute(node) {
-  let current = node.parent;
-  while (current) {
-    if (current.type === "JSXAttribute") return true;
-    current = current.parent;
-  }
-  return false;
+  return classTokens(str).some((token) => tokenHasDarkVariant(token));
 }
 
 export default defineRule({
@@ -80,39 +69,18 @@ export default defineRule({
      * @param {string[]} collected
      */
     function reportIfDark(node, collected) {
-      for (const s of collected) {
-        if (hasDarkVariant(s)) {
-          context.report({ node, messageId: RULE_NAME });
-          return;
-        }
+      if (collected.some(hasDarkVariant)) {
+        context.report({ node, messageId: RULE_NAME });
       }
     }
 
     return {
-      JSXAttribute(node) {
-        const name = node.name.type === "JSXIdentifier" ? node.name.name : undefined;
-        if (name !== "className" && name !== "class") return;
-
-        if (node.value) {
-          reportIfDark(node, extractStrings(node.value));
-        }
-      },
       Literal(node) {
-        if (typeof node.value !== "string" || !hasDarkVariant(node.value) || isInsideJsxAttribute(node)) {
-          return;
-        }
-
-        context.report({ node, messageId: RULE_NAME });
+        if (typeof node.value !== "string") return;
+        reportIfDark(node, [node.value]);
       },
       TemplateLiteral(node) {
-        if (isInsideJsxAttribute(node)) {
-          return;
-        }
-
-        const strings = extractStrings(node);
-        if (strings.some(hasDarkVariant)) {
-          context.report({ node, messageId: RULE_NAME });
-        }
+        reportIfDark(node, extractStrings(node));
       },
     };
   },

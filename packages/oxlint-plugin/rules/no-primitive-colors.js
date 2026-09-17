@@ -1,6 +1,7 @@
 // Adapted from kumo lint/no-primitive-colors.js (MIT, Copyright (c) 2026 Cloudflare, Inc.).
 import { defineRule } from "@oxlint/plugins";
 
+import { classTokens } from "../class-tokens.js";
 import { extractStrings } from "../extract-strings.js";
 
 /** @import { ESTree } from "@oxlint/plugins" */
@@ -190,9 +191,8 @@ function isAllowedExactClass(token) {
  * @param {string} str
  */
 function stripAllowedClasses(str) {
-  return str
-    .split(/\s+/)
-    .filter((token) => token.length > 0 && !isAllowedExactClass(token))
+  return classTokens(str)
+    .filter((token) => !isAllowedExactClass(token))
     .join(" ");
 }
 

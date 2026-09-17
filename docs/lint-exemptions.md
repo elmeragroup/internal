@@ -14,9 +14,10 @@ One exemption remains:
 
 The package previously disabled the `typescript/no-unsafe-*` checks and
 `typescript/no-redundant-type-constituents`. Those were not about JavaScript: the package had no
-`tsconfig.json`, so its JSDoc `import("estree")` types resolved to `error`-typed values. With the
-package's own program in place (`tsconfig.json` + `type-check`), all six exemptions are provably
-unnecessary — removing them yields zero diagnostics.
+`tsconfig.json`, and its JSDoc `import("estree")` types pointed at a dependency the package did not
+declare, so they resolved to `error`-typed values. With the package's own program in place
+(`tsconfig.json` + `type-check`) and the JSDoc imports retargeted to `@oxlint/plugins`, all six
+exemptions are provably unnecessary — removing them yields zero diagnostics.
 
 ## `packages/oxlint-anti-slop/**`
 
