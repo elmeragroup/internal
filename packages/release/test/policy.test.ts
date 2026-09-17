@@ -5,7 +5,7 @@ import type { VerifiedRelease } from "../src/intent.ts";
 import type { Registry } from "../src/npm.ts";
 import { decideCanary, distTagFor, planPublication, shouldPromote } from "../src/policy.ts";
 import type { CommitAncestry } from "../src/policy.ts";
-import { assertStableReleaseVersion } from "../src/version.ts";
+import { assertCanaryReleaseVersion, assertStableReleaseVersion } from "../src/version.ts";
 import { commit, newerCommit, unrelatedCommit, verifiedRelease } from "./lib/release-fixtures.ts";
 
 const canary: VerifiedRelease = verifiedRelease("0.2.0-canary.11");
@@ -35,7 +35,7 @@ function decision(options: CanaryDecisionOptions = {}) {
       base: assertStableReleaseVersion(options.plannedBase ?? "0.2.0"),
     },
     options.registry ?? registry(),
-    options.reserved ?? [],
+    (options.reserved ?? []).map(assertCanaryReleaseVersion),
     options.ancestry ?? isAncestor
   );
 }

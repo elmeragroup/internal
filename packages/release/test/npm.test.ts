@@ -47,6 +47,46 @@ describe("registry failures", () => {
     );
     expect(registry.versions.get("0.1.0")?.commit).toBeUndefined();
   });
+  it("tolerates a release record without a recorded commit", async () => {
+    const registry = await Effect.runPromise(
+      readRegistry(packageName, () =>
+        Promise.resolve(
+          Response.json({
+            versions: { "0.1.0": { dist: {}, elmeraRelease: {} } },
+            "dist-tags": {},
+          })
+        )
+      )
+    );
+    expect(registry.versions.get("0.1.0")?.commit).toBeUndefined();
+  });
+  it("prefers a usable elmeraRelease commit over gitHead", async () => {
+    const legacy = "b".repeat(40);
+    const registry = await Effect.runPromise(
+      readRegistry(packageName, () =>
+        Promise.resolve(
+          Response.json({
+            versions: { "0.1.0": { dist: {}, elmeraRelease: { commit }, gitHead: legacy } },
+            "dist-tags": {},
+          })
+        )
+      )
+    );
+    expect(registry.versions.get("0.1.0")?.commit).toBe(commit);
+  });
+  it("does not fall back to gitHead when the release record is unusable", async () => {
+    const registry = await Effect.runPromise(
+      readRegistry(packageName, () =>
+        Promise.resolve(
+          Response.json({
+            versions: { "0.1.0": { dist: {}, elmeraRelease: { commit: "main" }, gitHead: commit } },
+            "dist-tags": {},
+          })
+        )
+      )
+    );
+    expect(registry.versions.get("0.1.0")?.commit).toBeUndefined();
+  });
   it("keeps an unusable legacy gitHead as absent metadata", async () => {
     const registry = await Effect.runPromise(
       readRegistry(packageName, () =>
@@ -101,18 +141,32 @@ describe("registry failures", () => {
 
 describe("npm CLI failures", () => {
   it("includes the captured stderr in the failure message", async () => {
-    const pkg: ReleasePackage = {
-      checkoutRoot: process.cwd(),
-      packageDirectory: process.cwd(),
-      packageName: "@acme/app",
-    };
-    // npm fails locally on a missing tarball, so this reaches the real CLI without a registry write.
-    const failure = await Effect.runPromise(
-      Effect.flip(createNpmPublisher(pkg).publish("/elmera-release-test/missing.tgz"))
-    );
-    expect(failure).toMatchObject({ _tag: "ReleaseError" });
-    expect(failure.message).toMatch(/^npm failed with status \d+: /u);
-    expect(failure.message).toContain("npm error code ENOENT");
+    const bin = mkdtempSync(join(tmpdir(), "elmera-npm-bin-"));
+    const script = join(bin, "npm");
+    try {
+      // A fake npm on PATH fails with a known stderr line, so the assertion
+      // pins the failure shape rather than the real CLI's wording.
+      writeFileSync(
+        script,
+        `#!${process.execPath}\nprocess.stderr.write("npm error code ENOENT\\n");\nprocess.exitCode = 1;\n`
+      );
+      chmodSync(script, 0o755);
+      vi.stubEnv("PATH", bin);
+      const pkg: ReleasePackage = {
+        checkoutRoot: process.cwd(),
+        packageDirectory: process.cwd(),
+        packageName: "@acme/app",
+      };
+      const failure = await Effect.runPromise(
+        Effect.flip(createNpmPublisher(pkg).publish("/elmera-release-test/missing.tgz"))
+      );
+      expect(failure).toMatchObject({ _tag: "ReleaseError" });
+      expect(failure.message).toMatch(/^npm failed with status \d+: /u);
+      expect(failure.message).toContain("npm error code ENOENT");
+    } finally {
+      vi.unstubAllEnvs();
+      rmSync(bin, { recursive: true, force: true });
+    }
   });
 });
 

@@ -48,9 +48,9 @@ export function isReleaseTag(tag: string): boolean {
   return tag.startsWith(canaryRecordPrefix) && isCommit(tag.slice(canaryRecordPrefix.length));
 }
 
-/** Parses a record tag. Throws, naming nothing else, when the tag is not a record tag. */
+/** Parses a record tag. Throws, naming the rejected tag, when the tag is not a record tag. */
 export function assertReleaseTag(tag: string): string {
-  if (!isReleaseTag(tag)) throw new Error("Expected a stable or canary release record tag");
+  if (!isReleaseTag(tag)) throw new Error(`Expected a stable or canary release record tag; received ${tag}`);
   return tag;
 }
 

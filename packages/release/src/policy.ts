@@ -144,7 +144,7 @@ function nextCanaryVersion(base: StableVersion, taken: readonly string[]): Canar
 export function decideCanary(
   target: CanaryTarget,
   registry: Registry,
-  reserved: readonly string[],
+  reserved: readonly CanaryVersion[],
   isAncestor: CommitAncestry
 ): CanaryDecision {
   if (compareStableVersions(target.base, target.current) <= 0) {

@@ -30,7 +30,7 @@ export type NpmPublisher = {
 };
 
 const ReleaseSource = Schema.Struct({
-  commit: Schema.String,
+  commit: Schema.optionalKey(Schema.String),
 });
 
 const NpmVersion = Schema.Struct({
@@ -51,10 +51,12 @@ function registryUrl(packageName: string): string {
 }
 
 function publishedCommit(manifest: typeof NpmVersion.Type): CommitSha | undefined {
-  // Both fields are usable only as a full commit SHA; an unusable recorded value is absent
-  // metadata, not a reason to fail every read of the package's history.
+  // Both fields are usable only as a full commit SHA; a missing or unusable recorded value is
+  // absent metadata, not a reason to fail every read of the package's history. A present
+  // `elmeraRelease` record owns the answer: a malformed one never falls back to gitHead.
   if (manifest.elmeraRelease !== undefined) {
-    return isCommit(manifest.elmeraRelease.commit) ? manifest.elmeraRelease.commit : undefined;
+    const recorded = manifest.elmeraRelease.commit;
+    return recorded !== undefined && isCommit(recorded) ? recorded : undefined;
   }
   return manifest.gitHead !== undefined && isCommit(manifest.gitHead) ? manifest.gitHead : undefined;
 }
@@ -78,10 +80,11 @@ async function fetchRegistry(packageName: string, fetcher: typeof fetch): Promis
 export function createNpmPublisher(pkg: ReleasePackage): NpmPublisher {
   function runNpm(args: readonly string[]): Effect.Effect<void, ReleaseError> {
     return lift(() => {
-      // npm writes everything, including its publish notice, to stderr. Stdout stays attached
-      // so progress is visible live, stdin stays closed so npm can never block on a prompt
-      // (CI authentication is token-based), and stderr is captured to name a failure and
-      // re-emitted after a success so the CI log keeps the trace.
+      // npm writes its publish notice and progress to stderr. Stdout stays
+      // attached, stdin stays closed so npm can never block on a prompt (CI
+      // authentication is token-based), and stderr is captured to name a
+      // failure and re-emitted after a success; progress is not live, but the
+      // CI log keeps the full trace.
       const result = spawnSync("npm", args, {
         cwd: pkg.checkoutRoot,
         encoding: "utf8",

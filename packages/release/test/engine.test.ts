@@ -24,6 +24,7 @@ import type { CommitAncestry } from "../src/policy.ts";
 import { canaryRecordTag, releaseTag } from "../src/record.ts";
 import type { ReleaseStore, SavedRelease } from "../src/store.ts";
 import { assertStableReleaseVersion } from "../src/version.ts";
+import { withMissingGitHubCredentials } from "./lib/environment.ts";
 import { commit, commitSha, newerCommit, releaseIntent } from "./lib/release-fixtures.ts";
 
 const packedArchive = new Uint8Array([1, 2, 3]);
@@ -366,23 +367,6 @@ const missingCheckout: ReleasePackage = {
   packageDirectory: "/missing-checkout/packages/app",
   packageName: "@acme/app",
 };
-
-async function withMissingGitHubCredentials(run: () => Promise<void>): Promise<void> {
-  const previous = {
-    GITHUB_REPOSITORY: process.env.GITHUB_REPOSITORY,
-    GH_TOKEN: process.env.GH_TOKEN,
-  };
-  delete process.env.GITHUB_REPOSITORY;
-  delete process.env.GH_TOKEN;
-  try {
-    await run();
-  } finally {
-    if (previous.GITHUB_REPOSITORY === undefined) delete process.env.GITHUB_REPOSITORY;
-    else process.env.GITHUB_REPOSITORY = previous.GITHUB_REPOSITORY;
-    if (previous.GH_TOKEN === undefined) delete process.env.GH_TOKEN;
-    else process.env.GH_TOKEN = previous.GH_TOKEN;
-  }
-}
 
 describe("shipped live operations", () => {
   it("constructs retryRelease without credentials and fails with ReleaseError when executed", async () => {
