@@ -67,10 +67,10 @@ assert.equal(first.components.length, 1);
 assert.equal(first.components[0].parts[0].rsc, "client");
 assert.deepEqual(
   first.components[0].parts[0].props.map((prop) => prop.name),
-  ["label", "disabled"]
+  ["disabled", "label"]
 );
-assert.equal(first.components[0].parts[0].props[1].defaultValue, "false");
-assert.deepEqual(first.components[0].parts[0].props[1].origin, { packageName: "@base-ui/react" });
+assert.equal(first.components[0].parts[0].props[0].defaultValue, "false");
+assert.deepEqual(first.components[0].parts[0].props[0].origin, { packageName: "@base-ui/react" });
 assert.match(first.components[0].$generated, /@elmeragroup\/internal/);
 const before = await stat("docs/button/api.json");
 await generateApiArtifacts(options);

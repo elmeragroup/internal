@@ -110,14 +110,17 @@ function enrichPart(
     });
     handled.add(property.name);
   }
-  additions.sort((left, right) => compareUtf16CodeUnits(left.name, right.name));
   if (additions.length > current.forwardedCount) {
     problems.add(`${current.name}: selected props exceed forwarded prop count`);
     return current;
   }
   return {
     ...current,
-    props: [...current.props, ...additions],
+    // The published order is a contract over the merged set, not each run:
+    // authored and enriched props interleave by UTF-16 name order.
+    props: [...current.props, ...additions].sort((left, right) =>
+      compareUtf16CodeUnits(left.name, right.name)
+    ),
     forwardedCount: current.forwardedCount - additions.length,
   };
 }

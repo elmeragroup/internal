@@ -258,10 +258,6 @@ function forwardedOfProps(context: LibraryProject, properties: Iterable<TsSymbol
   return { count, from: [...from].sort(compareUtf16CodeUnits) };
 }
 
-function addProblem(problems: ProblemLog | undefined, message: string): void {
-  problems?.add(message);
-}
-
 export type ComponentApiRequest = {
   /** Absolute path of the public entry module, e.g. `/project/src/button.ts`. */
   entryFile: string;
@@ -279,17 +275,17 @@ export type ComponentApiRequest = {
 export function componentPartRequests(
   context: LibraryProject,
   request: ComponentApiRequest,
-  problems?: ProblemLog
+  problems: ProblemLog
 ): readonly PartRequest[] {
   const { checker, program } = context;
   const sourceFile = program.getSourceFile(request.entryFile);
   if (sourceFile === undefined) {
-    addProblem(problems, `${request.entryFile}: entry module is not part of the library program`);
+    problems.add(`${request.entryFile}: entry module is not part of the library program`);
     return [];
   }
   const moduleSymbol = checker.getSymbolAtLocation(sourceFile);
   if (moduleSymbol === undefined) {
-    addProblem(problems, `${request.entryFile}: entry module has no module symbol`);
+    problems.add(`${request.entryFile}: entry module has no module symbol`);
     return [];
   }
   const moduleExports = checker.getExportsOfModule(moduleSymbol);
@@ -297,12 +293,12 @@ export function componentPartRequests(
   for (const exportName of request.exportNames) {
     const rootSymbol = moduleExports.find((exported) => exported.name === exportName);
     if (rootSymbol === undefined) {
-      addProblem(problems, `${request.entryFile}: does not export "${exportName}"`);
+      problems.add(`${request.entryFile}: does not export "${exportName}"`);
       continue;
     }
     const rootType = checker.getTypeOfSymbol(rootSymbol);
     if (rootType === undefined || rootType.isErrorType()) {
-      addProblem(problems, `${exportName}: exported value has an unresolvable type`);
+      problems.add(`${exportName}: exported value has an unresolvable type`);
       continue;
     }
     if (hasCallSignatures(checker, rootType)) {
@@ -321,7 +317,7 @@ export function componentPartRequests(
       });
     }
     if (parts.length === start) {
-      addProblem(problems, `${exportName}: no renderable parts were found on the exported namespace`);
+      problems.add(`${exportName}: no renderable parts were found on the exported namespace`);
     }
   }
   return parts;

@@ -209,8 +209,8 @@ undocumented?: string;
       allowedWarningCodes: ["unsupported-type-fallback"],
     });
     expect(result.diagnostics.some(({ warning }) => warning.code === "unsupported-type-fallback")).toBe(true);
-    expect(result.components[0]?.parts[0]?.props.map((prop) => prop.name)).toEqual(["label", "external"]);
-    expect(result.components[0]?.parts[0]?.props[1]).toMatchObject({
+    expect(result.components[0]?.parts[0]?.props.map((prop) => prop.name)).toEqual(["external", "label"]);
+    expect(result.components[0]?.parts[0]?.props[0]).toMatchObject({
       origin: { packageName: "fixture-dependency" },
       description: "External description.",
       defaultValue: "false",

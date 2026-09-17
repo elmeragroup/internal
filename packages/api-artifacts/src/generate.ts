@@ -100,13 +100,15 @@ function describeComponent(
   problems: ProblemLog
 ): ComponentApi {
   if (inspected.length !== parts.length) {
-    throw new ApiArtifactsError([
-      `${request.slug}: source inspection returned ${inspected.length} results for ${parts.length} parts`,
-    ]);
+    // Inspection and part requests are built from one request list, so a
+    // mismatch is a generation defect, not a project problem.
+    throw new Error(
+      `${request.slug}: source inspection returned ${inspected.length} results for ${parts.length} parts`
+    );
   }
   const partApis = parts.map((part, index) => {
     const source = inspected[index];
-    if (source === undefined) throw new ApiArtifactsError([`${part.name}: missing source inspection result`]);
+    if (source === undefined) throw new Error(`${part.name}: missing source inspection result`);
     return extractPart(context, part, source, problems);
   });
   return {
