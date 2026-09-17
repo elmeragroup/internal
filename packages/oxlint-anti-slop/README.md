@@ -31,12 +31,18 @@ alias table, and the module-internal `resolveAliasTarget` chases a bare
 reference to the single non-generic local alias it names. `resolvesThroughAliases`
 is the one walk from a type to a keyword leaf through parentheses, aliases, and
 the enabled container steps (`throughUnions`, `throughPromises`); the unshadowed
-`Promise`/`PromiseLike` descent lives there rather than in each rule. Scope containers include `StaticBlock`, whose
-`body` is a statement list, so inner type aliases in `class C { static { ... } }`
-are found. `TSImportEqualsDeclaration` locals, including
-`import Promise = require("./p")`, are recorded as `shadowed`, and any other
-identifier-bearing declaration kind fail-closes as `shadowed` so lookup never
-walks to an outer name. Keep them when refreshing the vendored upstream files.
+`Promise`/`PromiseLike` descent lives there rather than in each rule. Scope
+containers include `StaticBlock`, whose `body` is a statement list, and
+`SwitchStatement`, whose cases share one container through their concatenated
+consequents, so inner type aliases in `class C { static { ... } }` and across
+`switch` cases are found. Type binders are interleaved with those containers
+during the outward walk: a nearer `type T` shadows an outer `<T>`, and a class's
+own type parameters do not apply inside its static members or static blocks,
+while an enclosing class's parameters still do. `TSImportEqualsDeclaration`
+locals, including `import Promise = require("./p")`, are recorded as
+`shadowed`, and any other identifier-bearing declaration kind fail-closes as
+`shadowed` so lookup never walks to an outer name. Keep them when refreshing the
+vendored upstream files.
 
 `shared/variable-scope.ts`, `shared/function-parameters.ts` and
 `shared/expression-unwrapping.ts` are also local: they own the lexical

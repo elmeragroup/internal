@@ -32,7 +32,7 @@ export const noObjectParametersRule = defineRule({
 		const checkParameters = (node: FunctionLikeNode) => {
 			for (const parameter of node.params) {
 				const annotation = parameterAnnotation(parameter);
-				if (annotation === null || annotation === undefined) continue;
+				if (annotation === null) continue;
 				if (!resolvesToObject(annotation.typeAnnotation)) continue;
 				context.report({
 					node: annotation.typeAnnotation,

@@ -27,7 +27,7 @@ export const noUnknownTypeAliasesRule = defineRule({
 		): boolean =>
 			scope !== null &&
 			resolvesThroughAliases(scope, type, (candidate) => candidate.type === "TSUnknownKeyword", {
-				throughUnions: false,
+				throughUnions: true,
 				visitedAliases,
 			});
 

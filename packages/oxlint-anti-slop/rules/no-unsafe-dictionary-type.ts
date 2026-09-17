@@ -3,9 +3,9 @@ import { defineRule } from "@oxlint/plugins";
 import {
 	classifyUnsafeDictionary,
 	classifyUnsafeDictionaryValue,
-	createTypeEnvironment,
 } from "../shared/dictionary-types.ts";
-import type { TypeEnvironment } from "../shared/dictionary-types.ts";
+import { createTypeNameScope } from "../shared/type-name-scope.ts";
+import type { TypeNameScope } from "../shared/type-name-scope.ts";
 
 import type { ESTree } from "@oxlint/plugins";
 
@@ -66,22 +66,22 @@ function isInsideTypeAliasDeclaration(node: ESTree.Node): boolean {
 	return false;
 }
 
-function isPlainAliasConsumerUse(node: ESTree.TSType, environment: TypeEnvironment): boolean {
+function isPlainAliasConsumerUse(node: ESTree.TSType, scope: TypeNameScope): boolean {
 	if (node.type !== "TSTypeReference" || node.typeArguments?.params.length) return false;
 	const name = typeReferenceName(node);
 	return (
 		name !== null &&
-		environment.scope.resolve(node, name)?.kind === "alias" &&
+		scope.resolve(node, name)?.kind === "alias" &&
 		!isInsideTypeAliasDeclaration(node)
 	);
 }
 
-function shouldReportType(node: ESTree.TSType, environment: TypeEnvironment): boolean {
-	if (isPlainAliasConsumerUse(node, environment)) return false;
-	if (classifyUnsafeDictionary(node, environment) === null) return false;
+function shouldReportType(node: ESTree.TSType, scope: TypeNameScope): boolean {
+	if (isPlainAliasConsumerUse(node, scope)) return false;
+	if (classifyUnsafeDictionary(node, scope) === null) return false;
 	let current: ESTree.Node | null = node.parent;
 	while (current !== null && current.type !== "Program") {
-		if (isTypeNode(current) && classifyUnsafeDictionary(current, environment) !== null)
+		if (isTypeNode(current) && classifyUnsafeDictionary(current, scope) !== null)
 			return false;
 		current = current.parent;
 	}
@@ -102,34 +102,34 @@ export const noUnsafeDictionaryTypeRule = defineRule({
 		},
 	},
 	createOnce(context) {
-		let environment: TypeEnvironment | null = null;
+		let scope: TypeNameScope | null = null;
 		const report = (node: ESTree.Node, value: string) => {
 			context.report({ node, messageId: "unsafeDictionary", data: { value } });
 		};
 		const reportIfUnsafe = (node: ESTree.TSType) => {
-			if (environment === null || !shouldReportType(node, environment)) return;
-			const unsafe = classifyUnsafeDictionary(node, environment);
+			if (scope === null || !shouldReportType(node, scope)) return;
+			const unsafe = classifyUnsafeDictionary(node, scope);
 			if (unsafe === null) return;
 			report(node, unsafe.unsafeValue);
 		};
 
 		return {
 			Program(node) {
-				environment = createTypeEnvironment(node, context.sourceCode.visitorKeys);
+				scope = createTypeNameScope(node, context.sourceCode.visitorKeys);
 			},
 			TSTypeReference: reportIfUnsafe,
 			TSTypeLiteral: reportIfUnsafe,
 			TSMappedType: reportIfUnsafe,
 			TSIndexSignature(node) {
 				if (
-					environment === null ||
+					scope === null ||
 					node.typeAnnotation === null ||
 					node.parent.type === "TSTypeLiteral"
 				)
 					return;
 				const unsafe = classifyUnsafeDictionaryValue(
 					node.typeAnnotation.typeAnnotation,
-					environment,
+					scope,
 				);
 				if (unsafe !== null) report(node, unsafe.unsafeValue);
 			},

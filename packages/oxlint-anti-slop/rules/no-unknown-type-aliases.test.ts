@@ -13,10 +13,6 @@ tester.run("anti-slop/no-unknown-type-aliases", noUnknownTypeAliasesRule, {
 		"type Value = string; function f() { type Hidden = (Value); }",
 		"type UnknownValue = string; function f<UnknownValue>() { type Hidden = UnknownValue; }",
 		{
-			name: "a union member of unknown does not make the alias itself unknown",
-			code: "type Alias = string | unknown;",
-		},
-		{
 			name: "a self-referential alias stops the chase",
 			code: "type Alias = Alias;",
 		},
@@ -34,11 +30,31 @@ tester.run("anti-slop/no-unknown-type-aliases", noUnknownTypeAliasesRule, {
 			code: "type Alias = (unknown);",
 			errors: [error],
 		},
+		{
+			name: "a union containing unknown resolves to unknown",
+			code: "type Alias = string | unknown;",
+			errors: [error],
+		},
 		{ code: "function f() { type Payload = unknown; }", errors: [error] },
 		{ code: "namespace N { type Payload = unknown; }", errors: [error] },
 		{ code: "class C { static { type Payload = unknown; } }", errors: [error] },
 		{
 			code: "switch (input) { case 1: type Payload = unknown; break; default: type Other = unknown; }",
+			errors: [error, error],
+		},
+		{
+			name: "all switch cases share one lexical scope",
+			code: "switch (input) { case 1: type Payload = unknown; break; case 2: type Alias = Payload; }",
+			errors: [error, error],
+		},
+		{
+			name: "a nearer alias shadows an outer type parameter",
+			code: "function f<T>() { { type T = unknown; type Alias = T; } }",
+			errors: [error, error],
+		},
+		{
+			name: "a class type parameter does not reach its static members",
+			code: "type T = unknown; class C<T> { static { type Alias = T; } }",
 			errors: [error, error],
 		},
 		{

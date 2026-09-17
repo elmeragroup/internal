@@ -1,10 +1,10 @@
 import type { ESTree, SourceCode } from "@oxlint/plugins";
 
 /**
- * Function-like nodes whose parameter list and return contract the anti-slop rules inspect. The
- * bare `ESTree.Function` declarations (`FunctionDeclaration`, `FunctionExpression`,
- * `TSDeclareFunction`, `TSEmptyBodyFunctionExpression`) share their shape but are not members of
- * this union.
+ * Function-like nodes whose parameter list and return contract the anti-slop rules inspect:
+ * every node shape carrying a `params` list, including the bare `ESTree.Function` declarations
+ * (`FunctionDeclaration`, `FunctionExpression`, `TSDeclareFunction`,
+ * `TSEmptyBodyFunctionExpression`).
  */
 export type FunctionLikeNode =
 	| ESTree.ArrowFunctionExpression
@@ -15,9 +15,21 @@ export type FunctionLikeNode =
 	| ESTree.TSFunctionType
 	| ESTree.TSMethodSignature;
 
+/** Visitor keys of every node shape with a function-like parameter list. */
+type FunctionLikeVisitorKey =
+	| "ArrowFunctionExpression"
+	| "FunctionDeclaration"
+	| "FunctionExpression"
+	| "TSCallSignatureDeclaration"
+	| "TSConstructSignatureDeclaration"
+	| "TSConstructorType"
+	| "TSDeclareFunction"
+	| "TSEmptyBodyFunctionExpression"
+	| "TSFunctionType"
+	| "TSMethodSignature";
+
 /**
- * The visitor table for every node shape with a function-like parameter list: the
- * `FunctionLikeNode` members plus the bare function declarations that share their shape.
+ * The visitor table for every node shape with a function-like parameter list.
  *
  * @param check - The check to run for each visited function-like node.
  * @returns One handler per function-like visitor key.
@@ -34,28 +46,28 @@ export function functionLikeVisitors(check: (node: FunctionLikeNode) => void) {
 		TSEmptyBodyFunctionExpression: check,
 		TSFunctionType: check,
 		TSMethodSignature: check,
-	};
+	} satisfies Record<FunctionLikeVisitorKey, (node: FunctionLikeNode) => void>;
 }
 
 /**
  * Find a parameter's type annotation through parameter properties, rest elements, and defaults.
  *
  * @param parameter - The parameter pattern to inspect.
- * @returns The attached annotation, or null/undefined when the parameter has none.
+ * @returns The attached annotation, or null when the parameter has none.
  */
 export function parameterAnnotation(
 	parameter: ESTree.ParamPattern,
-): ESTree.TSTypeAnnotation | null | undefined {
+): ESTree.TSTypeAnnotation | null {
 	if (parameter.type === "TSParameterProperty") {
 		return parameterAnnotation(parameter.parameter);
 	}
 	if (parameter.type === "RestElement") {
-		return parameter.typeAnnotation ?? parameterAnnotation(parameter.argument);
+		return parameter.typeAnnotation ?? parameterAnnotation(parameter.argument) ?? null;
 	}
 	if (parameter.type === "AssignmentPattern") {
-		return parameter.typeAnnotation ?? parameter.left.typeAnnotation;
+		return parameter.typeAnnotation ?? parameter.left.typeAnnotation ?? null;
 	}
-	return parameter.typeAnnotation;
+	return parameter.typeAnnotation ?? null;
 }
 
 function bindingPattern(parameter: ESTree.ParamPattern): ESTree.BindingPattern {

@@ -1,6 +1,6 @@
 import type { ESTree } from "@oxlint/plugins";
 
-import { lexicalTypeParameterNames } from "./lexical-type-parameters.ts";
+import { isStaticMember, typeParameterNamesAt } from "./lexical-type-parameters.ts";
 import type { VisitorKeys } from "./lexical-type-parameters.ts";
 
 /**
@@ -40,7 +40,8 @@ function containerStatements(node: ESTree.Node): readonly ESTree.Node[] | null {
 	) {
 		return node.body;
 	}
-	if (node.type === "SwitchCase") return node.consequent;
+	// Every case of one switch shares the switch block's lexical scope.
+	if (node.type === "SwitchStatement") return node.cases.flatMap((switchCase) => switchCase.consequent);
 	return null;
 }
 
@@ -162,17 +163,28 @@ export function createTypeNameScope(program: ESTree.Program, visitorKeys: Visito
 
 	return {
 		resolve(useSite, name) {
-			if (lexicalTypeParameterNames(useSite, visitorKeys).has(name)) {
-				return { kind: "shadowed" };
-			}
-			let current: ESTree.Node | null = useSite.parent;
+			// Walk outward once, interleaving type binders with declaration
+			// containers, so the nearest binding wins: an inner `type T` shadows
+			// an outer `<T>`, and a class's own type parameters stop at its
+			// static members.
+			let current: ESTree.Node | null = useSite;
+			let descendant: ESTree.Node = useSite;
+			let staticMemberOwner: ESTree.Node | null = null;
 			while (current !== null) {
+				if (isStaticMember(current)) {
+					const classBody = current.parent;
+					staticMemberOwner = classBody !== null ? classBody.parent : null;
+				}
+				for (const binder of typeParameterNamesAt(current, descendant, visitorKeys, staticMemberOwner)) {
+					if (binder === name) return { kind: "shadowed" };
+				}
 				const index = indexOf(current);
 				if (index !== null) {
 					const binding = index.get(name);
 					if (binding !== undefined) return binding;
 				}
 				if (current.type === "Program") return null;
+				descendant = current;
 				current = current.parent;
 			}
 			return null;
@@ -239,10 +251,10 @@ function unshadowedPromiseArgument(scope: TypeNameScope, type: ESTree.TSType): E
 
 /** How {@link resolvesThroughAliases} walks a type to its match. */
 type AliasChaseOptions = {
-	/** Whether a matching union member matches the union itself. */
-	readonly throughUnions: boolean;
+	/** Whether a matching union member matches the union itself. Defaults to false. */
+	readonly throughUnions?: boolean;
 
-	/** Whether an unshadowed `Promise`/`PromiseLike` type argument continues the walk. */
+	/** Whether an unshadowed `Promise`/`PromiseLike` type argument continues the walk. Defaults to false. */
 	readonly throughPromises?: boolean;
 
 	/** Aliases already being resolved; seed with the declaration under test to stop self-chasing. */
@@ -275,7 +287,7 @@ export function resolvesThroughAliases(
 			if (promiseArgument !== undefined && walk(promiseArgument, visitedAliases)) return true;
 		}
 		if (current.type === "TSParenthesizedType") return walk(current.typeAnnotation, visitedAliases);
-		if (options.throughUnions && current.type === "TSUnionType") {
+		if (options.throughUnions === true && current.type === "TSUnionType") {
 			return current.types.some((member) => walk(member, visitedAliases));
 		}
 		const alias = resolveAliasTarget(scope, current, visitedAliases);
