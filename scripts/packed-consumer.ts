@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { parse } from "yaml";
 
-import { asRecord, asString } from "./lib/json-object.mjs";
+import { asRecord, asString, readJsonObject } from "./lib/json-object.mjs";
 import { runCommand } from "./lib/run-command.ts";
 import { verifyPackedArchive } from "./packed-verification.ts";
 import { archivePath, releaseLayout, releaseVersion } from "./release.ts";
@@ -15,10 +15,7 @@ const catalog = asRecord(
     .catalog,
   "catalog"
 );
-const rootManifest = asRecord(
-  JSON.parse(readFileSync(resolve(layout.checkoutRoot, "package.json"), "utf8")),
-  "root manifest"
-);
+const rootManifest = readJsonObject(resolve(layout.checkoutRoot, "package.json"));
 const packageManager = asString(rootManifest.packageManager, "packageManager");
 const consumer = mkdtempSync(resolve(tmpdir(), "elmera-packed-consumer-"));
 try {
