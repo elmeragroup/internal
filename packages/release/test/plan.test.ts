@@ -66,6 +66,16 @@ function writeWorkspaceFixture(workspace: string): void {
   symlinkSync(join(repoRoot, "node_modules"), join(workspace, "node_modules"));
 }
 
+function writeFakeChangesets(workspace: string, bin: string): void {
+  writeFileSync(join(workspace, "package.json"), `${JSON.stringify({ name: "plan-fixture" })}\n`);
+  mkdirSync(join(workspace, "node_modules/@changesets/cli"), { recursive: true });
+  writeFileSync(
+    join(workspace, "node_modules/@changesets/cli/package.json"),
+    `${JSON.stringify({ name: "@changesets/cli", version: "0.0.0" })}\n`
+  );
+  writeFileSync(join(workspace, "node_modules/@changesets/cli/bin.js"), bin);
+}
+
 function withPlannerWorkspace(run: (workspace: string) => void, head: WorkspaceHead = "branch"): void {
   withGitWorkspace("elmera-release-plan-", (workspace) => {
     writeWorkspaceFixture(workspace.path);
@@ -82,7 +92,7 @@ function plannedVersion(releases: readonly PlannedRelease[]): string {
   expect(releases).toHaveLength(1);
   const release = releases[0];
   expect(release?.name).toBe(packageName);
-  if (release === undefined) throw new Error("expected a planned release");
+  if (release?.newVersion === undefined) throw new Error("expected a planned release version");
   const version = assertReleaseVersion(release.newVersion);
   expect(() => assertCanaryReleaseVersion(version)).toThrow(/Canary publication requires/);
   return version;
@@ -137,14 +147,8 @@ describe("changeset planning failures", () => {
     "reports the Changesets stderr and keeps the original cause",
     () => {
       withGitWorkspace("elmera-release-plan-", (workspace) => {
-        writeFileSync(join(workspace.path, "package.json"), `${JSON.stringify({ name: "plan-fixture" })}\n`);
-        mkdirSync(join(workspace.path, "node_modules/@changesets/cli"), { recursive: true });
-        writeFileSync(
-          join(workspace.path, "node_modules/@changesets/cli/package.json"),
-          `${JSON.stringify({ name: "@changesets/cli", version: "0.0.0" })}\n`
-        );
-        writeFileSync(
-          join(workspace.path, "node_modules/@changesets/cli/bin.js"),
+        writeFakeChangesets(
+          workspace.path,
           'process.stderr.write("changesets could not resolve the base branch\\n");\nprocess.exit(1);\n'
         );
         let caught: unknown;
@@ -157,6 +161,23 @@ describe("changeset planning failures", () => {
         if (!(caught instanceof Error)) throw new Error("expected a thrown error");
         expect(caught.message).toContain("changesets could not resolve the base branch");
         expect(caught.cause).toBeInstanceOf(Error);
+      });
+    },
+    workspaceTimeout
+  );
+
+  it(
+    "rejects a planned public release without a new version",
+    () => {
+      withGitWorkspace("elmera-release-plan-", (workspace) => {
+        const plan = { releases: [{ name: packageName, type: "minor", changesets: ["minor-internal"] }] };
+        writeFakeChangesets(
+          workspace.path,
+          `require("node:fs").writeFileSync(process.argv[process.argv.indexOf("--output") + 1], ${JSON.stringify(JSON.stringify(plan))});\n`
+        );
+        expect(() =>
+          Effect.runSync(plannedCanaryBase(assertStableReleaseVersion("0.2.9"), packageName, workspace.path))
+        ).toThrow(`The release plan for ${packageName} has no newVersion`);
       });
     },
     workspaceTimeout
@@ -193,6 +214,28 @@ describe("canary base planning in the publisher's checkout", () => {
         expect(
           Effect.runSync(plannedCanaryBase(assertStableReleaseVersion("0.0.1"), packageName, workspace))
         ).toBe(planned);
+      }, "detached");
+    },
+    workspaceTimeout
+  );
+
+  it(
+    "plans past a private workspace package without a version",
+    () => {
+      withPlannerWorkspace((workspace) => {
+        const manifestPath = join(workspace, "packages/internal/package.json");
+        const manifest = readJson(manifestPath, Schema.Record(Schema.String, Schema.Json));
+        writeFileSync(manifestPath, `${JSON.stringify({ ...manifest, version: "0.4.2" }, null, 2)}\n`);
+        // Changesets lists this dependent with `type: "none"` and, lacking a `version`, no `newVersion`.
+        mkdirSync(join(workspace, "packages/docs"));
+        writeFileSync(
+          join(workspace, "packages/docs/package.json"),
+          `${JSON.stringify({ name: "docs", private: true, dependencies: { [packageName]: "workspace:*" } })}\n`
+        );
+        writeChangeset(workspace, "minor-internal", packageName, "minor");
+        expect(
+          Effect.runSync(plannedCanaryBase(assertStableReleaseVersion("0.2.9"), packageName, workspace))
+        ).toBe("0.5.0");
       }, "detached");
     },
     workspaceTimeout
