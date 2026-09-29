@@ -18,10 +18,12 @@ const ChangesetConfig = Schema.Struct({
   baseBranch: Schema.String,
 });
 
+// Changesets omits `newVersion` for a workspace package without a `version`, such as a private app
+// listed as a `none` dependent of the public package.
 const PlannedReleaseEntry = Schema.Struct({
   name: Schema.String,
   type: Schema.String,
-  newVersion: Schema.String,
+  newVersion: Schema.optionalKey(Schema.String),
 });
 
 const ChangesetPlan = Schema.Struct({
@@ -96,6 +98,9 @@ export function plannedCanaryBase(
     if (planned.length > 1) throw new Error("Multiple release plans for the public package");
     const release = planned[0];
     if (release === undefined) return nextPatchVersion(current);
+    if (release.newVersion === undefined) {
+      throw new Error(`The release plan for ${packageName} has no newVersion`);
+    }
     return assertStableReleaseVersion(release.newVersion);
   });
 }
