@@ -1,5 +1,6 @@
 import { Brand, Redacted, Schema } from "effect";
 
+import { resendOnDroppedConnection } from "./connection-retry.ts";
 import { decodeJson } from "./json.ts";
 
 /** GitHub release identity; distinct from a release asset identity even though both are numbers. */
@@ -96,7 +97,7 @@ export function releaseEnvironment(): ReleaseEnvironment {
   return {
     repository: process.env.GITHUB_REPOSITORY ?? "",
     token: Redacted.make(process.env.GH_TOKEN ?? ""),
-    fetch: (input, init) => globalThis.fetch(input, init),
+    fetch: resendOnDroppedConnection((input, init) => globalThis.fetch(input, init)),
   };
 }
 
