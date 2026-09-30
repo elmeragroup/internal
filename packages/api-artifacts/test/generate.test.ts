@@ -85,6 +85,22 @@ describe("generateApiArtifacts", () => {
     expect(await readFile(path.join(root, "docs/button/api.json"), "utf8")).toBe(component?.text);
   });
 
+  it("names TypeScript's default library `typescript` wherever the compiler installed it", async () => {
+    // TypeScript 7 installs its default library inside a per-platform package, such as
+    // `@typescript/typescript-linux-x64`, so an artifact naming that package would differ by the
+    // machine that generated it.
+    const root = await fixture(`export type Props = Intl.NumberFormatOptions & {
+  /** Label shown on the button. */
+  label: string;
+};
+export function Button({ label }: Props) { return label; }
+export const Compound = { Root: Button };
+`);
+    const part = (await generateApiArtifacts(options(root))).components[0]?.parts[0];
+    expect(part?.forwardedFrom).toEqual(["typescript"]);
+    expect(part?.forwardedCount).toBeGreaterThan(0);
+  });
+
   it("checks without writing and preserves mtimes on unchanged generation", async () => {
     const root = await fixture();
     const input = options(root);

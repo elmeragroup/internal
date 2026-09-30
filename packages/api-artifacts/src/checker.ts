@@ -55,8 +55,16 @@ export function readRscStatus(sourceFile: SourceFile): RscStatus {
   return "server";
 }
 
-/** Package name a forwarded prop comes from, e.g. `@base-ui/react` or `react`. */
-function declaringPackage(declarationPath: string): string | null {
+/**
+ * Package name a forwarded prop comes from, e.g. `@base-ui/react` or `react`. TypeScript's default
+ * library is `typescript` wherever the compiler installed it: TypeScript 7 ships it inside a
+ * per-platform package such as `@typescript/typescript-linux-x64`, and an artifact must not depend
+ * on the machine that generated it.
+ */
+function declaringPackage(context: LibraryProject, declarationPath: string): string | null {
+  if (context.program.getSourceFileMetadata(declarationPath)?.isDefaultLibrary === true) {
+    return "typescript";
+  }
   const marker = "/node_modules/";
   const last = declarationPath.lastIndexOf(marker);
   if (last === -1) {
@@ -251,7 +259,7 @@ function forwardedOfProps(context: LibraryProject, properties: Iterable<TsSymbol
     if (!isForwardedProp(context, property)) continue;
     count += 1;
     for (const declaration of property.declarations) {
-      const packageName = declaringPackage(declaration.path);
+      const packageName = declaringPackage(context, declaration.path);
       if (packageName !== null) from.add(packageName);
     }
   }
