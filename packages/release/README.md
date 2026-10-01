@@ -44,8 +44,14 @@ run promise- and process-based code lifted into that channel with `liftPromise` 
 failure — wherever it is raised — surfaces as one `ReleaseError` (`Schema.TaggedError`,
 `_tag: "ReleaseError"`) carrying its `message` and the original `cause`.
 Integrity and source mismatches are fatal: they are never retried as transient and never accepted
-as success. Registry confirmation polls `npm` on a `Schedule` that doubles the injected
-`confirmationInterval` up to 30 seconds; tests inject a zero interval.
+as success. After `npm publish`, and again after the dist-tag update, registry confirmation keeps
+reading `npm` for the injected `confirmationWindow`. It waits `confirmationInterval` before the
+second read and doubles the wait after each read, up to 30 seconds. The live engine uses a
+5-second interval and a 10-minute window, because npm processes a new version asynchronously and
+has taken longer than four minutes to show it. The window counts scheduled waits, so it does not
+depend on registry latency. When the window runs out, confirmation fails with the same retry
+message as before. Tests inject a zero interval, which reads once without waiting, or run the live
+timing on Effect's `TestClock`.
 
 ## Pack-and-verify adapter
 

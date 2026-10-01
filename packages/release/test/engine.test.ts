@@ -155,6 +155,7 @@ function harness(options: HarnessOptions = {}) {
     readRegistry: () => Effect.succeed(registry),
     npm,
     confirmationInterval: 0,
+    confirmationWindow: 0,
     stableGate: () => Effect.succeed(options.line ?? canaryLine),
     plannedCanaryBase: () => Effect.succeed(assertStableReleaseVersion(options.base ?? "0.2.0")),
     verifyArchive: (intent, bytes) => {
