@@ -16,7 +16,7 @@ import type { CanaryIntent, CommitSha, ReleaseIntent, StableIntent, VerifiedRele
 import { createNpmPublisher, readRegistry } from "./npm.ts";
 import { changesetBaseBranch, plannedCanaryBase, trackedBranchOf } from "./plan.ts";
 import { decideCanary } from "./policy.ts";
-import { publishVerifiedRelease } from "./publication.ts";
+import { liveConfirmation, publishVerifiedRelease } from "./publication.ts";
 import type { PublicationDeps } from "./publication.ts";
 import { assertReleaseTag, canaryRecordTag, releaseTag } from "./record.ts";
 import { createReleaseStore } from "./store.ts";
@@ -202,7 +202,7 @@ function liveReleaseDeps(pkg: ReleasePackage, environment: ReleaseEnvironment): 
     store: createReleaseStore(createGitHubClient(environment), pkg.packageName),
     readRegistry: () => readRegistry(pkg.packageName, environment.fetch),
     npm: createNpmPublisher(pkg),
-    confirmationInterval: 5_000,
+    ...liveConfirmation,
     verifyArchive: (intent, bytes) => verifyReleaseArchive(intent, bytes, pkg.packageName),
     log: (message) => {
       console.log(message);

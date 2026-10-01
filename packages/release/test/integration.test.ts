@@ -234,6 +234,7 @@ writeFileSync(file, JSON.stringify({ releases: [] }));
             }),
         },
         confirmationInterval: 0,
+        confirmationWindow: 0,
         stableGate: createStableReleaseGate(client, root, uiDirectory, "main"),
         plannedCanaryBase: (current) => plannedCanaryBase(current, packageName, root),
         verifyArchive: (intent, bytes) =>

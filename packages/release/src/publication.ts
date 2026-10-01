@@ -14,25 +14,58 @@ export type PublicationDeps = {
   readRegistry: () => Effect.Effect<Registry, ReleaseError>;
   npm: NpmPublisher;
   ancestry: CommitAncestry;
+  /** Delay before the first re-read; it doubles per re-read up to `maxConfirmationDelay`. */
   confirmationInterval: Duration.Input;
+  /**
+   * Total time confirmation keeps re-reading the registry after the first read, separately for the
+   * upload and the dist-tag. A zero `confirmationInterval` never re-reads, whatever the window.
+   */
+  confirmationWindow: Duration.Input;
 };
 
-const propagationAttempts = 10;
-/** Each retry doubles `confirmationInterval`, capped so a slow packument gets minutes, not seconds. */
+/**
+ * Live confirmation timing. npm processes a new version asynchronously ("may take a few minutes
+ * to become available") and has taken longer than four minutes, so the window allows ten.
+ */
+export const liveConfirmation = {
+  confirmationInterval: Duration.seconds(5),
+  confirmationWindow: Duration.minutes(10),
+} as const satisfies Pick<PublicationDeps, "confirmationInterval" | "confirmationWindow">;
+
+/** Caps the doubling delay so a long window polls npm every 30 seconds rather than hammering it. */
 const maxConfirmationDelay = Duration.seconds(30);
 
 const unverifiedPublication = "Publication could not be verified; retry the recorded release";
 
-function confirmationSchedule(interval: Duration.Input) {
-  const base = Duration.fromInputUnsafe(interval);
-  return Schedule.recurs(propagationAttempts - 1).pipe(
-    Schedule.addDelay((metadata) =>
-      Effect.succeed(Duration.min(Duration.times(base, 2 ** metadata.output), maxConfirmationDelay))
-    )
+function confirmationDelay(interval: Duration.Duration, retry: number): Duration.Duration {
+  return Duration.min(Duration.times(interval, 2 ** retry), maxConfirmationDelay);
+}
+
+/**
+ * The number of re-reads whose delays first cover `window`. Counting scheduled delays rather than
+ * wall-clock time keeps the read count independent of registry latency, so the slept total is at
+ * least the window and tests on a test clock see a deterministic schedule.
+ */
+function confirmationRetries(interval: Duration.Duration, window: Duration.Duration): number {
+  if (!Duration.isPositive(interval)) return 0;
+  let retries = 0;
+  let waited = Duration.zero;
+  while (Duration.isLessThan(waited, window)) {
+    waited = Duration.sum(waited, confirmationDelay(interval, retries));
+    retries += 1;
+  }
+  return retries;
+}
+
+function confirmationSchedule(deps: PublicationDeps) {
+  const interval = Duration.fromInputUnsafe(deps.confirmationInterval);
+  const window = Duration.fromInputUnsafe(deps.confirmationWindow);
+  return Schedule.recurs(confirmationRetries(interval, window)).pipe(
+    Schedule.addDelay((metadata) => Effect.succeed(confirmationDelay(interval, metadata.output)))
   );
 }
 
-/** Polls the registry until `isVisible` holds or `propagationAttempts` is exhausted. */
+/** Polls the registry until `isVisible` holds or the confirmation window is spent. */
 function confirmRegistry(
   deps: PublicationDeps,
   isVisible: (registry: Registry) => boolean
@@ -43,7 +76,7 @@ function confirmRegistry(
     return visible ? registry : undefined;
   }).pipe(
     Effect.repeat({
-      schedule: confirmationSchedule(deps.confirmationInterval),
+      schedule: confirmationSchedule(deps),
       until: (registry) => registry !== undefined,
     })
   );
