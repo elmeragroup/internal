@@ -64,7 +64,7 @@ export const GitHubPullRequest = Schema.Struct({
 export type GitHubPullRequest = typeof GitHubPullRequest.Type;
 
 /** Request options for one GitHub call; `allow404` is added by the requester overload. */
-export type GitHubRequest = {
+type GitHubRequest = {
   method?: string;
   body?: string | Blob;
   accept?: string;

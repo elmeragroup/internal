@@ -3,7 +3,7 @@ import { Duration, Effect, Result, Schedule } from "effect";
 import { lift, ReleaseError } from "./errors.ts";
 import type { VerifiedRelease } from "./intent.ts";
 import type { NpmPublisher, Registry } from "./npm.ts";
-import { distTagFor, npmIdentity, planPublication, shouldPromote } from "./policy.ts";
+import { distTagFor, npmIdentity, planPublication } from "./policy.ts";
 import type { CommitAncestry } from "./policy.ts";
 
 /**
@@ -131,8 +131,9 @@ export function publishVerifiedRelease(
     const intended = yield* lift(() => planPublication(release, registry, deps.ancestry));
     if (intended.kind === "superseded") return "superseded";
     const confirmed = intended.upload ? yield* uploadAndConfirm(release, deps) : registry;
-    const promote = yield* lift(() => shouldPromote(release, confirmed, deps.ancestry));
-    if (promote) yield* promoteAndConfirm(release, deps);
+    // Promotion is re-decided against the registry read that confirmed the upload.
+    const confirmedPlan = yield* lift(() => planPublication(release, confirmed, deps.ancestry));
+    if (confirmedPlan.kind === "publish" && confirmedPlan.promote) yield* promoteAndConfirm(release, deps);
     return "published";
   });
 }

@@ -20,7 +20,7 @@ type AuthoredComponentParameter = {
  * binding defaults travel together so the component transform does not traverse
  * the same declarations once for props and again for defaults.
  */
-export type AuthoredComponentRecovery = {
+type AuthoredComponentRecovery = {
   readonly propNodes: readonly BackendTypeNodeHandle[];
   readonly bindingDefaults?: ReadonlyMap<string, string>;
 };

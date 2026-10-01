@@ -104,7 +104,7 @@ export function boundaryTimingBudget(
  * @throws When a catalog entry is missing the oracle files or ceilings its plan needs, or
  *   when orders are duplicated or negative.
  */
-export function deriveTimingPlan<Plan extends TimingPlan>(
+function deriveTimingPlan<Plan extends TimingPlan>(
   catalog: readonly FixtureEvidenceRecord[],
   plan: Plan
 ): readonly TimingPlanResult[Plan][] {
@@ -297,7 +297,7 @@ export const boundarySupplementalFixtures: readonly SupplementalBoundaryFixture[
  * @returns One row per fixture naming its input, conformance class, type-check strategy,
  *   timing plans, and whether it has a warning oracle.
  */
-export function derivePackageExecutionPlan(catalog: readonly FixtureEvidenceRecord[]): readonly {
+function derivePackageExecutionPlan(catalog: readonly FixtureEvidenceRecord[]): readonly {
   readonly fixture: string;
   readonly input: string;
   readonly conformance: boolean;

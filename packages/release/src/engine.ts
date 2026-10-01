@@ -14,7 +14,7 @@ import type { ReleaseEnvironment } from "./github.ts";
 import { assertCommit } from "./intent.ts";
 import type { CanaryIntent, CommitSha, ReleaseIntent, StableIntent, VerifiedRelease } from "./intent.ts";
 import { createNpmPublisher, readRegistry } from "./npm.ts";
-import { changesetBaseBranch, plannedCanaryBase, trackedBranchOf } from "./plan.ts";
+import { changesetBaseBranch, plannedCanaryBase } from "./plan.ts";
 import { decideCanary } from "./policy.ts";
 import { liveConfirmation, publishVerifiedRelease } from "./publication.ts";
 import type { PublicationDeps } from "./publication.ts";
@@ -223,7 +223,8 @@ function liveCheckedCommitDeps(pkg: ReleasePackage, environment: ReleaseEnvironm
       client,
       pkg.checkoutRoot,
       pkg.packageDirectory,
-      trackedBranchOf(baseBranch)
+      // The branch Changesets tracks, without the `origin/` prefix.
+      baseBranch.slice("origin/".length)
     ),
     plannedCanaryBase: (current) => plannedCanaryBase(current, pkg.packageName, pkg.checkoutRoot),
   };
@@ -241,7 +242,7 @@ function withLiveDeps<D, A>(
 }
 
 /** The shipped operations with a transport seam that is not part of the public package surface. */
-export type ReleaseOperations = {
+type ReleaseOperations = {
   checkReleasePr: (pkg: ReleasePackage) => Effect.Effect<void, ReleaseError>;
   releaseCheckedCommit: (
     pkg: ReleasePackage,

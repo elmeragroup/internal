@@ -1,6 +1,11 @@
 import { join } from "node:path";
 
-import { assertNodeMajor, issue02TimingCommand, knownIssue02TimingCommands } from "../files.ts";
+import {
+  assertNodeMajor,
+  issue02TimingCommand,
+  knownIssue02TimingCommands,
+  packageVersion,
+} from "../files.ts";
 import {
   assertBytesReceivedBudget,
   assertFetchedToMaterializedRatioBudget,
@@ -13,14 +18,15 @@ import {
   fetchedToMaterializedRatio,
   fixtureDirectory,
   fixtureInputPath,
-  boundarySupplementalFixtures,
-  boundaryTimingBudget,
-  boundaryTimingFixtures,
   isWithinIpcBudget,
-  packageVersion,
   readTimingReport,
 } from "../fixture-evidence.ts";
 import type { TimingReport } from "../fixture-evidence.ts";
+import {
+  boundarySupplementalFixtures,
+  boundaryTimingBudget,
+  boundaryTimingFixtures,
+} from "../fixture-plans.ts";
 import { boundaryStatuses, timedExtraction } from "./shared.ts";
 
 const reportPath = join(fixtureDirectory, "timing-boundary.json");

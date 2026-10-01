@@ -1,14 +1,9 @@
 import type { ExtractionResult, PropertyNode, SemanticType } from "@elmeragroup/api-extractor";
 
 import { dedupeDocumentation, readPartPropFact, shortTypeOf } from "./checker.ts";
-import type { ComponentApi, LibraryPartApi, LibraryProject } from "./checker.ts";
-import type { ProblemLog } from "./errors.ts";
+import type { ComponentApi, LibraryProject } from "./checker.ts";
 import type { ApiArtifactDiagnostic, ApiPart, ApiProp } from "./model.ts";
 import { compareUtf16CodeUnits } from "./ordering.ts";
-
-function isEnrichable(facts: LibraryPartApi): boolean {
-  return facts.source?.origin !== "forwarded";
-}
 
 function propertiesOf(type: SemanticType): readonly PropertyNode[] {
   switch (type.kind) {
@@ -57,12 +52,13 @@ function enrichPart(
   result: ExtractionResult,
   roots: readonly string[],
   packages: readonly string[],
-  problems: ProblemLog
+  problems: string[]
 ): ApiPart {
   const root = roots.find((name) => current.name === name || current.name.startsWith(`${name}.`));
   const facts = component.partApis.find((part) => part.name === current.name);
   if (root === undefined || facts === undefined) return current;
-  if (!isEnrichable(facts)) return current;
+  // Forwarded values accept only dependency-declared props and are never enriched.
+  if (facts.source?.origin === "forwarded") return current;
   const selected = selectedProps(result, root, current.name);
   if (selected === undefined) return current;
   const handled = new Set(current.props.map((prop) => prop.name));
@@ -96,7 +92,7 @@ function enrichPart(
       // An intersection repeats its members in the merged and per-branch lists, so
       // mark the prop handled to record the same unresolvable problem once.
       handled.add(property.name);
-      problems.add(`${current.name}.${property.name}: selected dependency prop has an unresolvable type`);
+      problems.push(`${current.name}.${property.name}: selected dependency prop has an unresolvable type`);
       continue;
     }
     additions.push({
@@ -111,7 +107,7 @@ function enrichPart(
     handled.add(property.name);
   }
   if (additions.length > current.forwardedCount) {
-    problems.add(`${current.name}: selected props exceed forwarded prop count`);
+    problems.push(`${current.name}: selected props exceed forwarded prop count`);
     return current;
   }
   return {
@@ -143,7 +139,7 @@ export function enrichComponents(
   results: readonly ExtractionResult[],
   model: readonly ComponentApi[],
   packages: readonly string[],
-  problems: ProblemLog
+  problems: string[]
 ): EnrichedLibraryApi {
   const diagnostics: ApiArtifactDiagnostic[] = [];
   const components = model.map((component, index) => {

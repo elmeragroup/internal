@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, expectTypeOf, it } from "vitest";
@@ -13,7 +13,6 @@ import {
   sourceBoundaryViolations,
   sourceFiles,
 } from "../scripts/boundary-scanner.ts";
-import { cleanPackageDist } from "../scripts/build.ts";
 import { assertFreshDeclarationOutput } from "../scripts/check-boundary.ts";
 import type {
   BackendCompilerOperations,
@@ -23,7 +22,14 @@ import type {
   BackendSignatureHandle,
   BackendTypeHandle,
 } from "../src/backend/contracts.ts";
-import { parseModule } from "../src/parser.ts";
+import { parseExtractorOptions } from "../src/parse/options.ts";
+import type { ResolvedModule } from "../src/parse/resolver.ts";
+import { resolveModuleDraft } from "../src/parser.ts";
+
+/** Reads and resolves one module through the parser seam with default options, as the extractor does. */
+function parseModule(session: BackendExtractionSession, filePath: string): ResolvedModule {
+  return resolveModuleDraft(session, session.readModule(filePath), filePath, parseExtractorOptions());
+}
 
 describe("compiler boundary", () => {
   it("catches every compiler import spelling, including side-effect and template forms", () => {
@@ -409,24 +415,6 @@ describe("compiler boundary", () => {
           declarationDirectory,
         })
       ).toThrow(/stale/u);
-    } finally {
-      rmSync(directory, { recursive: true, force: true });
-    }
-  });
-
-  it("cleans stale declarations from only the package dist before building", () => {
-    const directory = mkdtempSync(join(tmpdir(), "api-extractor-build-clean-"));
-    try {
-      const packageDist = join(directory, "package", "dist");
-      const unrelated = join(directory, "keep.txt");
-      mkdirSync(join(packageDist, "src/backend"), { recursive: true });
-      writeFileSync(join(packageDist, "src/backend/tsgo.d.ts"), "stale");
-      writeFileSync(unrelated, "keep");
-
-      cleanPackageDist(packageDist);
-
-      expect(existsSync(packageDist)).toBe(false);
-      expect(existsSync(unrelated)).toBe(true);
     } finally {
       rmSync(directory, { recursive: true, force: true });
     }

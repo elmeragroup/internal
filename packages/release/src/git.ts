@@ -46,11 +46,10 @@ export function createCommitAncestry(cwd: string): CommitAncestry {
 
 /**
  * Reads git for the release pipeline. `cwd` is the checkout to read.
- * `packageManifest` is the git path to package.json.
+ * `packageManifest` is the forward-slash git path to package.json (see `packageManifestGitPath`).
  * `remoteTrackingRef` is the Changesets base branch (`origin/<branch>`). Required.
  */
 export function createGitPort(cwd: string, packageManifest: string, remoteTrackingRef: string): GitPort {
-  const manifest = packageManifest.replaceAll("\\", "/");
   return {
     head: () => lift(() => assertCommit(git(cwd, ["rev-parse", "HEAD"]))),
     baseBranchTip: () => lift(() => assertCommit(git(cwd, ["rev-parse", remoteTrackingRef]))),
@@ -58,7 +57,7 @@ export function createGitPort(cwd: string, packageManifest: string, remoteTracki
     stableVersionAt: (revision) =>
       lift(() => {
         const recorded = decodeJson(
-          git(cwd, ["show", `${revision}:${manifest}`]),
+          git(cwd, ["show", `${revision}:${packageManifest}`]),
           PackageManifest,
           "recorded manifest"
         );

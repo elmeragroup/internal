@@ -1,14 +1,6 @@
-import type {
-  BackendDeclarationOwnership,
-  BackendNodeHandle,
-  BackendNodeReference,
-  BackendSymbolFacts,
-  BackendSymbolHandle,
-} from "../backend/contracts.ts";
+import type { BackendNodeHandle, BackendSymbolFacts, BackendSymbolHandle } from "../backend/contracts.ts";
 import { isExternalOwnership } from "../backend/contracts.ts";
 import type { ResolverContext } from "./contracts.ts";
-
-export { isExternalOwnership };
 
 type Context = ResolverContext;
 
@@ -25,14 +17,6 @@ type Context = ResolverContext;
  * dependency-owned declaration makes the whole symbol external), while the
  * standard-library gates quantify over declarations at their own sites.
  */
-
-/** Normalized ownership of one declaration's source file. */
-export function declarationOwnership(
-  node: BackendNodeReference,
-  context: Context
-): BackendDeclarationOwnership {
-  return context.operations.declarationOwnership(node);
-}
 
 /**
  * The declaration a symbol is read from when one must stand for it: the value
@@ -63,12 +47,14 @@ export function symbolDeclarations(
 export function isExternalSymbol(symbol: BackendSymbolHandle, context: Context): boolean {
   return context.operations
     .symbolFacts(symbol)
-    .declarations.some((declaration) => isExternalOwnership(declarationOwnership(declaration, context)));
+    .declarations.some((declaration) =>
+      isExternalOwnership(context.operations.declarationOwnership(declaration))
+    );
 }
 
 /** Whether one declaration lives in TypeScript's own standard-library files. */
 export function isStandardLibraryDeclaration(node: BackendNodeHandle, context: Context): boolean {
-  const ownership = declarationOwnership(node, context);
+  const ownership = context.operations.declarationOwnership(node);
   return ownership.kind === "typescript" && ownership.library === "standard-library";
 }
 
@@ -78,5 +64,5 @@ export function isStandardLibraryDeclaration(node: BackendNodeHandle, context: C
  * where nested toolchain copies count but other packages do not.
  */
 export function isTypeScriptToolchainDeclaration(node: BackendNodeHandle, context: Context): boolean {
-  return declarationOwnership(node, context).kind === "typescript";
+  return context.operations.declarationOwnership(node).kind === "typescript";
 }

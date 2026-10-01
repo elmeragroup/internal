@@ -11,7 +11,7 @@
     }
   },
   "scripts": {
-    "build": "node scripts/build.ts",
+    "build": "node ../../scripts/build-package.ts",
     "ci:checks": "pnpm run check:catalog && pnpm run check:boundary && pnpm run test:fixtures && pnpm run test:conformance && pnpm run test:timing && pnpm run test:timing:issue14 && pnpm run test:timing:external-selection",
     "format:check": "oxfmt --check .",
     "lint": "oxlint . --deny-warnings",

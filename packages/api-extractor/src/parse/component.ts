@@ -27,7 +27,7 @@ type ComponentRecognition =
   | { readonly outcome: "uncertain"; readonly reason: "mixed-component-union" };
 
 /** The result of the component transform: the output type and what recognition decided. */
-export type ComponentTransformResult = {
+type ComponentTransformResult = {
   readonly type: SemanticType;
   readonly recognition: ComponentRecognition;
 };

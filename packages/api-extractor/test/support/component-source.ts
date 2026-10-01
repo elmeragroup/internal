@@ -11,7 +11,7 @@ import { openTsgoProject } from "../../src/backend/ts7/project.ts";
 import type { ComponentSourceRequest, ComponentSourceResult } from "../../src/component-sources.ts";
 import { ProjectExtractor } from "../../src/index.ts";
 
-export const componentSourceFixtures = resolve(import.meta.dirname, "../fixtures/component-source");
+const componentSourceFixtures = resolve(import.meta.dirname, "../fixtures/component-source");
 const tsconfigPath = resolve(componentSourceFixtures, "tsconfig.json");
 
 /** One fixture module's absolute path. */

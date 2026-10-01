@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { assertCommit } from "../src/intent.ts";
 import type { VerifiedRelease } from "../src/intent.ts";
 import type { Registry } from "../src/npm.ts";
-import { decideCanary, distTagFor, planPublication, shouldPromote } from "../src/policy.ts";
+import { decideCanary, distTagFor, planPublication } from "../src/policy.ts";
 import type { CommitAncestry } from "../src/policy.ts";
 import { assertCanaryReleaseVersion, assertStableReleaseVersion } from "../src/version.ts";
 import { commit, newerCommit, unrelatedCommit, verifiedRelease } from "./lib/release-fixtures.ts";
@@ -295,8 +295,16 @@ describe("publication plan", () => {
 
 describe("promotion decision", () => {
   it("promotes a new release that takes its channel tag", () => {
-    expect(shouldPromote(canary, registry(), isAncestor)).toBe(true);
-    expect(shouldPromote(stable, registry(), isAncestor)).toBe(true);
+    expect(planPublication(canary, registry(), isAncestor)).toEqual({
+      kind: "publish",
+      upload: true,
+      promote: true,
+    });
+    expect(planPublication(stable, registry(), isAncestor)).toEqual({
+      kind: "publish",
+      upload: true,
+      promote: true,
+    });
   });
 
   it("does not promote an already-published canary that no longer owns the channel", () => {
@@ -312,7 +320,6 @@ describe("promotion decision", () => {
         upload: false,
         promote: false,
       });
-      expect(shouldPromote(canary, published, isAncestor)).toBe(false);
     }
   });
 
@@ -320,14 +327,17 @@ describe("promotion decision", () => {
     const published = registry();
     published.versions.set("0.2.0-canary.12", { commit: newerCommit, integrity: "newer" });
     expect(planPublication(canary, published, isAncestor)).toEqual({ kind: "superseded" });
-    expect(shouldPromote(canary, published, isAncestor)).toBe(false);
   });
 
   it("does not promote a stable that already owns latest", () => {
     const published = registry();
     published.versions.set(stable.version, { commit, integrity: stable.integrity });
     published.tags.set("latest", stable.version);
-    expect(shouldPromote(stable, published, isAncestor)).toBe(false);
+    expect(planPublication(stable, published, isAncestor)).toEqual({
+      kind: "publish",
+      upload: false,
+      promote: false,
+    });
   });
 });
 

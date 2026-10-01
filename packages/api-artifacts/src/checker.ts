@@ -2,17 +2,15 @@ import path from "node:path";
 import type { SourceFile } from "typescript/unstable/ast";
 import { isExpressionStatement, isStringLiteral } from "typescript/unstable/ast/is";
 import { API, NodeBuilderFlags, SignatureKind, SymbolFlags } from "typescript/unstable/sync";
-import type { Checker, Program, Project, Symbol as TsSymbol, Type } from "typescript/unstable/sync";
+import type { Checker, Program, Symbol as TsSymbol, Type } from "typescript/unstable/sync";
 
 import type { ComponentSourceRequest, ComponentSourceResult } from "@elmeragroup/api-extractor";
 
-import type { ProblemLog } from "./errors.ts";
 import type { ApiPart, ApiProp, RscStatus } from "./model.ts";
 import { compareUtf16CodeUnits } from "./ordering.ts";
 
 export type LibraryProject = {
   projectRoot: string;
-  project: Project;
   checker: Checker;
   program: Program;
   close: () => void;
@@ -27,7 +25,6 @@ export function openLibraryProject(tsconfigPath: string, projectRoot: string): L
     if (project === undefined) throw new Error(`Could not open the project at ${tsconfigPath}`);
     return {
       projectRoot,
-      project,
       checker: project.checker,
       program: project.program,
       close: () => api.close(),
@@ -118,13 +115,15 @@ function isRecipeAxisDeclaration(declarationPath: string): boolean {
 }
 
 /**
- * Classifies a prop from facts supplied by either checker.  Recipe axes are
- * checker-synthesized in the current model and are declared in `*-variants`
- * sources by the Effect model; neither case needs the consumer-facing JSDoc
- * policy applied to ordinary declared props.
+ * Recipe axes are either checker-synthesized (no declaration) or declared in
+ * `*-variants` sources; neither case needs the consumer-facing JSDoc policy
+ * applied to ordinary declared props.
  */
-export function propOrigin(declarationPaths: readonly string[], synthesized: boolean): ApiProp["origin"] {
-  return synthesized || declarationPaths.some(isRecipeAxisDeclaration) ? "recipe-axis" : "declared";
+function isRecipeAxisProp(symbol: TsSymbol): boolean {
+  return (
+    symbol.declarations.length === 0 ||
+    symbol.declarations.some((declaration) => isRecipeAxisDeclaration(declaration.path))
+  );
 }
 
 /**
@@ -137,15 +136,15 @@ function partSourceFromInspection(
   context: LibraryProject,
   partName: string,
   result: ComponentSourceResult,
-  problems: ProblemLog
+  problems: string[]
 ): PartSource | null {
   if (result.status === "unresolved") {
-    problems.add(`${partName}: could not recover the authored implementation (${result.reason})`);
+    problems.push(`${partName}: could not recover the authored implementation (${result.reason})`);
     return null;
   }
   const sourceFile = context.program.getSourceFile(result.filePath);
   if (sourceFile === undefined) {
-    problems.add(`${partName}: could not load the authored implementation file (${result.filePath})`);
+    problems.push(`${partName}: could not load the authored implementation file (${result.filePath})`);
     return null;
   }
   return {
@@ -226,11 +225,7 @@ function hasCallSignatures(checker: Checker, type: Type): boolean {
 }
 
 function isForwardedProp(context: LibraryProject, symbol: TsSymbol): boolean {
-  const declarationPaths = symbol.declarations.map((declaration) => declaration.path);
-  return (
-    propOrigin(declarationPaths, symbol.declarations.length === 0) !== "recipe-axis" &&
-    !isOwnProp(context, symbol)
-  );
+  return !isRecipeAxisProp(symbol) && !isOwnProp(context, symbol);
 }
 
 /** Forwarded-prop summary for one checker-backed part: omitted count and declaring packages. */
@@ -283,17 +278,17 @@ export type ComponentApiRequest = {
 export function componentPartRequests(
   context: LibraryProject,
   request: ComponentApiRequest,
-  problems: ProblemLog
+  problems: string[]
 ): readonly PartRequest[] {
   const { checker, program } = context;
   const sourceFile = program.getSourceFile(request.entryFile);
   if (sourceFile === undefined) {
-    problems.add(`${request.entryFile}: entry module is not part of the library program`);
+    problems.push(`${request.entryFile}: entry module is not part of the library program`);
     return [];
   }
   const moduleSymbol = checker.getSymbolAtLocation(sourceFile);
   if (moduleSymbol === undefined) {
-    problems.add(`${request.entryFile}: entry module has no module symbol`);
+    problems.push(`${request.entryFile}: entry module has no module symbol`);
     return [];
   }
   const moduleExports = checker.getExportsOfModule(moduleSymbol);
@@ -301,12 +296,12 @@ export function componentPartRequests(
   for (const exportName of request.exportNames) {
     const rootSymbol = moduleExports.find((exported) => exported.name === exportName);
     if (rootSymbol === undefined) {
-      problems.add(`${request.entryFile}: does not export "${exportName}"`);
+      problems.push(`${request.entryFile}: does not export "${exportName}"`);
       continue;
     }
     const rootType = checker.getTypeOfSymbol(rootSymbol);
     if (rootType === undefined || rootType.isErrorType()) {
-      problems.add(`${exportName}: exported value has an unresolvable type`);
+      problems.push(`${exportName}: exported value has an unresolvable type`);
       continue;
     }
     if (hasCallSignatures(checker, rootType)) {
@@ -325,7 +320,7 @@ export function componentPartRequests(
       });
     }
     if (parts.length === start) {
-      problems.add(`${exportName}: no renderable parts were found on the exported namespace`);
+      problems.push(`${exportName}: no renderable parts were found on the exported namespace`);
     }
   }
   return parts;
@@ -435,24 +430,23 @@ function describeProps(
   request: PartRequest,
   source: PartSource,
   props: ReadonlyMap<string, TsSymbol>,
-  problems: ProblemLog
+  problems: string[]
 ): ApiProp[] {
   const { checker } = context;
   const rows: ApiProp[] = [];
   for (const property of props.values()) {
-    const declarationPaths = property.declarations.map((declaration) => declaration.path);
-    const isRecipeAxis = propOrigin(declarationPaths, property.declarations.length === 0) === "recipe-axis";
-    if (isForwardedProp(context, property)) continue;
+    const isRecipeAxis = isRecipeAxisProp(property);
+    if (!isRecipeAxis && !isOwnProp(context, property)) continue;
     const printed = printType(checker, checker.getTypeOfSymbol(property));
     if (printed === null) {
-      problems.add(
+      problems.push(
         `${request.name}.${property.name}: type is unresolvable — the docs build cannot print it (${source.sourcePath})`
       );
       continue;
     }
     const description = dedupeDocumentation(checker.getDocumentationCommentOfSymbol(property));
     if (description === "" && !isRecipeAxis) {
-      problems.add(
+      problems.push(
         `${request.name}.${property.name}: public prop has no JSDoc description (${source.sourcePath})`
       );
       continue;
@@ -477,10 +471,10 @@ function describePart(
   contract: PartContract,
   source: PartSource | null,
   forwarded: PartForwarded,
-  problems: ProblemLog
+  problems: string[]
 ): ApiPart | null {
   if (contract.kind !== "one") {
-    problems.add(
+    problems.push(
       contract.kind === "none"
         ? `${request.name}: no call signature — it does not look like a component`
         : `${request.name}: ${String(contract.count)} call signatures — API artifacts describe one public props contract; keep one public overload`
@@ -501,7 +495,7 @@ function describePart(
         forwardedCount: 0,
       };
     case "unresolved":
-      problems.add(`${request.name}: props type is unresolvable`);
+      problems.push(`${request.name}: props type is unresolvable`);
       return null;
     case "resolved":
       return {
@@ -520,7 +514,7 @@ export function extractPart(
   context: LibraryProject,
   request: PartRequest,
   sourceResult: ComponentSourceResult,
-  problems: ProblemLog
+  problems: string[]
 ): LibraryPartApi {
   const source = partSourceFromInspection(context, request.name, sourceResult, problems);
   const contract = partContractOf(context.checker, request.type);

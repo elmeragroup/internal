@@ -24,13 +24,13 @@ export type InternalTimedExtraction = {
 };
 
 /** Extracts one file and reports the compiler timing observed during the run. */
-export type InternalTimingMethod = (
+type InternalTimingMethod = (
   filePath: string,
   options?: ExtractorOptions
 ) => Effect.Effect<InternalTimedExtraction, BackendError | FileNotInProgramError | ExtractError>;
 
 /** The timed counterpart of `ProjectExtractorService`, used only by timing evidence. */
-export type InternalTimingService = {
+type InternalTimingService = {
   readonly extractModule: InternalTimingMethod;
 };
 

@@ -4,7 +4,7 @@ import { ProvenanceEntrySchema } from "./provenance.ts";
 import { ExtractWarningSchema } from "./warnings.ts";
 
 /** Every intrinsic the model can name; the type, the schema, and the backend contract derive from it. */
-export const intrinsicNames = [
+const intrinsicNames = [
   "any",
   "bigint",
   "boolean",

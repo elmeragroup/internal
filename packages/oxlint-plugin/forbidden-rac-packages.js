@@ -6,7 +6,7 @@
  *
  * @type {readonly string[]}
  */
-export const FORBIDDEN_RAC_PACKAGES = Object.freeze([
+const FORBIDDEN_RAC_PACKAGES = Object.freeze([
   "react-aria-components",
   "react-aria",
   "@internationalized/date",

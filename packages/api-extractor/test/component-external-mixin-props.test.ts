@@ -2,7 +2,8 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import type { ComponentNode, ExtractionResult } from "../src/index.ts";
-import { extractFixture, fixtureRoot } from "./support/extract.ts";
+import { extractFixture } from "./support/extract.ts";
+import { fixtureRoot } from "./support/temp-dirs.ts";
 
 const fixtureDirectory = resolve(fixtureRoot, "component-external-mixin-props");
 const tsconfigPath = resolve(fixtureDirectory, "tsconfig.json");

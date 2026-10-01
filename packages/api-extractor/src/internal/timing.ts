@@ -6,9 +6,7 @@ import { projectExtractorLayerWithTiming } from "../extractor.ts";
 import type { ProjectExtractor } from "../extractor.ts";
 import type { OpenProjectOptions } from "../options.ts";
 import { InternalProjectExtractorTiming } from "./project-options.ts";
-import type { InternalOpenProjectOptions, InternalTimedExtraction } from "./project-options.ts";
-
-export type TimedExtraction = InternalTimedExtraction;
+import type { InternalOpenProjectOptions } from "./project-options.ts";
 
 /**
  * Internal evidence-only layer.  The public ProjectExtractor layer never

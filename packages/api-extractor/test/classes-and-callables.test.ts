@@ -4,7 +4,8 @@ import { describe, expect, it, beforeAll } from "vitest";
 import type { ExtractionResult, ExtractorOptions } from "../src/index.ts";
 import type { ClassMethod, ClassProperty, SemanticType } from "../src/model.ts";
 import { exportedType } from "./support/exports.ts";
-import { extractFixture, fixtureRoot } from "./support/extract.ts";
+import { extractFixture } from "./support/extract.ts";
+import { fixtureRoot } from "./support/temp-dirs.ts";
 
 const tsconfigPath = resolve(fixtureRoot, "classes-and-callables-tsconfig.json");
 

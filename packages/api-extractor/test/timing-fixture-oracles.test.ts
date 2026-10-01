@@ -5,9 +5,8 @@ import {
   assertFixtureOracle,
   assertSupplementalFixture,
   fixtureInputPath,
-  boundarySupplementalFixtures,
-  boundaryTimingFixtures,
 } from "../scripts/fixture-evidence.ts";
+import { boundarySupplementalFixtures, boundaryTimingFixtures } from "../scripts/fixture-plans.ts";
 import { extractFixture } from "./support/extract.ts";
 
 const fixtureDirectory = resolve(import.meta.dirname, "fixtures");

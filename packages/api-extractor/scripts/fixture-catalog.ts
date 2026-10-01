@@ -1,7 +1,8 @@
 import { Schema } from "effect";
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 
+import { decodeJson } from "./files.ts";
 import type {
   FixtureBudgets,
   FixtureEvidenceRecord,
@@ -56,10 +57,6 @@ const FixtureBudgetsSchema = Schema.Struct({
 /** A warning oracle is the reviewed warning list, in the order the extractor reports it. */
 const WarningOracleSchema = Schema.Array(Schema.Struct({ code: Schema.String }));
 
-function readJson(path: string): Schema.Json {
-  return Schema.decodeUnknownSync(Schema.Json)(JSON.parse(readFileSync(path, "utf8")));
-}
-
 /**
  * Reads and decodes the hand-maintained fixture facts (`fixtures.json`): IPC ceilings and the
  * recorded per-fixture exceptions no filename can state.
@@ -69,12 +66,12 @@ function readJson(path: string): Schema.Json {
  * @throws When the file is unreadable or does not match the schema.
  */
 export function readFixtureBudgets(root: string): FixtureBudgets {
-  return Schema.decodeUnknownSync(FixtureBudgetsSchema)(readJson(join(root, "fixtures.json")));
+  return Schema.decodeUnknownSync(FixtureBudgetsSchema)(decodeJson(join(root, "fixtures.json")));
 }
 
 /** The warning codes a fixture's oracle records, in oracle order. */
 function warningCodes(path: string): readonly string[] {
-  return Schema.decodeUnknownSync(WarningOracleSchema)(readJson(path)).map((entry) => entry.code);
+  return Schema.decodeUnknownSync(WarningOracleSchema)(decodeJson(path)).map((entry) => entry.code);
 }
 
 function timingOf(budgets: FixtureBudgets, id: string): readonly TimingMetadata[] {

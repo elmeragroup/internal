@@ -5,11 +5,6 @@
  * carries the same stable discriminant without a schema dependency.
  */
 
-/** Renders the message for one batch of generation problems, keeping the structured list intact. */
-function renderProblems(problems: readonly string[]): string {
-  return `API artifact generation failed:\n${problems.join("\n")}`;
-}
-
 /**
  * Expected failure of `generateApiArtifacts`: the project could not be turned into
  * artifacts. `problems` keeps every rendered problem as structured data so callers
@@ -22,7 +17,7 @@ export class ApiArtifactsError extends Error {
   readonly problems: readonly string[];
 
   constructor(problems: readonly string[]) {
-    super(renderProblems(problems));
+    super(`API artifact generation failed:\n${problems.join("\n")}`);
     this.name = "ApiArtifactsError";
     this.problems = [...problems];
   }
@@ -43,24 +38,5 @@ export class ApiArtifactsDriftError extends Error {
     super(`API artifacts are missing or stale:\n${files.join("\n")}`);
     this.name = "ApiArtifactsDriftError";
     this.files = [...files];
-  }
-}
-
-/**
- * Collects actionable problems found while describing a project, so generation can
- * fail once with the complete list instead of at the first problem. A non-empty log
- * is reported through {@link ApiArtifactsError}.
- */
-export class ProblemLog {
-  private readonly entries: string[] = [];
-
-  /** Records one rendered problem message. */
-  add(problem: string): void {
-    this.entries.push(problem);
-  }
-
-  /** Every problem recorded so far, in discovery order. */
-  get problems(): readonly string[] {
-    return this.entries;
   }
 }

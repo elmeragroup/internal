@@ -57,10 +57,7 @@ export function symbolOrigin(session: TsgoFactsSession, handle: BackendSymbolHan
  * the parser's visibility gate.
  */
 export function declaringParentIsClass(session: TsgoFactsSession, handle: BackendSymbolHandle): boolean {
-  return parentSymbolIsClass(session, session.symbol(handle, "symbolFacts.declaringParentIsClass"));
-}
-
-function parentSymbolIsClass(session: TsgoFactsSession, symbol: TsSymbol): boolean {
+  const symbol = session.symbol(handle, "symbolFacts.declaringParentIsClass");
   session.ensureOpen("symbolFacts.declaringParentIsClass");
   const parent = symbol.getParent();
   return parent !== undefined && (parent.flags & SymbolFlags.Class) !== 0;

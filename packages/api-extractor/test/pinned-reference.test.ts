@@ -3,7 +3,7 @@ import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { failedFixtureIndices } from "../scripts/conformance/report.ts";
-import { conformanceFixtureManifest } from "../scripts/fixture-evidence.ts";
+import { conformanceFixtureManifest } from "../scripts/fixture-plans.ts";
 import {
   pinnedFixturePathUniverse,
   pinnedUpstream,

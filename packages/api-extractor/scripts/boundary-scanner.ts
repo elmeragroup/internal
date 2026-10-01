@@ -29,7 +29,7 @@ const excludedDirectoryNames = new Set([
 ]);
 
 /** Remove comments without deleting string/template literals used by imports. */
-export function stripComments(source: string): string {
+function stripComments(source: string): string {
   let output = "";
   let quote: "'" | '"' | "`" | undefined;
   let escaped = false;
@@ -129,7 +129,7 @@ export function scanCompilerImports(source: string): readonly string[] {
 }
 
 /** Return every literal import/export edge, including import types. */
-export function scanModuleSpecifiers(source: string): readonly string[] {
+function scanModuleSpecifiers(source: string): readonly string[] {
   const cleaned = stripComments(source);
   const matches: string[] = [];
   const pattern =

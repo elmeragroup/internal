@@ -1,6 +1,6 @@
 import type { BackendNodeFacts, BackendNodeReference } from "../backend/contracts.ts";
+import { isExternalOwnership } from "../backend/contracts.ts";
 import type { ResolverContext } from "./contracts.ts";
-import { declarationOwnership, isExternalOwnership } from "./ownership.ts";
 
 type Context = ResolverContext;
 
@@ -112,6 +112,6 @@ function referencedProjectAliasBody(
   // a dependency alias's body belongs to the external graph this walk must not
   // traverse. Ownership is the normalized backend fact (`declarationOwnership`),
   // shared with every other external-policy site.
-  if (isExternalOwnership(declarationOwnership(declaration, context))) return undefined;
+  if (isExternalOwnership(context.operations.declarationOwnership(declaration))) return undefined;
   return declarationFacts.type;
 }

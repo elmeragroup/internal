@@ -1,38 +1,17 @@
 import type { BackendExtractionSession, BackendModuleDraft } from "./backend/contracts.ts";
 import { applyTypeOnlyStarFilter } from "./backend/type-only-star-filter.ts";
-import type { ExtractorOptions } from "./options.ts";
-import { parseExtractorOptions } from "./parse/options.ts";
 import type { ResolvedExtractorOptions } from "./parse/options.ts";
 import { resolveModule } from "./parse/resolver.ts";
 import type { ResolvedModule } from "./parse/resolver.ts";
 
 /**
- * Backend-neutral module policy and resolver entry point.
+ * Backend-neutral module policy over a draft the adapter has already read.
  *
  * The adapter supplies a module descriptor and opaque compiler graph. This
  * module owns type resolution, alias/mapped substitution, warnings, and the
  * React component transform. A replacement compiler therefore only needs to
  * implement the package-owned operations in `BackendCompilerOperations`.
- */
-export function parseModule(
-  session: BackendExtractionSession,
-  filePath: string,
-  options?: ExtractorOptions
-): ResolvedModule {
-  const draft = readModuleDraft(session, filePath);
-  return resolveModuleDraft(session, draft, filePath, parseExtractorOptions(options));
-}
-
-/**
- * Performs only compiler-adapter discovery. Keeping this operation separate
- * lets the Effect shell classify adapter failures independently from resolver
- * policy and user callbacks.
- */
-export function readModuleDraft(session: BackendExtractionSession, filePath: string): BackendModuleDraft {
-  return session.readModule(filePath);
-}
-
-/**
+ *
  * Apply module re-export policy and then invoke the compiler-free resolver.
  *
  * Type-only star re-exports keep only their pure types; structured module-walk

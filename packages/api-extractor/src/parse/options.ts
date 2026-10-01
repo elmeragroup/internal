@@ -1,7 +1,7 @@
+import type { BackendExternalTypeSelection } from "../backend/contracts.ts";
 import { defaultExtractorOptions } from "../options.ts";
 import type { ExtractorOptions } from "../options.ts";
 import { normalizeExternalTypeSelection } from "./external-type-selection.ts";
-import type { ExternalTypeSelection } from "./external-type-selection.ts";
 
 /**
  * Extraction options after defaults and the external-type selection are parsed
@@ -13,7 +13,7 @@ import type { ExternalTypeSelection } from "./external-type-selection.ts";
 export type ResolvedExtractorOptions = {
   readonly shouldInclude: ExtractorOptions["shouldInclude"] | undefined;
   readonly shouldResolveObject: NonNullable<ExtractorOptions["shouldResolveObject"]>;
-  readonly externalTypes: ExternalTypeSelection;
+  readonly externalTypes: BackendExternalTypeSelection;
 };
 
 /**

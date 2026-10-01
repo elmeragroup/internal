@@ -255,8 +255,3 @@ export function auditPinnedReference(
     command,
   };
 }
-
-/** A compact helper for existing issue suites that only need optional bytes. */
-export function assertOptionalReferenceBytes(): ReferenceAuditResult {
-  return auditPinnedReference("optional");
-}

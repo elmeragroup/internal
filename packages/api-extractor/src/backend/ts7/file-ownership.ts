@@ -1,5 +1,3 @@
-import type { Node } from "typescript/unstable/ast";
-
 import type { BackendDeclarationOwnership, BackendNodeReference } from "../contracts.ts";
 import { isExternalOwnership } from "../contracts.ts";
 import type { TsgoFactsSession } from "./facts.ts";
@@ -20,23 +18,15 @@ export function declarationOwnership(
   session: TsgoFactsSession,
   handle: BackendNodeReference
 ): BackendDeclarationOwnership {
-  return declarationOwnershipOfPath(session, session.nodePath(handle));
-}
-
-/** Classifies a declaration handle's path without resolving its AST subtree. */
-export function declarationOwnershipOfPath(
-  session: Pick<TsgoFactsSession, "ownershipOfPath">,
-  filePath: string
-): BackendDeclarationOwnership {
-  return session.ownershipOfPath(filePath);
+  return session.ownershipOfPath(session.nodePath(handle));
 }
 
 /** Whether a raw compiler declaration belongs outside the extracted project. */
 export function isExternalDeclaration(
   session: Pick<TsgoFactsSession, "ownershipOfPath">,
-  declaration: { readonly path: string; readonly resolve: () => Node | undefined }
+  declaration: { readonly path: string }
 ): boolean {
-  return isExternalOwnership(declarationOwnershipOfPath(session, declaration.path));
+  return isExternalOwnership(session.ownershipOfPath(declaration.path));
 }
 
 /**
@@ -46,16 +36,11 @@ export function isExternalDeclaration(
  */
 export function isTypeScriptLibraryDeclaration(
   session: Pick<TsgoFactsSession, "ownershipOfPath">,
-  declaration: { readonly path: string; readonly resolve: () => Node | undefined }
+  declaration: { readonly path: string }
 ): boolean {
-  const ownership = declarationOwnershipOfPath(session, declaration.path);
+  const ownership = session.ownershipOfPath(declaration.path);
   return ownership.kind === "typescript" && ownership.library === "standard-library";
 }
-
-export type SourceFileOwnershipMetadata = {
-  readonly externalLibrary: boolean;
-  readonly defaultLibrary: boolean;
-};
 
 /** The compiler metadata needed to resolve ownership without materializing a node. */
 export type CompilerSourceFileMetadata = {
@@ -64,42 +49,20 @@ export type CompilerSourceFileMetadata = {
 };
 
 /**
- * Classifies a source file with the compiler's optional ownership metadata.
- * An absent metadata record deliberately keeps the path fallback in
- * `classifySourceFile`; an explicit record is authoritative, including two
- * `false` flags for a project file whose path resembles TypeScript's library.
- */
-export function sourceFileOwnership(
-  filePath: string,
-  metadata?: CompilerSourceFileMetadata
-): BackendDeclarationOwnership {
-  return classifySourceFile(
-    filePath,
-    metadata === undefined
-      ? undefined
-      : {
-          externalLibrary: metadata.isFromExternalLibrary,
-          defaultLibrary: metadata.isDefaultLibrary,
-        }
-  );
-}
-
-/** Whether a source file is outside the extracted project. */
-export function isExternalSourceFile(filePath: string, metadata?: CompilerSourceFileMetadata): boolean {
-  return isExternalOwnership(sourceFileOwnership(filePath, metadata));
-}
-
-/**
  * Classifies one source-file path into the ownership facts the contract
  * defines. The three tests mirror the questions the resolver previously asked
  * inline: packaged sources under any `node_modules` segment are external;
  * TypeScript's own library files (`…/typescript/lib/…`, including
  * `@typescript` toolchain installs) are the standard library; and the wider
  * toolchain question accepts any TypeScript installation's lib directory.
+ *
+ * An absent metadata record deliberately keeps the path fallback; an explicit
+ * record from the compiler is authoritative, including two `false` flags for a
+ * project file whose path resembles TypeScript's library.
  */
 export function classifySourceFile(
   filePath: string,
-  metadata?: SourceFileOwnershipMetadata
+  metadata?: CompilerSourceFileMetadata
 ): BackendDeclarationOwnership {
   const normalizedPath = filePath.replaceAll("\\", "/");
   const pathSegments = normalizedPath.split("/").filter((segment) => segment.length > 0);
@@ -114,8 +77,8 @@ export function classifySourceFile(
   // Default libraries are compiler-owned even when the installation is not
   // beneath `node_modules`; they remain external to the extracted project.
   const external =
-    metadata === undefined ? pathExternal : metadata.externalLibrary || metadata.defaultLibrary;
-  const standardLibrary = metadata?.defaultLibrary ?? pathStandardLibrary;
+    metadata === undefined ? pathExternal : metadata.isFromExternalLibrary || metadata.isDefaultLibrary;
+  const standardLibrary = metadata?.isDefaultLibrary ?? pathStandardLibrary;
   // The path shape remains useful for the wider toolchain fact, but compiler
   // metadata wins for files in the opened project. This keeps a project file
   // named `typescript/lib/lib.dom.d.ts` from becoming a compiler library while

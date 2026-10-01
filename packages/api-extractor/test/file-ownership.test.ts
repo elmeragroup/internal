@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { classifySourceFile, isExternalSourceFile } from "../src/backend/ts7/file-ownership.ts";
+import { isExternalOwnership } from "../src/backend/contracts.ts";
+import { classifySourceFile } from "../src/backend/ts7/file-ownership.ts";
 
 describe("backend source-file ownership classification", () => {
   it.each([
@@ -86,31 +87,31 @@ describe("backend source-file ownership classification", () => {
       "Unix project TypeScript-shaped library with compiler metadata",
       "/repo/src/typescript/lib/lib.dom.d.ts",
       { kind: "project" },
-      { externalLibrary: false, defaultLibrary: false },
+      { isFromExternalLibrary: false, isDefaultLibrary: false },
     ],
     [
       "Windows project @typescript-shaped library with compiler metadata",
       String.raw`C:\repo\src\@typescript\tsc\lib\lib.es2022.d.ts`,
       { kind: "project" },
-      { externalLibrary: false, defaultLibrary: false },
+      { isFromExternalLibrary: false, isDefaultLibrary: false },
     ],
     [
       "non-node_modules compiler default library",
       "/opt/typescript/lib/lib.es2022.d.ts",
       { kind: "typescript", library: "standard-library" },
-      { externalLibrary: false, defaultLibrary: true },
+      { isFromExternalLibrary: false, isDefaultLibrary: true },
     ],
     [
       "non-node_modules external compiler declaration",
       "/opt/typescript/lib/index.d.ts",
       { kind: "typescript", library: "toolchain" },
-      { externalLibrary: true, defaultLibrary: false },
+      { isFromExternalLibrary: true, isDefaultLibrary: false },
     ],
     [
       "external declaration with no identifiable package owner",
       "/vendor/declarations/index.d.ts",
       { kind: "external" },
-      { externalLibrary: true, defaultLibrary: false },
+      { isFromExternalLibrary: true, isDefaultLibrary: false },
     ],
   ] as const)("combines compiler metadata for $0", (_label, filePath, expected, metadata) => {
     expect(classifySourceFile(filePath, metadata)).toEqual(expected);
@@ -136,6 +137,6 @@ describe("backend source-file ownership classification", () => {
       true,
     ],
   ] as const)("uses $0", (_label, filePath, metadata, expected) => {
-    expect(isExternalSourceFile(filePath, metadata)).toBe(expected);
+    expect(isExternalOwnership(classifySourceFile(filePath, metadata))).toBe(expected);
   });
 });

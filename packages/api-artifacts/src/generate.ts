@@ -9,7 +9,7 @@ import type { ComponentSourceResult, ExtractWarning, ExtractionResult } from "@e
 import { componentPartRequests, extractPart, openLibraryProject } from "./checker.ts";
 import type { ComponentApi, LibraryProject, PartRequest } from "./checker.ts";
 import { enrichComponents } from "./enrichment.ts";
-import { ApiArtifactsDriftError, ApiArtifactsError, ProblemLog } from "./errors.ts";
+import { ApiArtifactsDriftError, ApiArtifactsError } from "./errors.ts";
 import type { ApiArtifactDiagnostic } from "./model.ts";
 import type { ComponentApiArtifact } from "./model.ts";
 
@@ -97,7 +97,7 @@ function describeComponent(
   request: ApiArtifactComponent,
   parts: readonly PartRequest[],
   inspected: readonly ComponentSourceResult[],
-  problems: ProblemLog
+  problems: string[]
 ): ComponentApi {
   if (inspected.length !== parts.length) {
     // Inspection and part requests are built from one request list, so a
@@ -128,7 +128,7 @@ export async function generateApiArtifacts(
   const requests = requestsFor({ ...options, projectRoot });
   if (requests.length === 0) return { components: [], diagnostics: [] };
   const context = openLibraryProject(tsconfigPath, projectRoot);
-  const problems = new ProblemLog();
+  const problems: string[] = [];
   let model: readonly ComponentApi[];
   let diagnostics: readonly ApiArtifactDiagnostic[] = [];
   try {
@@ -143,8 +143,8 @@ export async function generateApiArtifacts(
               return describeComponent(context, request, parts, inspected, problems);
             })
           );
-          if (problems.problems.length > 0) {
-            return yield* Effect.fail(new ApiArtifactsError(problems.problems));
+          if (problems.length > 0) {
+            return yield* Effect.fail(new ApiArtifactsError(problems));
           }
           const packages = options.includeExternalTypes ?? [];
           if (packages.length === 0) return { components: described, diagnostics: [] };
@@ -152,8 +152,8 @@ export async function generateApiArtifacts(
             extractor.extractModule(entry.entryFile, { includeExternalTypes: packages })
           );
           const enriched = enrichComponents(context, extracted, described, packages, problems);
-          if (problems.problems.length > 0) {
-            return yield* Effect.fail(new ApiArtifactsError(problems.problems));
+          if (problems.length > 0) {
+            return yield* Effect.fail(new ApiArtifactsError(problems));
           }
           const rejected = enriched.diagnostics.filter(
             (diagnostic) => !options.allowedWarningCodes?.includes(diagnostic.warning.code)
