@@ -13,19 +13,16 @@ import {
   issue14TimingWallClockContract,
   issue14TimingWallClockRationale,
 } from "../conformance/contract.ts";
-import { assertNodeMajor } from "../files.ts";
+import { assertNodeMajor, decodeJson, packageVersion } from "../files.ts";
 import {
   assertFixtureOracle,
   bytesReceivedCeiling,
-  decodeJson,
   fixtureDirectory,
   fixtureInputPath,
-  boundaryTimingFixtures,
-  conformanceTimingFixtures,
-  packageVersion,
   readTimingReport,
 } from "../fixture-evidence.ts";
 import type { TimingReport } from "../fixture-evidence.ts";
+import { boundaryTimingFixtures, conformanceTimingFixtures } from "../fixture-plans.ts";
 import { boundaryStatuses, timedExtraction } from "./shared.ts";
 import type { BoundaryStatuses } from "./shared.ts";
 
@@ -44,7 +41,7 @@ export const timingToleranceMs = 0.001;
 /** The wall-clock timing contract recorded in the report and asserted by readers. */
 export const wallClockContract = issue14TimingWallClockContract;
 /** The rationale recorded beside the wall-clock contract. */
-export const wallClockContractRationale = issue14TimingWallClockRationale;
+const wallClockContractRationale = issue14TimingWallClockRationale;
 const expectedFixtureOrder = conformanceTimingFixtures.map((definition) => definition.fixture);
 const timingFields = ["roundTripMs", "serverTimeMs", "transportOverheadMs"] as const;
 const semanticFields = ["requestCount", "nodesMaterialized", "sourceFilesFetched", "nodesFetched"] as const;

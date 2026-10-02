@@ -1,11 +1,11 @@
 import type { BackendNodeHandle, BackendNodeReference, BackendTypeHandle } from "../backend/contracts.ts";
+import { isExternalOwnership } from "../backend/contracts.ts";
 import type { SemanticType, TypeName } from "../model.ts";
 import { definedFields } from "../optional-fields.ts";
 import { authoredContainsPreservableKeyof } from "./authored-node.ts";
 import { addUndefined } from "./component.ts";
 import type { ResolveSemanticType, ResolverContext } from "./contracts.ts";
 import { recordIndexSignatureKeyProvenance } from "./object-resolver.ts";
-import { declarationOwnership, isExternalOwnership } from "./ownership.ts";
 import { applySubstitutions, bindAliasInstantiation, bindAliasParameters } from "./substitutions.ts";
 import type { Substitutions } from "./substitutions.ts";
 
@@ -161,7 +161,7 @@ function mappedKeySignature(
       : undefined;
   return {
     keyName: facts.keyName ?? "P",
-    keyNameFromLibrary: isExternalOwnership(declarationOwnership(node, context)),
+    keyNameFromLibrary: isExternalOwnership(context.operations.declarationOwnership(node)),
     keyType,
     valueType,
     valueNode,

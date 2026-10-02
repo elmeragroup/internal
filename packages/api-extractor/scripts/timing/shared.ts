@@ -1,7 +1,7 @@
 import { Effect } from "effect";
 
+import type { InternalTimedExtraction } from "../../src/internal/project-options.ts";
 import { InternalProjectExtractorTiming, timedProjectExtractorLayer } from "../../src/internal/timing.ts";
-import type { TimedExtraction } from "../../src/internal/timing.ts";
 import type { ExtractorOptions } from "../../src/options.ts";
 import { BoundaryCheckError, checkBoundary } from "../check-boundary.ts";
 
@@ -33,7 +33,7 @@ export function timedExtraction(
   tsconfigPath: string,
   inputPath: string,
   options?: ExtractorOptions
-): Promise<TimedExtraction> {
+): Promise<InternalTimedExtraction> {
   return Effect.runPromise(
     Effect.scoped(
       Effect.gen(function* () {

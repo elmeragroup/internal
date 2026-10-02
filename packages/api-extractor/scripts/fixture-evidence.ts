@@ -15,12 +15,7 @@ export const fixtureDirectory = resolve(import.meta.dirname, "../test/fixtures")
 /** The package root; the base for workspace-relative paths. */
 export const packageDirectory = resolve(import.meta.dirname, "..");
 
-export { decodeJson, packageVersion, posixRelative, sha256File } from "./files.ts";
 import { decodeJson, posixRelative } from "./files.ts";
-
-export * from "./fixture-catalog.ts";
-export * from "./fixture-plans.ts";
-
 import type { TimingFixture } from "./fixture-plans.ts";
 import type { SupplementalBoundaryFixture } from "./fixture-plans.ts";
 
@@ -335,14 +330,14 @@ export function fixtureInputPath(definition: TimingFixture | SupplementalBoundar
 }
 
 /** Reads and validates a fixture's selected module oracle. */
-export function readModuleOracle(definition: TimingFixture): ModuleNode {
+function readModuleOracle(definition: TimingFixture): ModuleNode {
   return Schema.decodeUnknownSync(ModuleNodeSchema)(
     decodeJson(fixtureFile(definition.fixture, definition.oracleFile))
   );
 }
 
 /** Reads and validates a fixture's warning oracle. */
-export function readWarningOracle(definition: TimingFixture): readonly ExtractWarning[] {
+function readWarningOracle(definition: TimingFixture): readonly ExtractWarning[] {
   return Schema.decodeUnknownSync(Schema.Array(ExtractWarningSchema))(
     decodeJson(fixtureFile(definition.fixture, definition.warningOracle))
   );
@@ -520,7 +515,7 @@ export function readFixtureOracle(fixture: string, oracleFile: string): ModuleNo
  * Asserts a warning oracle file contains no host-dependent paths (absolute paths, drive
  * letters, or pnpm store paths), so the evidence stays comparable across checkouts.
  */
-export function assertStableWarningOracle(definition: TimingFixture): void {
+function assertStableWarningOracle(definition: TimingFixture): void {
   const source = readFileSync(fixtureFile(definition.fixture, definition.warningOracle), "utf8");
   if (
     /(?:^|["':\s(])\/(?:[^"'\s]|\\.)+/u.test(source) ||

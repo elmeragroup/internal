@@ -3,7 +3,8 @@ import { describe, expect, expectTypeOf, it } from "vitest";
 
 import type { ExtractionResult } from "../src/index.ts";
 import type { SemanticType, TypeOperatorResolutionKind } from "../src/model.ts";
-import { extractFixture, fixtureRoot } from "./support/extract.ts";
+import { extractFixture } from "./support/extract.ts";
+import { fixtureRoot } from "./support/temp-dirs.ts";
 
 const tsconfigPath = resolve(fixtureRoot, "type-operators-tsconfig.json");
 

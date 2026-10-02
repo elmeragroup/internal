@@ -9,7 +9,7 @@ import { relative } from "node:path";
 /** Timing evidence gates on Node major 24; the exact patch is a recorded observation. */
 export const requiredNodeMajor = 24 as const;
 
-export function nodeMajor(version: string): number {
+function nodeMajor(version: string): number {
   const [major] = version.split(".");
   const parsed = Number.parseInt(major ?? "", 10);
   if (!Number.isInteger(parsed) || parsed < 0) {

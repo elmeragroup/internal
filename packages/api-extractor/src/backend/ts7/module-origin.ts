@@ -27,7 +27,6 @@ import type { Symbol as TsSymbol } from "typescript/unstable/sync";
 import { definedFields } from "../../optional-fields.ts";
 import type { BackendDeclarationOwnership, BackendModuleOrigin } from "../contracts.ts";
 import type { TsgoFactsSession } from "./facts.ts";
-import { declarationOwnershipOfPath } from "./file-ownership.ts";
 import { aliasedSymbol } from "./module-resolution.ts";
 import { isStarExport } from "./syntax.ts";
 import { sameUltimateSymbol } from "./ultimate-symbol.ts";
@@ -43,7 +42,7 @@ type ModuleSource = {
  * branch has been compared. Reducing to `BackendModuleOrigin` too early makes
  * unrelated declarations with the same textual module facts indistinguishable.
  */
-export type OriginResolution =
+type OriginResolution =
   | { readonly status: "resolved"; readonly origin: BackendModuleOrigin; readonly symbol?: TsSymbol }
   | { readonly status: "ambiguous" }
   | { readonly status: "missing" };
@@ -427,7 +426,7 @@ function moduleIsExternal(session: TsgoFactsSession, symbol: TsSymbol): boolean 
  */
 function declarationOrigin(session: TsgoFactsSession, declaration: Node): BackendModuleOrigin | undefined {
   const sourceFile = declaration.getSourceFile();
-  const ownership = declarationOwnershipOfPath(session, sourceFile.fileName);
+  const ownership = session.ownershipOfPath(sourceFile.fileName);
   return moduleOriginFromOwnership(ownership);
 }
 
@@ -471,7 +470,7 @@ function declarationOriginWithoutMaterialization(
   if (!pathIsStandardLibrary && !declarationHasNoAuthoredSource) {
     return undefined;
   }
-  const ownership = declarationOwnershipOfPath(session, declaration.path);
+  const ownership = session.ownershipOfPath(declaration.path);
   if (pathIsStandardLibrary) {
     return ownership.kind === "typescript" && ownership.library === "standard-library"
       ? moduleOriginFromOwnership(ownership)

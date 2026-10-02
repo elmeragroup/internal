@@ -5,7 +5,7 @@
  */
 
 /** Required keys stay required; keys that admit `undefined` become optional and drop that union member. */
-export type DefinedFields<T> = {
+type DefinedFields<T> = {
   [K in keyof T as undefined extends T[K] ? never : K]: T[K];
 } & {
   [K in keyof T as undefined extends T[K] ? K : never]?: Exclude<T[K], undefined>;

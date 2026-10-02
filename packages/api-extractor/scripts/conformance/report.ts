@@ -13,22 +13,18 @@ import { definedFields } from "../../src/optional-fields.ts";
 import { writeArtifactBatchOrThrow } from "../artifact-batch-writer.ts";
 import type { ArtifactBatchItem } from "../artifact-batch-writer.ts";
 import { runIfMain } from "../cli.ts";
+import { decodeJson, packageVersion, posixRelative, sha256File } from "../files.ts";
 import { fixtureEvidenceCatalog } from "../fixture-catalog.ts";
+import { pinnedTypeScript7Compiler } from "../fixture-contracts.ts";
 import {
   assertTs7DivergenceEvidence,
   canonicalDifferencePaths,
   differenceDigest,
-  conformanceFixtureManifest,
-  pinnedTypeScript7Compiler,
-  decodeJson,
   normalizeWarnings,
-  packageVersion,
-  posixRelative,
-  sha256File,
 } from "../fixture-evidence.ts";
-import type { ConformanceFixture } from "../fixture-evidence.ts";
 import { createFixtureFileSystem } from "../fixture-filesystem.ts";
-import { deriveWarningEvidencePlan } from "../fixture-plans.ts";
+import { conformanceFixtureManifest, deriveWarningEvidencePlan } from "../fixture-plans.ts";
+import type { ConformanceFixture } from "../fixture-plans.ts";
 import { auditPinnedReference, pinnedFixturePathUniverse, pinnedUpstream } from "../reference.ts";
 import { issue14ConformanceCommand, issue14SelectedOracleFile } from "./contract.ts";
 import {
@@ -181,9 +177,6 @@ function withFixtureExtractor<A, E>(
     )
   );
 }
-
-export { issue14ConformanceCommand } from "./contract.ts";
-export { assertStoredReport, summarizeFixtureRun } from "./invariants.ts";
 
 type AdditionalTs7Evidence = {
   readonly code: string;
@@ -783,7 +776,7 @@ async function extractWarningEvidence(
 }
 
 /** Refresh only cataloged warning oracles and the report that records their reviewed bytes. */
-export async function refreshWarningEvidence(
+async function refreshWarningEvidence(
   names: readonly string[] = [],
   options: { readonly referenceRoot?: string } = {}
 ): Promise<void> {

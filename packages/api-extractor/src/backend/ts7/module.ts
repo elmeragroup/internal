@@ -383,7 +383,8 @@ function appendNamespaceMembers(
   visitedNamespaces: ReadonlySet<TsSymbol>,
   chain: readonly string[] = scope.chain
 ): void {
-  const ns = namespaceSymbolOf(scope.session, scope.symbol) ?? scope.symbol;
+  // The namespace symbol a module declaration declares, when it has one.
+  const ns = mergedNamespaceSymbols(scope.session, scope.symbol)[0] ?? scope.symbol;
   if (visitedNamespaces.has(ns)) {
     recordUnresolvedReExport({ ...scope, chain }, "cycle");
     return;
@@ -525,11 +526,6 @@ function mergedNamespaceSymbols(session: TsgoModuleSession, symbol: TsSymbol): r
     if (named !== undefined && !namespaces.includes(named)) namespaces.push(named);
   }
   return namespaces;
-}
-
-/** Resolves the namespace symbol a module declaration declares, when it has one. */
-function namespaceSymbolOf(session: TsgoModuleSession, symbol: TsSymbol): TsSymbol | undefined {
-  return mergedNamespaceSymbols(session, symbol)[0];
 }
 
 function starExportSpecifiers(source: SourceFile, typeOnly: boolean): readonly string[] {

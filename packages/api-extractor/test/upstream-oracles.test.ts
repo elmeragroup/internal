@@ -10,7 +10,7 @@ import {
   readFixtureOracle,
 } from "../scripts/fixture-evidence.ts";
 import { referenceAvailable, upstreamFixtureRoot } from "../scripts/reference.ts";
-import { extractFixture, fixtureRoot } from "./support/extract.ts";
+import { extractFixture } from "./support/extract.ts";
 import {
   callableFixtures,
   canonicalizationFixtures,
@@ -24,6 +24,7 @@ import {
   reactWrapperFixtures,
   typeOperatorFixtures,
 } from "./support/fixture-suites.ts";
+import { fixtureRoot } from "./support/temp-dirs.ts";
 
 type Oracle = "immutable-upstream" | "reviewed-ts7";
 

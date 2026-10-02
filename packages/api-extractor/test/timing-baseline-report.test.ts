@@ -13,9 +13,9 @@ import {
   decodeTimingReport,
   fetchedToMaterializedRatio,
   fixtureInputPath,
-  boundaryTimingFixtures,
   readTimingReport,
 } from "../scripts/fixture-evidence.ts";
+import { boundaryTimingFixtures } from "../scripts/fixture-plans.ts";
 import { ProjectExtractor } from "../src/index.ts";
 import { InternalProjectExtractorTiming, timedProjectExtractorLayer } from "../src/internal/timing.ts";
 

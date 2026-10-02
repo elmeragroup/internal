@@ -10,7 +10,7 @@ import type { CommitSha } from "./intent.ts";
 import { decodeJson } from "./json.ts";
 
 /** What one published npm version records about the release that produced it. */
-export type PublishedVersion = {
+type PublishedVersion = {
   /** The archive integrity npm recorded for this version, when the packument carries one. */
   integrity?: string;
   /** The release commit recorded in the published manifest, when it is a full commit SHA. */

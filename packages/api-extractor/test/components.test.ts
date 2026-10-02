@@ -6,7 +6,8 @@ import { readFixtureOracle } from "../scripts/fixture-evidence.ts";
 import type { ExtractionResult } from "../src/index.ts";
 import { warningMessage } from "../src/parse/fallback.ts";
 import { ExtractWarningSchema } from "../src/warnings.ts";
-import { extractFixture, fixtureRoot } from "./support/extract.ts";
+import { extractFixture } from "./support/extract.ts";
+import { fixtureRoot } from "./support/temp-dirs.ts";
 
 const tsconfigPath = resolve(fixtureRoot, "react-recognition-tsconfig.json");
 

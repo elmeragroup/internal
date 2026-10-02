@@ -7,24 +7,20 @@ import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { issue14TypecheckCommand } from "../scripts/conformance/contract.ts";
+import { assertStoredReport, summarizeFixtureRun } from "../scripts/conformance/invariants.ts";
 import {
   assertConformanceReportInvariants,
-  assertStoredReport,
   assertStoredReportInvariants,
   assertTs7WriteReference,
   failedFixtureIndices,
   decodeIssue14ConformanceReport,
   extractFixtureResults,
   readIssue14ConformanceReport,
-  summarizeFixtureRun,
   writeAdditionalTs7Evidence,
 } from "../scripts/conformance/report.ts";
-import {
-  assertTs7DivergenceEvidence,
-  differenceDigest,
-  conformanceFixtureManifest,
-} from "../scripts/fixture-evidence.ts";
+import { assertTs7DivergenceEvidence, differenceDigest } from "../scripts/fixture-evidence.ts";
 import { createFixtureFileSystem, moduleImportsOnlyDependency } from "../scripts/fixture-filesystem.ts";
+import { conformanceFixtureManifest } from "../scripts/fixture-plans.ts";
 import { ExtractError, ProjectExtractor } from "../src/index.ts";
 import { extractFixture } from "./support/extract.ts";
 import { createTemporaryRoot, fixtureRoot } from "./support/temp-dirs.ts";

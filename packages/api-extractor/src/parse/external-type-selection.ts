@@ -6,16 +6,13 @@ import type {
 import { externalTypeSelectionAllowsOwnership } from "../backend/contracts.ts";
 import { symbolDeclarations } from "./ownership.ts";
 
-export { externalTypeSelectionAllowsOwnership };
-
-/** Normalized request policy for declarations outside the extracted project; shared with the backend session. */
-export type ExternalTypeSelection = BackendExternalTypeSelection;
-
 const noExternalTypes = { kind: "none" } as const;
 const allExternalTypes = { kind: "all" } as const;
 
 /** Copies mutable caller input once so one extraction has a stable policy. */
-export function normalizeExternalTypeSelection(value: boolean | readonly string[]): ExternalTypeSelection {
+export function normalizeExternalTypeSelection(
+  value: boolean | readonly string[]
+): BackendExternalTypeSelection {
   if (value === true) return allExternalTypes;
   if (value === false || value.length === 0) return noExternalTypes;
   return { kind: "packages", packageNames: new Set(value) };
@@ -31,7 +28,7 @@ export function normalizeExternalTypeSelection(value: boolean | readonly string[
 export function externalTypeSelectionAllowsSymbol(
   symbol: BackendSymbolHandle,
   operations: BackendCompilerOperations,
-  selection: ExternalTypeSelection
+  selection: BackendExternalTypeSelection
 ): boolean {
   if (selection.kind === "all") return true;
   const facts = operations.symbolFacts(symbol);

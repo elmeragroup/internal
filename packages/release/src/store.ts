@@ -53,14 +53,6 @@ function assertSameIntent(saved: ReleaseIntent, intended: ReleaseIntent): void {
     throw new Error("Release intent differs from the saved release");
 }
 
-function releaseBodyText(value: GitHubRelease): string {
-  return value.body ?? "";
-}
-
-function assetNames(value: GitHubRelease): string[] {
-  return value.assets.map((asset) => asset.name);
-}
-
 function savedReleaseFrom(value: GitHubRelease, intent: ReleaseIntent): SavedRelease {
   const assets = value.assets.filter((asset) => asset.name === releaseArchiveName);
   if (assets.length > 1) throw new Error("Duplicate release archives");
@@ -77,7 +69,11 @@ function savedReleaseFrom(value: GitHubRelease, intent: ReleaseIntent): SavedRel
  */
 function classifyCatalogEntry(value: GitHubRelease): CatalogEntry | undefined {
   try {
-    const classification = classifyReleaseRecord(value.tag_name, releaseBodyText(value), assetNames(value));
+    const classification = classifyReleaseRecord(
+      value.tag_name,
+      value.body ?? "",
+      value.assets.map((asset) => asset.name)
+    );
     switch (classification.kind) {
       case "ignored":
         return undefined;

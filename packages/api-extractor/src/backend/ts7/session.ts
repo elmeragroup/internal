@@ -28,7 +28,7 @@ import type {
 import { HandleRegistry } from "../handles.ts";
 import { createSessionFacts } from "./facts.ts";
 import type { TsgoFactsSession, TsgoSessionFacts } from "./facts.ts";
-import { PathNameOwnershipCache, sourceFileOwnership } from "./file-ownership.ts";
+import { PathNameOwnershipCache, classifySourceFile } from "./file-ownership.ts";
 import { SessionFileTrees } from "./file-trees.ts";
 import type { TsgoHeritageSession } from "./heritage.ts";
 import { resolveModule } from "./module-resolution.ts";
@@ -339,7 +339,7 @@ export class TsgoExtractionSession implements BackendExtractionSession {
     ]);
   }
   private ownershipOfPath(path: string): BackendDeclarationOwnership {
-    return intern(this.ownershipByPath, path, () => sourceFileOwnership(path, this.sourceFileMetadata(path)));
+    return intern(this.ownershipByPath, path, () => classifySourceFile(path, this.sourceFileMetadata(path)));
   }
   private isExternalPath(path: string): boolean {
     return isExternalOwnership(this.ownershipOfPath(path));

@@ -4,9 +4,8 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
 import { runIfMain } from "../cli.ts";
-import { packageVersion } from "../fixture-evidence.ts";
-import { conformanceTypecheckPlan } from "../fixture-plans.ts";
-import { conformanceFixtureManifest } from "../fixture-plans.ts";
+import { packageVersion } from "../files.ts";
+import { conformanceTypecheckPlan, conformanceFixtureManifest } from "../fixture-plans.ts";
 import type { ConformanceFixture } from "../fixture-plans.ts";
 
 const packageDirectory = resolve(import.meta.dirname, "../..");

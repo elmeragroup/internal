@@ -146,7 +146,7 @@ function isBuiltInContainer(input: ExternalPolicyInput, facts: BackendTypeFacts)
 }
 
 /** TypeScript utilities and React component wrappers are the only exceptions. */
-export function isAllowedBuiltInExternal(type: BackendTypeHandle, context: ResolverContext): boolean {
+function isAllowedBuiltInExternal(type: BackendTypeHandle, context: ResolverContext): boolean {
   const facts = context.operations.typeFacts(type);
   const symbol = facts.aliasSymbol ?? facts.symbol;
   if (symbol === undefined) return false;

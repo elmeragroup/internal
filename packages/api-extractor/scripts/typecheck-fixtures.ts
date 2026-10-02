@@ -7,7 +7,7 @@ import { packageFixtureTypecheckPlan } from "./fixture-plans.ts";
 const packageDirectory = resolve(import.meta.dirname, "..");
 const compilerScript = resolve(packageDirectory, "node_modules/typescript/bin/tsc");
 
-export function typecheckFixtureProjects(): number {
+function typecheckFixtureProjects(): number {
   for (const entry of packageFixtureTypecheckPlan) {
     const result = spawnSync(
       process.execPath,

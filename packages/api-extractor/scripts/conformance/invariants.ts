@@ -3,13 +3,12 @@ import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 
+import { decodeJson, sha256File } from "../files.ts";
 import {
   assertTs7DivergenceEvidence,
   canonicalDifferencePaths,
   differenceDigest,
   fixtureDirectory,
-  decodeJson,
-  sha256File,
 } from "../fixture-evidence.ts";
 import { conformanceFixtureManifest } from "../fixture-plans.ts";
 import type { ConformanceFixture } from "../fixture-plans.ts";

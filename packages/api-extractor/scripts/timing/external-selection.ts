@@ -3,9 +3,9 @@ import { resolve } from "node:path";
 import {
   assertBytesReceivedCeiling,
   assertRequestCountCeiling,
-  externalSelectionTimingFixtures,
   fixtureDirectory,
 } from "../fixture-evidence.ts";
+import { externalSelectionTimingFixtures } from "../fixture-plans.ts";
 import { timedExtraction } from "./shared.ts";
 
 const selectedPackage = "@fixture/selected";

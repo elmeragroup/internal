@@ -5,7 +5,7 @@ import { packageFixtureExecutionPlan, packageFixtureTypecheckPlan } from "./fixt
  * Reports the derived fixture inventory. The catalog validates itself when it is derived, so
  * this entry point only summarizes what it found.
  */
-export function checkFixtureCatalog() {
+function checkFixtureCatalog() {
   return {
     fixtures: packageFixtureExecutionPlan.length,
     conformance: packageFixtureExecutionPlan.filter((entry) => entry.conformance).length,

@@ -15,10 +15,10 @@ import type { CanaryVersion, StableVersion } from "./version.ts";
 export type CommitAncestry = (ancestor: CommitSha, descendant: CommitSha) => boolean;
 
 /** Whether a commit still owns its canary channel, or which published release already covers it. */
-export type CanarySupersession = "owned" | "canary-superseded" | "stable-superseded";
+type CanarySupersession = "owned" | "canary-superseded" | "stable-superseded";
 
 /** What publication should do with a verified release against one registry read. */
-export type PublicationPlan = { kind: "superseded" } | { kind: "publish"; upload: boolean; promote: boolean };
+type PublicationPlan = { kind: "superseded" } | { kind: "publish"; upload: boolean; promote: boolean };
 
 const conflictingCanaryVersion =
   "Commit already has a different canary version or its durable release record is missing";
@@ -73,7 +73,7 @@ function canaryHistory(commit: CommitSha, registry: Registry, isAncestor: Commit
 }
 
 /** The canary a main commit would cut: its source commit, the checked-out line, and the planned base. */
-export type CanaryTarget = {
+type CanaryTarget = {
   commit: CommitSha;
   current: StableVersion;
   base: StableVersion;
@@ -85,7 +85,7 @@ export type CanaryTarget = {
  * Callers pass the version of their durable record so a published canary for the same commit and
  * version is owned rather than a conflict.
  */
-export function canarySupersession(
+function canarySupersession(
   commit: CommitSha,
   base: StableVersion,
   registry: Registry,
@@ -106,10 +106,10 @@ export function canarySupersession(
 }
 
 /** Why a checked commit does not cut a canary. Each kind renders one log sentence. */
-export type CanarySkip = Exclude<CanarySupersession, "owned"> | "regressed-base";
+type CanarySkip = Exclude<CanarySupersession, "owned"> | "regressed-base";
 
 /** The Canary decision: the version to cut, or the skip and its sentence. */
-export type CanaryDecision = { cut: CanaryVersion } | { skip: CanarySkip; reason: string };
+type CanaryDecision = { cut: CanaryVersion } | { skip: CanarySkip; reason: string };
 
 const skipReasons = {
   "canary-superseded": "Skipping a commit superseded by a published canary",
@@ -227,14 +227,4 @@ export function planPublication(
     return published ? { kind: "publish", upload: false, promote: false } : { kind: "superseded" };
   }
   return { kind: "publish", upload: !published, promote: canaryTakesTag(release, registry) };
-}
-
-/** Promotion is re-decided against the registry read that confirmed the upload. */
-export function shouldPromote(
-  release: VerifiedRelease,
-  registry: Registry,
-  isAncestor: CommitAncestry
-): boolean {
-  const plan = planPublication(release, registry, isAncestor);
-  return plan.kind === "publish" && plan.promote;
 }

@@ -61,7 +61,7 @@ type BackendCalleeFacts = {
 /** A normalized compiler observation. It has no semantic model values. */
 export type BackendTypeFacts = {
   readonly flags: readonly TypeFlagName[];
-  readonly intrinsic?: BackendIntrinsicName;
+  readonly intrinsic?: IntrinsicName;
   readonly literal?: string | number | boolean;
   readonly isError?: boolean;
   readonly isTypeParameter?: boolean;
@@ -440,9 +440,6 @@ export type BackendWarningFact = ExtractWarning extends infer Warning
     ? Omit<Warning, "message">
     : never
   : never;
-
-/** The backend reports the same intrinsic vocabulary the model publishes. */
-export type BackendIntrinsicName = IntrinsicName;
 
 /**
  * Whether a name is one of TypeScript's internal `__`-prefixed symbol names,

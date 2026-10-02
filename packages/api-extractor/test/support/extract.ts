@@ -3,8 +3,6 @@ import { Effect } from "effect";
 import { ProjectExtractor } from "../../src/index.ts";
 import type { ExtractionResult, ExtractorOptions, OpenProjectOptions } from "../../src/index.ts";
 
-export { fixtureRoot } from "./temp-dirs.ts";
-
 /** Opens one project, extracts one module through the public service, and closes the project. */
 export function extractFixture(
   project: OpenProjectOptions,

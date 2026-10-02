@@ -20,7 +20,7 @@ import { inspectRequestedComponentSources } from "./parse/component-source.ts";
 import { parseExtractorOptions } from "./parse/options.ts";
 import type { ResolvedExtractorOptions } from "./parse/options.ts";
 import { ResolverFailure } from "./parse/resolver-failure.ts";
-import { readModuleDraft, resolveModuleDraft } from "./parser.ts";
+import { resolveModuleDraft } from "./parser.ts";
 
 /** One extracted module: its semantic model, warnings, and provenance. */
 export type ExtractionResult = typeof ExtractionResultSchema.Type;
@@ -160,7 +160,7 @@ const inspectComponentSources = Effect.fn("ProjectExtractor.inspectComponentSour
     filePath
   );
   const draft = yield* Effect.try({
-    try: () => readModuleDraft(session, filePath),
+    try: () => session.readModule(filePath),
     catch: (cause) => classifyThrown(cause, { filePath, operation: "readModule" }),
   });
   const results = yield* Effect.try({
@@ -186,7 +186,7 @@ const extractModule = Effect.fn("ProjectExtractor.extractModule")(function* (
     filePath
   );
   const draft = yield* Effect.try({
-    try: () => readModuleDraft(session, filePath),
+    try: () => session.readModule(filePath),
     catch: (cause) => classifyThrown(cause, { filePath, operation: "readModule" }),
   });
   const resolved = yield* Effect.try({

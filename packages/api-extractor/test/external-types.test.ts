@@ -1,12 +1,13 @@
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { expectedFixtureWarnings, expectedWarningCodes } from "../scripts/fixture-evidence.ts";
+import { expectedFixtureWarnings, expectedWarningCodes } from "../scripts/fixture-plans.ts";
 import type { ExtractionResult } from "../src/index.ts";
 import type { ExternalTypeNode } from "../src/model.ts";
 import { defaultExtractorOptions } from "../src/options.ts";
-import { extractFixture, fixtureRoot } from "./support/extract.ts";
+import { extractFixture } from "./support/extract.ts";
 import { externalTypeFixtures } from "./support/fixture-suites.ts";
+import { fixtureRoot } from "./support/temp-dirs.ts";
 
 const tsconfigPath = resolve(fixtureRoot, "external-types-tsconfig.json");
 

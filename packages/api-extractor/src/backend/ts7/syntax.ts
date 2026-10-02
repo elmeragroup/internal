@@ -8,7 +8,7 @@ import { isExportDeclaration, isStringLiteral } from "typescript/unstable/ast/is
  */
 
 /** One-based file position of a node's first token, as every warning and node fact reports it. */
-export type AuthoredLocation = {
+type AuthoredLocation = {
   readonly filePath: string;
   readonly line: number;
   readonly column: number;

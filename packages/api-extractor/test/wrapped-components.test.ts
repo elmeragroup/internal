@@ -3,17 +3,15 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import {
-  expectedFixtureWarnings,
-  expectedWarningCodes,
-  normalizeWarnings,
-} from "../scripts/fixture-evidence.ts";
+import { normalizeWarnings } from "../scripts/fixture-evidence.ts";
+import { expectedFixtureWarnings, expectedWarningCodes } from "../scripts/fixture-plans.ts";
 import type { ExtractionResult } from "../src/index.ts";
 import type { ComponentNode, SemanticType } from "../src/model.ts";
 import { ProvenanceEntrySchema } from "../src/provenance.ts";
 import { ExtractWarningSchema } from "../src/warnings.ts";
-import { extractFixture, fixtureRoot } from "./support/extract.ts";
+import { extractFixture } from "./support/extract.ts";
 import { reactFixtureAudit, reactWrapperFixtures } from "./support/fixture-suites.ts";
+import { fixtureRoot } from "./support/temp-dirs.ts";
 
 const tsconfigPath = resolve(fixtureRoot, "react-origin-tsconfig.json");
 

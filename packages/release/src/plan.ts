@@ -49,11 +49,6 @@ export function changesetBaseBranch(checkoutRoot: string): string {
   return base;
 }
 
-/** The branch Changesets tracks, without the `origin/` prefix. */
-export function trackedBranchOf(baseBranch: string): string {
-  return baseBranch.slice("origin/".length);
-}
-
 /**
  * Asks Changesets which releases the pending changesets in `checkoutRoot` would produce.
  *

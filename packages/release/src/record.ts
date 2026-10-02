@@ -83,7 +83,7 @@ export function serializeIntent(intent: ReleaseIntent): string {
  * else's release), `owned` (marked by this owner), or `legacy` (unmarked schema 1, or an archive
  * carrier without a foreign marker).
  */
-export type ReleaseRecordClassification =
+type ReleaseRecordClassification =
   | { kind: "ignored" }
   | { kind: "foreign" }
   | { kind: "owned"; intent: ReleaseIntent }

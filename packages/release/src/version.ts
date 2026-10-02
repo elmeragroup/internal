@@ -7,7 +7,7 @@ const canaryMarker = "-canary.";
  * Components stay `bigint`: these versions come from the npm registry, the grammar accepts
  * unbounded digits, and a canary counter beyond `Number.MAX_SAFE_INTEGER` must not round.
  */
-export type ParsedStableVersion = {
+type ParsedStableVersion = {
   major: bigint;
   minor: bigint;
   patch: bigint;
@@ -23,7 +23,7 @@ export type CanaryVersion = Brand.Branded<string, "CanaryVersion">;
 export type ReleaseVersion = StableVersion | CanaryVersion;
 
 /** A canary split into its stable base and its counter. */
-export type ParsedCanaryVersion = {
+type ParsedCanaryVersion = {
   base: StableVersion;
   n: bigint;
 };
