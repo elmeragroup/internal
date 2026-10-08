@@ -1,14 +1,16 @@
 import { Effect, Exit, Redacted, Schema, Scope } from "effect";
 import { describe, expect, it, onTestFinished } from "vitest";
 
-import { createGitHubClient, releaseEnvironment } from "../src/github.ts";
-import type { GitHubClient, ReleaseEnvironment } from "../src/github.ts";
+import { releaseEnvironment } from "../src/environment.ts";
+import { createGitHubClient } from "../src/github.ts";
+import type { GitHubClient, GitHubConnection } from "../src/github.ts";
 import { readRegistry } from "../src/npm.ts";
 import type { ReleaseTransport } from "../src/release-transport.ts";
-import { createReleaseStore } from "../src/store.ts";
+import { createRecordStore } from "../src/store.ts";
 import type { ServerTransport } from "./lib/idle-closing-server-protocol.ts";
 import { startIdleClosingServer } from "./lib/idle-closing-server.ts";
 import type { IdleClosingServer } from "./lib/idle-closing-server.ts";
+import { packArchive } from "./lib/packed-archive.ts";
 import { releaseIntent } from "./lib/release-fixtures.ts";
 import { createTestCertificate, trustUntilTestFinishes } from "./lib/test-certificate.ts";
 
@@ -40,7 +42,7 @@ function routedTo(origin: string, transport: ReleaseTransport): ReleaseTransport
 
 type Engine = {
   server: IdleClosingServer;
-  environment: ReleaseEnvironment;
+  connection: GitHubConnection;
   client: GitHubClient;
 };
 
@@ -53,12 +55,12 @@ async function startEngine(transport?: ServerTransport): Promise<Engine> {
   const scope = Scope.makeUnsafe();
   onTestFinished(() => Effect.runPromise(Scope.close(scope, Exit.void)));
   const live = await Effect.runPromise(releaseEnvironment().pipe(Scope.provide(scope)));
-  const environment: ReleaseEnvironment = {
+  const connection: GitHubConnection = {
     repository: "acme/ui",
     token: Redacted.make("token"),
     fetch: routedTo(server.origin, live.fetch),
   };
-  return { server, environment, client: createGitHubClient(environment) };
+  return { server, connection, client: createGitHubClient(connection) };
 }
 
 describe("engine requests", () => {
@@ -121,18 +123,18 @@ describe("engine requests", () => {
   });
 
   it("reach the npm registry after a blocking phase however many connections were pooled", async () => {
-    const { server, environment } = await startEngine();
+    const { server, connection } = await startEngine();
     await Promise.all(
-      ["@acme/ui", "@acme/ui"].map((name) => Effect.runPromise(readRegistry(name, environment.fetch)))
+      ["@acme/ui", "@acme/ui"].map((name) => Effect.runPromise(readRegistry(name, connection.fetch)))
     );
     // An unpublished package's 404 leaves its body unread.
-    const unpublished = await Effect.runPromise(readRegistry("@acme/missing", environment.fetch));
+    const unpublished = await Effect.runPromise(readRegistry("@acme/missing", connection.fetch));
     expect(unpublished.versions.size).toBe(0);
     expect(server.connections()).toBeGreaterThanOrEqual(2);
 
     blockEventLoop(blockingPhaseMs);
 
-    const registry = await Effect.runPromise(readRegistry("@acme/ui", environment.fetch));
+    const registry = await Effect.runPromise(readRegistry("@acme/ui", connection.fetch));
     expect(registry.tags.get("canary")).toBe("0.2.0");
   });
 
@@ -144,14 +146,18 @@ describe("engine requests", () => {
     expect(server.connections()).toBe(3);
   });
 
-  it("upload the archive after a pack phase that outlasts the idle limit", async () => {
+  it("attach the archive after a pack phase that outlasts the idle limit", async () => {
     const { client } = await startEngine();
-    const store = createReleaseStore(client, "@acme/ui");
-    const created = await Effect.runPromise(store.create(releaseIntent("0.2.0")));
-
-    blockEventLoop(blockingPhaseMs);
-
-    const uploaded = await Effect.runPromise(store.upload(created, new Uint8Array([1, 2, 3])));
-    expect(uploaded.asset).toEqual({ state: "uploaded", id: 2 });
+    const intent = releaseIntent("0.2.0");
+    const adapter = {
+      pack: () => {
+        blockEventLoop(blockingPhaseMs);
+        return packArchive("@acme/ui", intent);
+      },
+    };
+    const prepared = await Effect.runPromise(
+      Effect.scoped(createRecordStore(client, "@acme/ui").prepare(intent, adapter))
+    );
+    expect(prepared.tag).toBe("v0.2.0");
   });
 });

@@ -73,8 +73,8 @@ describe("release record identity", () => {
 });
 
 describe("release record classification", () => {
-  // Cases the store suite does not reach through fixture fetch responses. Every other ownership rule
-  // is proven through ReleaseStore.find/create/reservedCanaryVersions in store.test.ts.
+  // Cases the store suite does not reach through the fake remote. Every other ownership rule is
+  // proven through the Record store's prepare, restore, and reservations in store.test.ts.
   it("ignores a valid intent body whose tag is not a record tag", () => {
     expect(classifyReleaseRecord("v1", JSON.stringify({ schema: 1, ...stable }), [])).toEqual({
       kind: "ignored",
