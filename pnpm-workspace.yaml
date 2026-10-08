@@ -9,7 +9,7 @@ catalog:
   "@types/react": 19.3.0
   "@types/react-dom": 19.3.0
   eslint-plugin-turbo: 2.10.12
-  effect: 4.0.0-rc.115
+  effect: 4.0.2
   oxfmt: 0.67.0
   oxlint: 1.82.0
   oxlint-tsgolint: 7.0.2001
@@ -31,4 +31,4 @@ allowBuilds:
 minimumReleaseAge: 4320
 
 minimumReleaseAgeExclude:
-  - effect@4.0.0-rc.115
+  - effect@4.0.2

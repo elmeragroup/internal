@@ -22,8 +22,8 @@ catalogs:
       specifier: 19.3.0
       version: 19.3.0
     effect:
-      specifier: 4.0.0-rc.115
-      version: 4.0.0-rc.115
+      specifier: 4.0.2
+      version: 4.0.2
     esbuild:
       specifier: 0.28.2
       version: 0.28.2
@@ -91,7 +91,7 @@ importers:
         version: 25.9.5
       effect:
         specifier: 'catalog:'
-        version: 4.0.0-rc.115
+        version: 4.0.2
       esbuild:
         specifier: 'catalog:'
         version: 0.28.2
@@ -130,7 +130,7 @@ importers:
         version: link:../api-extractor
       effect:
         specifier: 'catalog:'
-        version: 4.0.0-rc.115
+        version: 4.0.2
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
@@ -155,7 +155,7 @@ importers:
     dependencies:
       effect:
         specifier: 'catalog:'
-        version: 4.0.0-rc.115
+        version: 4.0.2
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
@@ -189,7 +189,7 @@ importers:
         version: 1.82.0
       effect:
         specifier: 'catalog:'
-        version: 4.0.0-rc.115
+        version: 4.0.2
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
@@ -267,7 +267,7 @@ importers:
     dependencies:
       effect:
         specifier: 'catalog:'
-        version: 4.0.0-rc.115
+        version: 4.0.2
     devDependencies:
       '@elmeragroup/typescript-config':
         specifier: workspace:*
@@ -1381,8 +1381,8 @@ packages:
       oxc-resolver:
         optional: true
 
-  effect@4.0.0-rc.115:
-    resolution: {integrity: sha512-ogYulZ5ffeOzrJqQrG0XOkDO5lKn2s9KNHhoxJy/6wKUkF0i12dlVXWA9TgsgQ+zV/JzizyG0+XMPepZEQX6vw==}
+  effect@4.0.2:
+    resolution: {integrity: sha512-YeYnLqSFrL4+tCOXRrfNP03w8FILoF/wDl+ukraJAGzXrjcS383W7LAAvGBbLatEyktmLxRq+9xJinx7QzXW5A==}
 
   empathic@2.0.1:
     resolution: {integrity: sha512-YGRs8knHhKHVShLkFET/rWAU8kmHbOV5LwN938RHI0pljAJ1Gf6SzXsSmRaEzcXTtOOmVqJ5+WtQPL5uigY50Q==}
@@ -2740,7 +2740,7 @@ snapshots:
 
   dts-resolver@3.0.0: {}
 
-  effect@4.0.0-rc.115: {}
+  effect@4.0.2: {}
 
   empathic@2.0.1: {}
 
