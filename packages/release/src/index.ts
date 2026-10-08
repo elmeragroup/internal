@@ -1,4 +1,4 @@
-export type { PackAndVerify } from "./engine.ts";
+export type { PackAndVerify } from "./archive.ts";
 export { checkReleasePr, releaseCheckedCommit, retryRelease } from "./engine.ts";
 export { ReleaseError } from "./errors.ts";
 export { readManifestVersion, resolveReleasePackage, type ReleasePackage } from "./files.ts";

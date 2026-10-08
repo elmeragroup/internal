@@ -29,18 +29,28 @@ retryRelease(pkg: ReleasePackage, recordTag: string): Effect<void, ReleaseError>
   the engine.
 - `retryRelease` finishes a prepared record from its recorded archive. It does not pack, and it
   does not read the Changesets configuration or the base branch. A record tag with no prepared
-  release fails naming that tag; an incomplete prepared record fails telling you to rerun the
-  original Merge job.
+  release fails naming that tag; an incomplete record fails telling you to rerun the original Merge
+  job.
 
-The engine reads `repository`, `token`, and the global fetch from `GITHUB_REPOSITORY` and `GH_TOKEN`
-inside each operation. Tests build a fixture transport through the internal
-`createReleaseOperations` constructor, which is not part of the package entry.
+The engine reads `repository` and `token` from `GITHUB_REPOSITORY` and `GH_TOKEN` inside each
+operation. Its transport is the global `fetch` for GitHub and the npm registry, an npm runner for
+the `npm` CLI, and a log. Tests inject that transport through the internal `createReleaseOperations`
+constructor, which is not part of the package entry. One fake remote stands in for GitHub, the npm
+registry, and the npm CLI, and the checkout is a real temporary git repository
+([ADR 0008](../../docs/adr/0008-release-tests-fake-remotes-at-their-interfaces.md)).
 
-## Ports and errors
+## Record store, ports, and errors
 
-Ports are `Effect`-native at the seam: git, the stable gate, the npm registry, Changesets planning,
-archive verification, and publication each return `Effect`. The GitHub record store and the npm CLI
-run promise- and process-based code lifted into that channel with `liftPromise` and `lift`. Every
+The Record store owns the record lifecycle; the engine sees only release intents and prepared
+records. It reserves a record for a release intent, attaches the recorded archive or restores it,
+and completes the record after publication. Only the Record store can construct a prepared record,
+and completing accepts nothing else, so a record cannot be completed without its verified recorded
+archive. The store is built inside each operation from the transport, not handed to the engine as a
+replaceable port.
+
+The remaining ports are `Effect`-native at the seam: git, the stable gate, the npm registry,
+Changesets planning, and publication each return `Effect`. The Record store and the npm CLI run
+promise- and process-based code lifted into that channel with `liftPromise` and `lift`. Every
 failure — wherever it is raised — surfaces as one `ReleaseError` (`Schema.TaggedError`,
 `_tag: "ReleaseError"`) carrying its `message` and the original `cause`.
 Integrity and source mismatches are fatal: they are never retried as transient and never accepted
@@ -50,8 +60,9 @@ second read and doubles the wait after each read, up to 30 seconds. The live eng
 5-second interval and a 10-minute window, because npm processes a new version asynchronously and
 has taken longer than four minutes to show it. The window counts scheduled waits, so it does not
 depend on registry latency. When the window runs out, confirmation fails with the same retry
-message as before. Tests inject a zero interval, which reads once without waiting, or run the live
-timing on Effect's `TestClock`.
+message as before. Publication tests inject a zero interval, which reads once without waiting, or
+run the live timing on Effect's `TestClock`. Operation tests keep the live timing: the fake registry
+is consistent, so the first read confirms.
 
 ## Pack-and-verify adapter
 
@@ -62,11 +73,11 @@ type PackAndVerify = {
 ```
 
 The consumer stamps packed identity, builds, packs, verifies, and returns the package archive bytes.
-The engine verifies those bytes against the intent, uploads them to the record, and re-verifies the
-same bytes on retry. The shared engine does not hardcode `pnpm packages:pack` or Internal archive
-names.
+The Record store verifies those bytes against the release intent before attaching them to the record
+as its recorded archive, and re-verifies the same bytes on retry. The shared engine does not hardcode
+`pnpm packages:pack` or Internal archive names.
 
-`pack` must return bytes that remain valid until the engine copies them into the GitHub upload.
+`pack` must return bytes that remain valid until the Record store copies them into the GitHub upload.
 Returning a `Uint8Array` is the supported contract.
 
 ## Tool prerequisites
@@ -97,7 +108,7 @@ uploaded the archive, retry refuses and the original Merge job must be rerun.
 
 New GitHub record bodies include `"owner": "elmera-release"`. Ownership is recognized before intent
 validation. An owned record with an invalid payload, unsupported schema, or mismatched tag is
-damaged: only `find(<tag>)` for that record fails, with the tag in the message, while the rest of
+damaged: only a lookup of that record's tag fails, with the tag in the message, while the rest of
 the catalog stays usable. Unmarked `schema: 1` intents remain readable without rewrite. Tags that
 are not record tags are ignored during discovery. A foreign occupant of a record tag fails without
 mutation.

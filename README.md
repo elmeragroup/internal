@@ -139,11 +139,11 @@ intent, then uploads to npm under `pending`. It verifies the registry's archive 
 commit, and only then updates `canary` or `latest`. Finally it makes the GitHub release visible.
 `pending` is an internal staging tag, not a supported installation channel.
 
-If publication or finalization fails after the archive was saved, run **Publish Release** manually
-from `main` and supply its record tag. The retry uses the original archive, even if main has advanced.
-An existing npm version must match both the archive integrity and source commit. A mismatch fails;
-it is never treated as a successful retry. The retry also finishes an interrupted channel update or
-GitHub release finalization.
+If publication or completing the record fails after the archive was saved, run **Publish Release**
+manually from `main` and supply its record tag. The retry uses the original archive, even if main has
+advanced. An existing npm version must match both the archive integrity and source commit. A mismatch
+fails; it is never treated as a successful retry. The retry also finishes an interrupted channel
+update or completes the record by making its GitHub release visible.
 
 If preparation failed before the archive was uploaded, rerun the original **Merge** workflow's failed
 jobs. That rebuilds the original checked commit using its reserved version. The manual retry workflow

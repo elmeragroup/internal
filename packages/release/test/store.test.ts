@@ -1,417 +1,450 @@
-import { Effect, Redacted, Schema } from "effect";
+import { Effect, Schema } from "effect";
+import type { Scope } from "effect";
 import { describe, expect, it } from "vitest";
 
-import { createGitHubClient, releaseAssetId, releaseId } from "../src/github.ts";
+import type { ReleaseError } from "../src/errors.ts";
+import { createGitHubClient } from "../src/github.ts";
 import type { ReleaseIntent } from "../src/intent.ts";
 import { decodeJson } from "../src/json.ts";
-import { releaseArchiveName, releaseRecordOwner, serializeIntent } from "../src/record.ts";
-import { createReleaseStore } from "../src/store.ts";
-import type { ReleaseStore, SavedRelease } from "../src/store.ts";
+import { releaseRecordOwner, serializeIntent } from "../src/record.ts";
+import { createRecordStore } from "../src/store.ts";
+import type { PreparedRecord, RecordStore } from "../src/store.ts";
+import { archiveIntegrity, createFakeRemote } from "./lib/fake-remote.ts";
+import type { FakeRemote, SeededAsset } from "./lib/fake-remote.ts";
+import { packArchive, recordingPacker } from "./lib/packed-archive.ts";
 import { commit, commitSha, releaseIntent } from "./lib/release-fixtures.ts";
 
+const repository = "example/package";
 const packageName = "@elmeragroup/internal";
+const githubApi = `https://api.github.com/repos/${repository}`;
+const releaseListing = /\/releases\?per_page=100&page=\d+$/u;
 const intent: ReleaseIntent = releaseIntent("0.2.0");
-const saved: SavedRelease = {
-  id: releaseId(1),
-  intent,
-  asset: { state: "uploaded", id: releaseAssetId(2) },
-};
-const uploadedAsset = { id: 2, name: releaseArchiveName, state: "uploaded", size: 12 };
-const starterAsset = { id: 2, name: releaseArchiveName, state: "starter", size: 0 };
+const legacyBody = JSON.stringify({ schema: 1, ...intent });
+const archive = packArchive(packageName, intent);
+const starterAsset: SeededAsset = { state: "starter", size: 0 };
 
-type ReleaseAssetPayload = { id: number; name: string; state: string; size: number };
-
-type ReleasePayload = {
-  tag_name: string;
-  id: number;
-  draft: boolean;
-  body: string;
-  assets: ReleaseAssetPayload[];
-};
-
-type StoreOptions = {
-  created?: ReleasePayload;
-  releaseId?: number;
-  tagStatus?: number;
-  tagSha?: string;
-  status?: number;
-  packageName?: string;
-};
-
-function releaseRecord(overrides: Partial<ReleasePayload> = {}): ReleasePayload {
-  return {
-    tag_name: "v0.2.0",
-    id: 1,
-    draft: true,
-    body: JSON.stringify({ schema: 1, ...intent }),
-    assets: [starterAsset],
-    ...overrides,
-  };
+function fakeRemote(): FakeRemote {
+  return createFakeRemote(repository, packageName);
 }
 
-async function savedRelease(store: ReleaseStore, tag: string): Promise<SavedRelease> {
-  const found = await Effect.runPromise(store.find(tag));
-  if (found === undefined) throw new Error(`No saved release for ${tag}`);
-  return found;
+function storeOver(remote: FakeRemote, name = packageName): RecordStore {
+  return createRecordStore(createGitHubClient(remote.environment), name);
 }
 
-function isPostedJson(body: RequestInit["body"]): body is string {
-  return Object.prototype.toString.call(body) === "[object String]";
+function run<A>(effect: Effect.Effect<A, ReleaseError, Scope.Scope>): Promise<A> {
+  return Effect.runPromise(Effect.scoped(effect));
 }
 
-function githubStore(releases: readonly ReleasePayload[], options: StoreOptions = {}) {
-  const state = { listed: 0, removed: false };
-  const mutations: string[] = [];
-  const posted: { path: string; body: string }[] = [];
-  const fetcher: typeof fetch = (url, init) => {
-    const path = url instanceof URL ? url.href : url instanceof Request ? url.url : url;
-    const method = init?.method ?? "GET";
-    if (method !== "GET") mutations.push(`${method} ${path}`);
-    if (method === "DELETE") {
-      state.removed = true;
-      return Promise.resolve(new Response(null, { status: 204 }));
-    }
-    if (method === "POST") {
-      if (isPostedJson(init?.body)) posted.push({ path, body: init.body });
-      if (path.includes("/git/refs")) {
-        return Promise.resolve(Response.json({ object: { type: "commit", sha: commit } }));
-      }
-      if (path.includes("/assets")) {
-        return Promise.resolve(
-          Response.json({ id: 3, state: "uploaded", size: 1, name: releaseArchiveName })
-        );
-      }
-      return Promise.resolve(
-        Response.json(options.created ?? releaseRecord({ id: options.releaseId ?? 1, assets: [] }))
-      );
-    }
-    if (path.includes("/git/ref/")) {
-      if (options.tagStatus === 404) return Promise.resolve(new Response("", { status: 404 }));
-      return Promise.resolve(Response.json({ object: { type: "commit", sha: options.tagSha ?? commit } }));
-    }
-    const byId = /\/releases\/(\d+)$/.exec(path);
-    if (byId !== null) {
-      const found = releases.find((item) => item.id === Number(byId[1]));
-      if (found === undefined) return Promise.resolve(new Response("", { status: 404 }));
-      return Promise.resolve(Response.json(found));
-    }
-    if (path.includes("/releases?")) {
-      if (options.status !== undefined) return Promise.resolve(new Response("", { status: options.status }));
-      state.listed += 1;
-      return Promise.resolve(Response.json(releases));
-    }
-    return Promise.resolve(new Response("", { status: options.status ?? 500 }));
-  };
-  const store = createReleaseStore(
-    createGitHubClient({ repository: "example/package", token: Redacted.make("test"), fetch: fetcher }),
-    options.packageName ?? packageName
-  );
-  return { store, state, mutations, posted };
+/** Seeds an unmarked schema-1 `v0.2.0` record pinned to `commit`; returns its release id. */
+function seedStableRecord(remote: FakeRemote, assets: readonly SeededAsset[], draft = true): number {
+  remote.seedTag("v0.2.0", commit);
+  return remote.seedRelease({ tag: "v0.2.0", body: legacyBody, draft, assets });
 }
 
-describe("durable GitHub release records", () => {
-  it("keeps starter lookup and publication retry read-only", async () => {
-    const { store, state, mutations } = githubStore([releaseRecord()]);
-    const found = await savedRelease(store, "v0.2.0");
-    await expect(Effect.runPromise(store.download(found))).rejects.toThrow("original Merge job");
-    expect(state.removed).toBe(false);
-    await expect(Effect.runPromise(store.create({ ...intent, commit: commitSha("b") }))).rejects.toThrow(
+function assetId(remote: FakeRemote, tag: string): number {
+  const [asset] = remote.release(tag).assets;
+  if (asset === undefined) throw new Error(`No asset on ${tag}`);
+  return asset.id;
+}
+
+function listings(remote: FakeRemote): number {
+  return remote.requests.filter((request) => request.method === "GET" && releaseListing.test(request.url))
+    .length;
+}
+
+function attachedArchives(remote: FakeRemote, tag: string) {
+  return remote.release(tag).assets.map(({ state, bytes }) => ({ state, bytes }));
+}
+
+describe("preparing a record", () => {
+  it("keeps starter lookup and publication retry read-only, then repairs the starter on preparation", async () => {
+    const remote = fakeRemote();
+    seedStableRecord(remote, [starterAsset]);
+    const starter = assetId(remote, "v0.2.0");
+    const store = storeOver(remote);
+    const packer = recordingPacker(packageName);
+    await expect(run(store.restore("v0.2.0"))).rejects.toThrow("original Merge job");
+    expect(remote.mutations()).toEqual([]);
+    await expect(run(store.prepare({ ...intent, commit: commitSha("b") }, packer.adapter))).rejects.toThrow(
       "intent differs"
     );
-    expect(state.removed).toBe(false);
-    await Effect.runPromise(store.upload(await Effect.runPromise(store.create(intent)), new Uint8Array()));
-    expect(state.removed).toBe(true);
-    expect(mutations.some((entry) => entry.endsWith("/releases/assets/2"))).toBe(true);
+    expect(remote.mutations()).toEqual([]);
+    expect(packer.packed).toEqual([]);
+    await run(store.prepare(intent, packer.adapter));
+    expect(packer.packed).toHaveLength(1);
+    expect(remote.mutations()[0]).toBe(`DELETE ${githubApi}/releases/assets/${String(starter)}`);
+    expect(attachedArchives(remote, "v0.2.0")).toEqual([{ state: "uploaded", bytes: packer.packed[0] }]);
   });
-  it("rejects a moved tag before downloading an archive", async () => {
-    const { store } = githubStore([releaseRecord({ assets: [uploadedAsset] })], { tagSha: "b".repeat(40) });
-    await expect(Effect.runPromise(store.find("v0.2.0"))).rejects.toThrow("v0.2.0 was moved");
-  });
-  it("recovers an uploaded asset from a still-draft release", async () => {
-    const { store, state } = githubStore([releaseRecord({ assets: [uploadedAsset] })]);
-    expect(await Effect.runPromise(store.find("v0.2.0"))).toEqual(saved);
-    await expect(Effect.runPromise(store.upload(saved, new Uint8Array()))).rejects.toThrow(
-      "cannot be replaced"
+
+  it("repairs the empty starter asset a failed upload leaves", async () => {
+    const remote = fakeRemote();
+    const packer = recordingPacker(packageName);
+    remote.failNextUpload();
+    await expect(run(storeOver(remote).prepare(intent, packer.adapter))).rejects.toThrow(
+      "GitHub POST failed: 502"
     );
-    expect(state.listed).toBe(1);
-  });
-  it("revalidates upload against the known release id instead of listing again", async () => {
-    const { store, state } = githubStore([releaseRecord()]);
-    const created = await Effect.runPromise(store.create(intent));
-    expect(state.listed).toBe(1);
-    const uploaded = await Effect.runPromise(store.upload(created, new Uint8Array()));
-    expect(state.listed).toBe(1);
-    expect(uploaded).toEqual({ id: 1, intent, asset: { state: "uploaded", id: 3 } });
-  });
-  it("fails closed when the archive was never uploaded", async () => {
-    const store = createReleaseStore(
-      createGitHubClient({
-        repository: "example/package",
-        token: Redacted.make("test"),
-        fetch: () => Promise.reject(new Error("must not request")),
-      }),
-      packageName
-    );
-    await expect(
-      Effect.runPromise(store.download({ ...saved, asset: { state: "missing" } }))
-    ).rejects.toThrow("original Merge job");
-  });
-  it("does not interpret authentication failures as missing releases", async () => {
-    const { store } = githubStore([], { status: 403 });
-    await expect(Effect.runPromise(store.find("v0.2.0"))).rejects.toThrow("403");
-  });
-  it("does not treat a missing listing page as an empty history", async () => {
-    const { store } = githubStore([], { status: 404 });
-    await expect(Effect.runPromise(store.find("v0.2.0"))).rejects.toThrow("404");
-  });
-  it("creates a tag when the ref lookup returns 404", async () => {
-    const { store } = githubStore([], { tagStatus: 404, releaseId: 9 });
-    await expect(Effect.runPromise(store.create(intent))).resolves.toEqual({
-      id: 9,
-      intent,
-      asset: { state: "missing" },
-    });
-  });
-  it("includes unfinished canary reservations in canary numbering", async () => {
-    const canaryIntent = releaseIntent("0.2.0-canary.12");
-    const { store, state } = githubStore([
-      {
-        tag_name: `canary-${commit}`,
-        id: 4,
-        draft: true,
-        body: JSON.stringify({ schema: 1, ...canaryIntent }),
-        assets: [],
-      },
+    expect(remote.release("v0.2.0").assets.map(({ state, size }) => ({ state, size }))).toEqual([
+      { state: "starter", size: 0 },
     ]);
-    expect(await Effect.runPromise(store.find(`canary-${commit}`))).toEqual({
-      id: 4,
-      intent: canaryIntent,
-      asset: { state: "missing" },
-    });
-    expect(await Effect.runPromise(store.reservedCanaryVersions())).toEqual(["0.2.0-canary.12"]);
-    expect(state.listed).toBe(1);
+    const prepared = await run(storeOver(remote).prepare(intent, packer.adapter));
+    expect(packer.packed).toHaveLength(2);
+    expect(attachedArchives(remote, "v0.2.0")).toEqual([{ state: "uploaded", bytes: packer.packed[1] }]);
+    expect(prepared.release.integrity).toBe(archiveIntegrity(packer.packed[1] ?? new Uint8Array()));
   });
-  it("parses the created release rather than trusting the requested intent", async () => {
-    const { store } = githubStore([], {
-      created: releaseRecord({
-        id: 9,
-        assets: [],
-        body: JSON.stringify({ schema: 1, ...intent, commit: "b".repeat(40) }),
-      }),
-    });
-    await expect(Effect.runPromise(store.create(intent))).rejects.toThrow("intent differs");
+
+  it("restores an attached archive from a still-draft release instead of packing", async () => {
+    const remote = fakeRemote();
+    seedStableRecord(remote, [{ bytes: archive }]);
+    const packer = recordingPacker(packageName);
+    const prepared = await run(storeOver(remote).prepare(intent, packer.adapter));
+    expect(packer.packed).toEqual([]);
+    expect(prepared.intent).toEqual(intent);
+    expect(prepared.tag).toBe("v0.2.0");
+    expect(prepared.release).toMatchObject({ ...intent, integrity: archiveIntegrity(archive) });
+    expect(remote.mutations()).toEqual([]);
+    expect(listings(remote)).toBe(1);
   });
-  it("refuses to publish a record whose archive was never uploaded", async () => {
-    const { store } = githubStore([releaseRecord({ assets: [uploadedAsset] })]);
+
+  it("never replaces an archive attached since the listing", async () => {
+    const remote = fakeRemote();
+    const id = seedStableRecord(remote, [starterAsset]);
+    // A concurrent preparation attached the archive after this store listed the starter.
+    remote.override("GET", `${githubApi}/releases/${String(id)}`, () =>
+      Response.json({
+        id,
+        tag_name: "v0.2.0",
+        draft: true,
+        body: legacyBody,
+        assets: [{ id: 99, name: "release.tgz", state: "uploaded", size: archive.length }],
+      })
+    );
     await expect(
-      Effect.runPromise(store.complete({ ...saved, asset: { state: "missing" } }))
-    ).rejects.toThrow("without its verified archive");
-    await expect(Effect.runPromise(store.complete(saved))).resolves.toBeUndefined();
+      run(storeOver(remote).prepare(intent, recordingPacker(packageName).adapter))
+    ).rejects.toThrow("A recorded release archive cannot be replaced");
+    expect(remote.count("POST", "/assets")).toBe(0);
+    expect(remote.count("DELETE", "/assets")).toBe(0);
   });
+
+  it("revalidates the upload against the known release id instead of listing again", async () => {
+    const remote = fakeRemote();
+    const id = seedStableRecord(remote, [starterAsset]);
+    await run(storeOver(remote).prepare(intent, recordingPacker(packageName).adapter));
+    expect(listings(remote)).toBe(1);
+    expect(remote.count("GET", `/releases/${String(id)}`)).toBe(1);
+    expect(attachedArchives(remote, "v0.2.0")).toHaveLength(1);
+  });
+
+  it("verifies packed bytes before attaching them", async () => {
+    const remote = fakeRemote();
+    const wrong = packArchive(packageName, releaseIntent("0.2.1"));
+    await expect(run(storeOver(remote).prepare(intent, { pack: () => wrong }))).rejects.toThrow(
+      "Archive does not match the recorded release source"
+    );
+    expect(remote.count("POST", "/assets")).toBe(0);
+    expect(remote.release("v0.2.0").assets).toEqual([]);
+  });
+
+  it("creates a tag when the ref lookup returns 404", async () => {
+    const remote = fakeRemote();
+    await run(storeOver(remote).prepare(intent, recordingPacker(packageName).adapter));
+    expect(remote.tag("v0.2.0")).toBe(commit);
+    expect(remote.mutations()).toEqual([
+      `POST ${githubApi}/git/refs`,
+      `POST ${githubApi}/releases`,
+      `POST https://uploads.github.com/repos/${repository}/releases/${String(remote.release("v0.2.0").id)}/assets?name=release.tgz`,
+    ]);
+  });
+
+  it("parses the created release rather than trusting the requested intent", async () => {
+    const remote = fakeRemote();
+    const packer = recordingPacker(packageName);
+    remote.override("POST", `${githubApi}/releases`, () =>
+      Response.json(
+        {
+          id: 9,
+          tag_name: "v0.2.0",
+          draft: true,
+          body: JSON.stringify({ schema: 1, ...intent, commit: commitSha("b") }),
+          assets: [],
+        },
+        { status: 201 }
+      )
+    );
+    await expect(run(storeOver(remote).prepare(intent, packer.adapter))).rejects.toThrow("intent differs");
+    expect(packer.packed).toEqual([]);
+  });
+
   it("remembers a created draft without listing GitHub releases again", async () => {
-    const { store, state } = githubStore([], { releaseId: 9 });
-    await expect(Effect.runPromise(store.create(intent))).resolves.toEqual({
-      id: 9,
-      intent,
-      asset: { state: "missing" },
-    });
-    expect(state.listed).toBe(1);
-    expect(await Effect.runPromise(store.find("v0.2.0"))).toEqual({
-      id: 9,
-      intent,
-      asset: { state: "missing" },
-    });
-    expect(state.listed).toBe(1);
+    const remote = fakeRemote();
+    const store = storeOver(remote);
+    await run(store.prepare(intent, recordingPacker(packageName).adapter));
+    expect(listings(remote)).toBe(1);
+    const restored = await run(store.restore("v0.2.0"));
+    expect(restored.intent).toEqual(intent);
+    expect(listings(remote)).toBe(1);
+  });
+
+  it("writes the owner marker and package display name on create", async () => {
+    const remote = fakeRemote();
+    await run(storeOver(remote, "@acme/app").prepare(intent, recordingPacker("@acme/app").adapter));
+    const created = remote.release("v0.2.0");
+    expect(created.name).toBe("@acme/app 0.2.0");
+    expect(created.body).toBe(serializeIntent(intent));
+    expect(
+      decodeJson(created.body ?? "", Schema.Struct({ owner: Schema.optionalKey(Schema.String) }), "intent")
+        .owner
+    ).toBe(releaseRecordOwner);
+  });
+});
+
+describe("restoring and completing a record", () => {
+  it("restores the recorded archive and verifies those exact bytes", async () => {
+    const remote = fakeRemote();
+    seedStableRecord(remote, [{ bytes: archive }]);
+    const prepared = await run(storeOver(remote).restore("v0.2.0"));
+    expect(prepared.intent).toEqual(intent);
+    expect(prepared.release.integrity).toBe(archiveIntegrity(archive));
+    expect(remote.mutations()).toEqual([]);
+  });
+
+  it("refuses a recorded archive that does not match its intent", async () => {
+    const remote = fakeRemote();
+    seedStableRecord(remote, [{ bytes: packArchive(packageName, releaseIntent("0.2.1")) }]);
+    await expect(run(storeOver(remote).restore("v0.2.0"))).rejects.toThrow(
+      "Archive does not match the recorded release source"
+    );
+  });
+
+  it("rejects a moved tag before downloading an archive", async () => {
+    const remote = fakeRemote();
+    seedStableRecord(remote, [{ bytes: archive }]);
+    remote.seedTag("v0.2.0", commitSha("b"));
+    await expect(run(storeOver(remote).restore("v0.2.0"))).rejects.toThrow("v0.2.0 was moved");
+    expect(remote.count("GET", "/releases/assets/")).toBe(0);
+  });
+
+  it("fails closed when the archive was never uploaded", async () => {
+    const remote = fakeRemote();
+    seedStableRecord(remote, []);
+    await expect(run(storeOver(remote).restore("v0.2.0"))).rejects.toThrow(
+      "Release preparation is incomplete; rerun its original Merge job before retrying publication"
+    );
+    expect(remote.count("GET", "/releases/assets/")).toBe(0);
+    expect(remote.mutations()).toEqual([]);
+  });
+
+  it("names the requested tag when no record exists", async () => {
+    const remote = fakeRemote();
+    await expect(run(storeOver(remote).restore("v9.9.9"))).rejects.toThrow(
+      "No prepared release exists for record tag v9.9.9"
+    );
+  });
+
+  it("refuses a tag that is not a record tag", async () => {
+    const remote = fakeRemote();
+    await expect(run(storeOver(remote).restore("weekly-notes"))).rejects.toThrow(
+      "Expected a stable or canary release record tag; received weekly-notes"
+    );
+    expect(remote.requests).toEqual([]);
+  });
+
+  it("completes a prepared record by publishing its draft release", async () => {
+    const remote = fakeRemote();
+    const id = seedStableRecord(remote, [{ bytes: archive }]);
+    const store = storeOver(remote);
+    const prepared = await run(store.restore("v0.2.0"));
+    expect(remote.release("v0.2.0").draft).toBe(true);
+    await Effect.runPromise(store.complete(prepared));
+    expect(remote.mutations()).toEqual([`PATCH ${githubApi}/releases/${String(id)}`]);
+    expect(remote.release("v0.2.0").draft).toBe(false);
+  });
+
+  it("accepts only a record the store prepared", () => {
+    // Never called: these bodies exist so the type checker proves neither forgery compiles.
+    const completeLiteral = (store: RecordStore, prepared: PreparedRecord) =>
+      // @ts-expect-error -- an object literal lacks the store's private release id.
+      store.complete({ intent: prepared.intent, release: prepared.release, tag: prepared.tag });
+    const completeSpread = (store: RecordStore, prepared: PreparedRecord) =>
+      store.complete(
+        // @ts-expect-error -- a spread copy drops the private release id, so an unverified archive cannot ride along.
+        {
+          // oxlint-disable-next-line typescript/no-misused-spread -- the spread is the forgery this case proves impossible.
+          ...prepared,
+          release: { ...prepared.release, archive: "/unverified/archive.tgz" },
+        }
+      );
+    expect(completeLiteral).toBeTypeOf("function");
+    expect(completeSpread).toBeTypeOf("function");
+  });
+
+  it("does not interpret authentication failures as missing releases", async () => {
+    const remote = fakeRemote();
+    remote.override("GET", releaseListing, () => new Response("", { status: 403 }));
+    await expect(run(storeOver(remote).restore("v0.2.0"))).rejects.toThrow("403");
+  });
+
+  it("does not treat a missing listing page as an empty history", async () => {
+    const remote = fakeRemote();
+    remote.override("GET", releaseListing, () => new Response("", { status: 404 }));
+    await expect(run(storeOver(remote).restore("v0.2.0"))).rejects.toThrow("404");
+  });
+});
+
+describe("canary reservations", () => {
+  it("includes unfinished canary reservations in canary numbering", async () => {
+    const remote = fakeRemote();
+    const canaryIntent = releaseIntent("0.2.0-canary.12");
+    remote.seedTag(`canary-${commit}`, commit);
+    remote.seedRelease({ tag: `canary-${commit}`, body: JSON.stringify({ schema: 1, ...canaryIntent }) });
+    const store = storeOver(remote);
+    expect(await Effect.runPromise(store.recordedCanaryIntent(commit))).toEqual(canaryIntent);
+    expect(await Effect.runPromise(store.reservedCanaryVersions())).toEqual(["0.2.0-canary.12"]);
+    expect(listings(remote)).toBe(1);
+  });
+
+  it("has no recorded canary intent for a commit without a record", async () => {
+    const remote = fakeRemote();
+    expect(await Effect.runPromise(storeOver(remote).recordedCanaryIntent(commit))).toBeUndefined();
+  });
+
+  it("reads every listing page, drafts included", async () => {
+    const remote = fakeRemote();
+    remote.seedRelease({ tag: `canary-${commit}`, body: serializeIntent(releaseIntent("0.2.0-canary.12")) });
+    for (let index = 0; index < 100; index += 1) {
+      remote.seedRelease({ tag: `notes-${String(index)}`, body: "Human release notes.", draft: false });
+    }
+    expect(await Effect.runPromise(storeOver(remote).reservedCanaryVersions())).toEqual(["0.2.0-canary.12"]);
+    expect(listings(remote)).toBe(2);
   });
 });
 
 describe("release asset classification", () => {
   it("rejects a non-draft starter asset", async () => {
-    const { store } = githubStore([releaseRecord({ draft: false })]);
-    await expect(Effect.runPromise(store.find("v0.2.0"))).rejects.toThrow(
+    const remote = fakeRemote();
+    seedStableRecord(remote, [starterAsset], false);
+    await expect(run(storeOver(remote).restore("v0.2.0"))).rejects.toThrow(
       "Unsupported starter release asset"
     );
   });
+
   it("rejects an unknown asset state", async () => {
-    const unknown = { id: 2, name: releaseArchiveName, state: "open", size: 0 };
-    const { store } = githubStore([releaseRecord({ assets: [unknown] })]);
-    await expect(Effect.runPromise(store.find("v0.2.0"))).rejects.toThrow(
+    const remote = fakeRemote();
+    seedStableRecord(remote, [{ state: "open", size: 0 }]);
+    await expect(run(storeOver(remote).restore("v0.2.0"))).rejects.toThrow(
       "Unsupported release asset state open"
     );
   });
+
   it("rejects a size-zero uploaded asset", async () => {
-    const empty = { id: 2, name: releaseArchiveName, state: "uploaded", size: 0 };
-    const { store } = githubStore([releaseRecord({ assets: [empty] })]);
-    await expect(Effect.runPromise(store.find("v0.2.0"))).rejects.toThrow(
+    const remote = fakeRemote();
+    seedStableRecord(remote, [{ state: "uploaded", size: 0 }]);
+    await expect(run(storeOver(remote).restore("v0.2.0"))).rejects.toThrow(
       "Uploaded release asset has no bytes"
     );
   });
+
+  it("rejects a record carrying two recorded archives", async () => {
+    const remote = fakeRemote();
+    seedStableRecord(remote, [{ bytes: archive }, { bytes: archive }]);
+    await expect(run(storeOver(remote).restore("v0.2.0"))).rejects.toThrow("Duplicate release archives");
+  });
 });
 
-describe("release record ownership in the GitHub store", () => {
+describe("release record ownership in the Record store", () => {
   it("ignores a foreign human release on a non-record tag during discovery", async () => {
-    const canaryIntent = { channel: "canary" as const, version: "0.2.0-canary.12", commit };
-    const { store, mutations } = githubStore([
-      {
-        tag_name: "weekly-notes",
-        id: 3,
-        draft: false,
-        body: "Human release notes.",
-        assets: [],
-      },
-      {
-        tag_name: `canary-${commit}`,
-        id: 4,
-        draft: true,
-        body: JSON.stringify({ schema: 1, ...canaryIntent }),
-        assets: [],
-      },
-    ]);
-    expect(await Effect.runPromise(store.reservedCanaryVersions())).toEqual(["0.2.0-canary.12"]);
-    expect(await Effect.runPromise(store.find("weekly-notes"))).toBeUndefined();
-    expect(mutations.filter((entry) => !entry.startsWith("GET "))).toEqual([]);
+    const remote = fakeRemote();
+    remote.seedRelease({ tag: "weekly-notes", body: "Human release notes.", draft: false });
+    remote.seedRelease({
+      tag: `canary-${commit}`,
+      body: JSON.stringify({ schema: 1, channel: "canary", version: "0.2.0-canary.12", commit }),
+    });
+    expect(await Effect.runPromise(storeOver(remote).reservedCanaryVersions())).toEqual(["0.2.0-canary.12"]);
+    expect(remote.mutations()).toEqual([]);
   });
 
   it("fails a foreign occupant of the requested record tag without mutation", async () => {
-    const { store, mutations } = githubStore([
-      {
-        tag_name: "v0.2.0",
-        id: 8,
-        draft: false,
-        body: "Human release notes.",
-        assets: [],
-      },
-    ]);
-    await expect(Effect.runPromise(store.find("v0.2.0"))).rejects.toThrow("foreign GitHub release occupies");
-    await expect(Effect.runPromise(store.create(intent))).rejects.toThrow("foreign GitHub release occupies");
-    expect(mutations.filter((entry) => /POST|PATCH|DELETE/.test(entry))).toEqual([]);
+    const remote = fakeRemote();
+    remote.seedRelease({ tag: "v0.2.0", body: "Human release notes.", draft: false });
+    const store = storeOver(remote);
+    const packer = recordingPacker(packageName);
+    await expect(run(store.restore("v0.2.0"))).rejects.toThrow("foreign GitHub release occupies");
+    await expect(run(store.prepare(intent, packer.adapter))).rejects.toThrow(
+      "foreign GitHub release occupies"
+    );
+    expect(remote.mutations()).toEqual([]);
+    expect(packer.packed).toEqual([]);
   });
 
   it("fails a malformed unmarked schema-1 candidate instead of treating it as foreign", async () => {
-    const { store } = githubStore([
-      {
-        tag_name: "v0.2.0",
-        id: 8,
-        draft: true,
-        body: JSON.stringify({ schema: 1, channel: "stable", version: "0.2.0" }),
-        assets: [],
-      },
-    ]);
-    await expect(Effect.runPromise(store.find("v0.2.0"))).rejects.toThrow("release intent is invalid");
-    await expect(Effect.runPromise(store.create(intent))).rejects.toThrow("release intent is invalid");
+    const remote = fakeRemote();
+    remote.seedRelease({
+      tag: "v0.2.0",
+      body: JSON.stringify({ schema: 1, channel: "stable", version: "0.2.0" }),
+    });
+    const store = storeOver(remote);
+    await expect(run(store.restore("v0.2.0"))).rejects.toThrow("release intent is invalid");
+    await expect(run(store.prepare(intent, recordingPacker(packageName).adapter))).rejects.toThrow(
+      "release intent is invalid"
+    );
+    expect(remote.mutations()).toEqual([]);
   });
 
   it("fails a marked owned record whose tag does not match its intent, naming the tag", async () => {
-    const { store } = githubStore([
-      {
-        tag_name: "v0.2.0",
-        id: 8,
-        draft: true,
-        body: serializeIntent(releaseIntent("0.2.0-canary.0")),
-        assets: [],
-      },
-    ]);
-    await expect(Effect.runPromise(store.find("v0.2.0"))).rejects.toThrow(
+    const remote = fakeRemote();
+    remote.seedRelease({ tag: "v0.2.0", body: serializeIntent(releaseIntent("0.2.0-canary.0")) });
+    const store = storeOver(remote);
+    await expect(run(store.restore("v0.2.0"))).rejects.toThrow(
       "Release record v0.2.0 is damaged: Release tag does not match its intent"
     );
     await expect(Effect.runPromise(store.reservedCanaryVersions())).resolves.toEqual([]);
   });
 
   it("names a marked owned record that cannot be decoded without blocking the catalog", async () => {
+    const remote = fakeRemote();
     const otherCommit = commitSha("b");
-    const { store } = githubStore([
-      {
-        tag_name: `canary-${commit}`,
-        id: 4,
-        draft: true,
-        body: JSON.stringify({
-          schema: 2,
-          owner: releaseRecordOwner,
-          channel: "canary",
-          version: "0.2.0-canary.0",
-          commit,
-        }),
-        assets: [],
-      },
-      {
-        tag_name: `canary-${otherCommit}`,
-        id: 5,
-        draft: true,
-        body: serializeIntent(releaseIntent("0.2.0-canary.12", otherCommit)),
-        assets: [],
-      },
-      releaseRecord({
-        tag_name: "v0.1.9",
-        id: 6,
-        body: JSON.stringify({ schema: 1, channel: "stable", version: "0.1.9", commit }),
-        assets: [],
+    remote.seedRelease({
+      tag: `canary-${commit}`,
+      body: JSON.stringify({
+        schema: 2,
+        owner: releaseRecordOwner,
+        channel: "canary",
+        version: "0.2.0-canary.0",
+        commit,
       }),
-    ]);
-    expect(await Effect.runPromise(store.reservedCanaryVersions())).toEqual(["0.2.0-canary.12"]);
-    expect(await Effect.runPromise(store.find("v0.1.9"))).toEqual({
-      id: 6,
-      intent: { channel: "stable", version: "0.1.9", commit },
-      asset: { state: "missing" },
     });
-    await expect(Effect.runPromise(store.find(`canary-${commit}`))).rejects.toThrow(
+    remote.seedRelease({
+      tag: `canary-${otherCommit}`,
+      body: serializeIntent(releaseIntent("0.2.0-canary.12", otherCommit)),
+    });
+    const stable = releaseIntent("0.1.9");
+    remote.seedTag("v0.1.9", commit);
+    remote.seedRelease({
+      tag: "v0.1.9",
+      body: JSON.stringify({ schema: 1, ...stable }),
+      assets: [{ bytes: packArchive(packageName, stable) }],
+    });
+    const store = storeOver(remote);
+    expect(await Effect.runPromise(store.reservedCanaryVersions())).toEqual(["0.2.0-canary.12"]);
+    expect((await run(store.restore("v0.1.9"))).intent).toEqual(stable);
+    await expect(Effect.runPromise(store.recordedCanaryIntent(commit))).rejects.toThrow(
       `Release record canary-${commit} is damaged: release intent is invalid`
     );
   });
 
   it("reads unmarked schema-1 records without rewriting them", async () => {
-    const { store, mutations } = githubStore([releaseRecord({ assets: [] })]);
-    expect(await Effect.runPromise(store.find("v0.2.0"))).toEqual({
-      id: 1,
-      intent,
-      asset: { state: "missing" },
-    });
-    expect(mutations.filter((entry) => /POST|PATCH|DELETE/.test(entry))).toEqual([]);
-  });
-
-  it("writes the owner marker and package display name on create", async () => {
-    const { store, posted } = githubStore([], {
-      tagStatus: 404,
-      releaseId: 9,
-      packageName: "@acme/app",
-      created: {
-        tag_name: "v0.2.0",
-        id: 9,
-        draft: true,
-        body: serializeIntent(intent),
-        assets: [],
-      },
-    });
-    await expect(Effect.runPromise(store.create(intent))).resolves.toEqual({
-      id: 9,
-      intent,
-      asset: { state: "missing" },
-    });
-    const created = posted.find((entry) => entry.path.endsWith("/releases"));
-    expect(created).toBeDefined();
-    const payload = decodeJson(
-      created?.body ?? "{}",
-      Schema.Struct({ name: Schema.String, body: Schema.String }),
-      "created release"
-    );
-    expect(payload.name).toBe("@acme/app 0.2.0");
-    expect(payload.body).toBe(serializeIntent(intent));
-    expect(
-      decodeJson(payload.body, Schema.Struct({ owner: Schema.optionalKey(Schema.String) }), "intent").owner
-    ).toBe(releaseRecordOwner);
+    const remote = fakeRemote();
+    seedStableRecord(remote, [{ bytes: archive }]);
+    expect((await run(storeOver(remote).restore("v0.2.0"))).intent).toEqual(intent);
+    expect(remote.mutations()).toEqual([]);
+    expect(remote.release("v0.2.0").body).toBe(legacyBody);
   });
 });
 
 describe("GitHub JSON arrays", () => {
   it("rejects a wrapped object where a release array is required", async () => {
-    const store = createReleaseStore(
-      createGitHubClient({
-        repository: "example/package",
-        token: Redacted.make("test"),
-        fetch: () => Promise.resolve(Response.json({ releases: [] })),
-      }),
-      packageName
-    );
-    await expect(Effect.runPromise(store.reservedCanaryVersions())).rejects.toThrow(
+    const remote = fakeRemote();
+    remote.override("GET", releaseListing, () => Response.json({ releases: [] }));
+    await expect(Effect.runPromise(storeOver(remote).reservedCanaryVersions())).rejects.toThrow(
       "GitHub releases is invalid"
     );
   });

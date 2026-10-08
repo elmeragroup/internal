@@ -76,36 +76,55 @@ async function fetchRegistry(packageName: string, fetcher: typeof fetch): Promis
   return { versions, tags: new Map(Object.entries(data["dist-tags"])) };
 }
 
-/** Live npm CLI port for one package. Publications publish to `pending`; promotion moves the tag. */
-export function createNpmPublisher(pkg: ReleasePackage): NpmPublisher {
-  function runNpm(args: readonly string[]): Effect.Effect<void, ReleaseError> {
-    return lift(() => {
-      // npm writes its publish notice and progress to stderr. Stdout stays
-      // attached, stdin stays closed so npm can never block on a prompt (CI
-      // authentication is token-based), and stderr is captured to name a
-      // failure and re-emitted after a success; progress is not live, but the
-      // CI log keeps the full trace.
-      const result = spawnSync("npm", args, {
-        cwd: pkg.checkoutRoot,
-        encoding: "utf8",
-        stdio: ["ignore", "inherit", "pipe"],
-      });
-      if (result.error !== undefined) throw result.error;
-      if (result.status !== 0) {
-        const stderr = result.stderr.trim();
-        throw new Error(
-          stderr === ""
-            ? `npm failed with status ${String(result.status)}`
-            : `npm failed with status ${String(result.status)}: ${stderr}`
-        );
-      }
-      process.stderr.write(result.stderr);
+/**
+ * Runs one npm CLI command in `cwd`. A non-zero exit fails naming the status and npm's captured
+ * stderr; the release transport injects it so tests can stand in for the npm process.
+ */
+export type NpmRunner = (cwd: string, args: readonly string[]) => Effect.Effect<void, ReleaseError>;
+
+/** The live npm CLI: a synchronous `npm` child process with stdin closed and stderr captured. */
+export const runNpmCli: NpmRunner = (cwd, args) =>
+  lift(() => {
+    // npm writes its publish notice and progress to stderr. Stdout stays
+    // attached, stdin stays closed so npm can never block on a prompt (CI
+    // authentication is token-based), and stderr is captured to name a
+    // failure and re-emitted after a success; progress is not live, but the
+    // CI log keeps the full trace.
+    const result = spawnSync("npm", args, {
+      cwd,
+      encoding: "utf8",
+      stdio: ["ignore", "inherit", "pipe"],
     });
-  }
+    if (result.error !== undefined) throw result.error;
+    if (result.status !== 0) {
+      const stderr = result.stderr.trim();
+      throw new Error(
+        stderr === ""
+          ? `npm failed with status ${String(result.status)}`
+          : `npm failed with status ${String(result.status)}: ${stderr}`
+      );
+    }
+    process.stderr.write(result.stderr);
+  });
+
+/**
+ * npm CLI port for one package, run through `run` in the checkout root. Publications publish to
+ * `pending`; promotion moves the channel dist-tag.
+ */
+export function createNpmPublisher(pkg: ReleasePackage, run: NpmRunner = runNpmCli): NpmPublisher {
   return {
     publish: (archive) =>
-      runNpm(["publish", archive, "--access", "public", "--tag", "pending", "--ignore-scripts"]),
-    promote: (version, tag) => runNpm(["dist-tag", "add", `${pkg.packageName}@${version}`, tag]),
+      run(pkg.checkoutRoot, [
+        "publish",
+        archive,
+        "--access",
+        "public",
+        "--tag",
+        "pending",
+        "--ignore-scripts",
+      ]),
+    promote: (version, tag) =>
+      run(pkg.checkoutRoot, ["dist-tag", "add", `${pkg.packageName}@${version}`, tag]),
   };
 }
 
