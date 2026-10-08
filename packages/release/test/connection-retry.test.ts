@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { resendOnDroppedConnection } from "../src/connection-retry.ts";
-import { releaseEnvironment } from "../src/github.ts";
+import { releaseEnvironment } from "../src/environment.ts";
 
 const url = "https://api.github.com/repos/acme/app/releases/1";
 

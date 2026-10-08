@@ -1,4 +1,4 @@
-import { Effect, Redacted } from "effect";
+import { Effect } from "effect";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -7,12 +7,14 @@ import { describe, expect, it } from "vitest";
 import { createStableReleaseGate } from "../src/gate.ts";
 import { createGitHubClient } from "../src/github.ts";
 import { assertStableReleaseVersion } from "../src/version.ts";
+import { createFakeRemote } from "./lib/fake-remote.ts";
+import type { FakePull } from "./lib/fake-remote.ts";
 import { commit } from "./lib/release-fixtures.ts";
 
 const previous = assertStableReleaseVersion("0.1.9");
 const current = assertStableReleaseVersion("0.2.0");
 
-const mergedReleasePull = {
+const mergedReleasePull: FakePull = {
   merged_at: "2026-09-09",
   merge_commit_sha: commit,
   head: { ref: "changeset-release/main", repo: { full_name: "example/package" } },
@@ -47,20 +49,11 @@ function withCheckout(
   });
 }
 
-/** Records every GitHub URL the gate reaches for, so unreached checks are visible. */
-function gitHub(pulls: readonly unknown[]) {
-  const requested: string[] = [];
-  const client = createGitHubClient({
-    repository: "example/package",
-    token: Redacted.make("test"),
-    fetch: (url) => {
-      const path = url instanceof URL ? url.href : url instanceof Request ? url.url : url;
-      requested.push(path);
-      if (path.includes("/pulls")) return Promise.resolve(Response.json(pulls));
-      return Promise.resolve(new Response("", { status: 500 }));
-    },
-  });
-  return { client, requested };
+/** A GitHub client over the fake remote; its request log shows which checks reached GitHub. */
+function gitHub(pulls: readonly FakePull[]) {
+  const remote = createFakeRemote("example/package", "@acme/app");
+  for (const pull of pulls) remote.seedPull(commit, pull);
+  return { client: createGitHubClient(remote.environment), requested: remote.requests };
 }
 
 describe("stable release gate", () => {
