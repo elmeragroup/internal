@@ -8,6 +8,7 @@ import type { ReleasePackage } from "./files.ts";
 import { isCommit } from "./intent.ts";
 import type { CommitSha } from "./intent.ts";
 import { decodeJson } from "./json.ts";
+import type { ReleaseTransport } from "./release-transport.ts";
 
 /** What one published npm version records about the release that produced it. */
 type PublishedVersion = {
@@ -61,8 +62,11 @@ function publishedCommit(manifest: typeof NpmVersion.Type): CommitSha | undefine
   return manifest.gitHead !== undefined && isCommit(manifest.gitHead) ? manifest.gitHead : undefined;
 }
 
-async function fetchRegistry(packageName: string, fetcher: typeof fetch): Promise<Registry> {
-  const response = await fetcher(registryUrl(packageName), { signal: AbortSignal.timeout(30_000) });
+async function fetchRegistry(packageName: string, fetcher: ReleaseTransport): Promise<Registry> {
+  const response = await fetcher(registryUrl(packageName), {
+    method: "GET",
+    signal: AbortSignal.timeout(30_000),
+  });
   if (response.status === 404) return { versions: new Map(), tags: new Map() };
   if (!response.ok) throw new Error(`npm registry lookup failed: ${String(response.status)}`);
   const data = decodeJson(await response.text(), NpmPackument, "npm registry");
@@ -115,7 +119,7 @@ export function createNpmPublisher(pkg: ReleasePackage): NpmPublisher {
  */
 export function readRegistry(
   packageName: string,
-  fetcher: typeof fetch
+  fetcher: ReleaseTransport
 ): Effect.Effect<Registry, ReleaseError> {
   return liftPromise(() => fetchRegistry(packageName, fetcher));
 }

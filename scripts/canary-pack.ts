@@ -58,7 +58,12 @@ for (const [dependency, specifier] of Object.entries(dependencies)) {
   if (dependency.startsWith("@elmeragroup/"))
     throw new Error(`${name}: private workspace dependency ${dependency}`);
 }
-if (!dependencies.typescript || !dependencies.effect || !dependencies["@oxlint/plugins"])
+if (
+  !dependencies.typescript ||
+  !dependencies.effect ||
+  !dependencies["@oxlint/plugins"] ||
+  !dependencies.undici
+)
   throw new Error(`${name}: external runtime dependency missing`);
 if (
   !files.includes("package/dist/index.mjs") ||
