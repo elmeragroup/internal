@@ -3,24 +3,24 @@ packages:
   - tooling/*
 
 catalog:
-  "@changesets/cli": 3.0.2
-  "@oxlint/plugins": 1.82.0
-  "@types/node": 25.9.5
+  "@changesets/cli": 3.0.3
+  "@oxlint/plugins": 1.87.0
+  "@types/node": 26.6.5
   "@types/react": 19.3.0
   "@types/react-dom": 19.3.0
-  eslint-plugin-turbo: 2.10.12
-  effect: 4.0.2
-  oxfmt: 0.67.0
-  oxlint: 1.82.0
-  oxlint-tsgolint: 7.0.2001
+  eslint-plugin-turbo: 2.11.7
+  effect: 4.0.3
+  oxfmt: 0.72.0
+  oxlint: 1.87.0
+  oxlint-tsgolint: 7.0.2004
   react: 19.3.0
   esbuild: 0.28.2
-  tsdown: 0.23.0
-  turbo: 2.10.12
+  tsdown: 0.23.1
+  turbo: 2.11.7
   typescript: 7.0.2
   undici: 8.11.2
-  vitest: 4.1.11
-  yaml: 2.9.0
+  vitest: 5.0.4
+  yaml: 2.9.1
 
 autoInstallPeers: true
 
@@ -30,6 +30,3 @@ allowBuilds:
   "@parcel/watcher": true
 
 minimumReleaseAge: 4320
-
-minimumReleaseAgeExclude:
-  - effect@4.0.2

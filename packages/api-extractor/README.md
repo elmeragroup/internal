@@ -12,9 +12,10 @@ Create one scoped `ProjectExtractor` layer for a TypeScript project, then call `
 files included by that project's `tsconfig.json`.
 
 ```ts
-import { ProjectExtractor } from "@elmeragroup/internal/api-extractor";
 import { Effect } from "effect";
 import { resolve } from "node:path";
+
+import { ProjectExtractor } from "@elmeragroup/internal/api-extractor";
 
 const tsconfigPath = resolve("tsconfig.json");
 const inputPath = resolve("src/index.ts");
