@@ -10,7 +10,8 @@
   "dependencies": {
     "effect": "catalog:",
     "typescript": "catalog:",
-    "@oxlint/plugins": "catalog:"
+    "@oxlint/plugins": "catalog:",
+    "undici": "catalog:"
   },
   "devDependencies": {
     "@elmeragroup/typescript-config": "workspace:*",

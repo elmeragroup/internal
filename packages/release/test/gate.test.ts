@@ -54,9 +54,8 @@ function gitHub(pulls: readonly unknown[]) {
     repository: "example/package",
     token: Redacted.make("test"),
     fetch: (url) => {
-      const path = url instanceof URL ? url.href : url instanceof Request ? url.url : url;
-      requested.push(path);
-      if (path.includes("/pulls")) return Promise.resolve(Response.json(pulls));
+      requested.push(url);
+      if (url.includes("/pulls")) return Promise.resolve(Response.json(pulls));
       return Promise.resolve(new Response("", { status: 500 }));
     },
   });

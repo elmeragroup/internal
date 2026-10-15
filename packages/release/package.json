@@ -16,7 +16,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "effect": "catalog:"
+    "effect": "catalog:",
+    "undici": "catalog:"
   },
   "devDependencies": {
     "@elmeragroup/typescript-config": "workspace:*",

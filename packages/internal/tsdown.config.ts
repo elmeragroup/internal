@@ -18,7 +18,7 @@ export default defineConfig({
   banner: { dts: '/// <reference lib="esnext.disposable" />' },
   deps: {
     alwaysBundle: [/^@elmeragroup\//],
-    neverBundle: ["effect", "typescript", "@oxlint/plugins"],
-    onlyImport: ["effect", "typescript", "@oxlint/plugins"],
+    neverBundle: ["effect", "typescript", "@oxlint/plugins", "undici"],
+    onlyImport: ["effect", "typescript", "@oxlint/plugins", "undici"],
   },
 });

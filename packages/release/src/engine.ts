@@ -230,13 +230,21 @@ function liveCheckedCommitDeps(pkg: ReleasePackage, environment: ReleaseEnvironm
   };
 }
 
-/** Acquires the given deps and gives `run` their scope; every external failure stays in the channel. */
+/** The environment one operation runs with; its transport lives until the operation's scope closes. */
+type EnvironmentAcquisition = Effect.Effect<ReleaseEnvironment, never, Scope.Scope>;
+
+/**
+ * Acquires the environment, builds the deps over it, and gives `run` their scope; the transport is
+ * released when the operation ends, and every external failure stays in the channel.
+ */
 function withLiveDeps<D, A>(
-  build: () => D,
+  environment: EnvironmentAcquisition,
+  build: (environment: ReleaseEnvironment) => D,
   run: (deps: D) => Effect.Effect<A, ReleaseError, Scope.Scope>
 ): Effect.Effect<A, ReleaseError> {
   return Effect.gen(function* () {
-    const deps = yield* lift(build);
+    const acquired = yield* environment;
+    const deps = yield* lift(() => build(acquired));
     return yield* run(deps);
   }).pipe(Effect.scoped);
 }
@@ -252,8 +260,8 @@ type ReleaseOperations = {
   retryRelease: (pkg: ReleasePackage, recordTag: string) => Effect.Effect<void, ReleaseError>;
 };
 
-/** Builds the operations against an injectable transport; production callers get `releaseEnvironment`. */
-export function createReleaseOperations(environment: () => ReleaseEnvironment): ReleaseOperations {
+/** Builds the operations against an injectable environment; production callers get `releaseEnvironment`. */
+export function createReleaseOperations(environment: EnvironmentAcquisition): ReleaseOperations {
   return {
     checkReleasePr: (pkg) =>
       Effect.gen(function* () {
@@ -262,18 +270,20 @@ export function createReleaseOperations(environment: () => ReleaseEnvironment): 
       }),
     releaseCheckedCommit: (pkg, adapter, commit) =>
       withLiveDeps(
-        () => liveCheckedCommitDeps(pkg, environment()),
+        environment,
+        (acquired) => liveCheckedCommitDeps(pkg, acquired),
         (deps) => executeCheckedCommit(pkg, adapter, commit, deps)
       ),
     retryRelease: (pkg, recordTag) =>
       withLiveDeps(
-        () => liveReleaseDeps(pkg, environment()),
+        environment,
+        (acquired) => liveReleaseDeps(pkg, acquired),
         (deps) => executeRetry(pkg, recordTag, deps)
       ),
   };
 }
 
-const production = createReleaseOperations(releaseEnvironment);
+const production = createReleaseOperations(Effect.suspend(releaseEnvironment));
 
 /**
  * Asserts that the checkout is a complete stable release PR for the Changesets base branch:

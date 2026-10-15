@@ -32,9 +32,29 @@ retryRelease(pkg: ReleasePackage, recordTag: string): Effect<void, ReleaseError>
   release fails naming that tag; an incomplete prepared record fails telling you to rerun the
   original Merge job.
 
-The engine reads `repository`, `token`, and the global fetch from `GITHUB_REPOSITORY` and `GH_TOKEN`
-inside each operation. Tests build a fixture transport through the internal
-`createReleaseOperations` constructor, which is not part of the package entry.
+The engine reads `repository` and `token` from `GITHUB_REPOSITORY` and `GH_TOKEN` inside each
+operation. Tests inject an environment through the internal `createReleaseOperations`
+constructor, which is not part of the package entry.
+
+### Connections
+
+Each publication or retry sends its GitHub and npm registry requests through its own transport:
+undici's `fetch` over an `Agent` the operation owns. The agent is destroyed when the operation ends,
+so it holds no handle open afterwards. Two settings make every connection carry exactly one
+request:
+
+- HTTP/1.1 only (`allowH2: false`). GitHub and npm otherwise negotiate HTTP/2, which multiplexes
+  every request over one long-lived session and ignores the keep-alive setting.
+- No keep-alive (`pipelining: 0`). Each request is sent with `connection: close`, and its connection
+  is closed after the response.
+
+The adapter's `pack` and the engine's git, tar, Changesets, and npm calls block the event loop, and
+a connection pool cannot notice a connection that GitHub or npm closed in the meantime. Because the
+engine opens a new connection for every request in a pool it shares with nobody, a request after a
+blocking phase always reaches the server, however long the phase lasted and whatever connections
+the adapter or other code in the process left idle. Requests are never resent, so a POST is sent at
+most once. `undici` is a pinned runtime dependency of `@elmeragroup/internal`, loaded only by its
+`release` entry.
 
 ## Ports and errors
 

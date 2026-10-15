@@ -1,0 +1,5 @@
+---
+"@elmeragroup/internal": patch
+---
+
+Publishing no longer fails with `fetch failed` (`EPIPE` or `UND_ERR_SOCKET: other side closed`) on the first GitHub or npm registry request after a long pack. A synchronous pack adapter, `npm publish`, and the engine's git, tar, and Changesets calls block the event loop, so the shared connection pool could not notice that GitHub or npm had closed an idle connection. The next request reused the closed socket, and resending it once was not enough when more than one closed socket was pooled. Each release operation now sends its requests through its own connection pool, which speaks HTTP/1.1 only, turns keep-alive off, opens a new connection for every request, and is closed when the operation ends. Requests after a blocking phase therefore always reach the server, however long the phase lasted and whatever connections other code in the process left open. Requests are no longer resent, so no write is sent twice. `@elmeragroup/internal` now depends on `undici` 8.11.2.

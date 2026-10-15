@@ -17,7 +17,7 @@ await build({
 const emitted = await readdir("consumer-dist", { recursive: true });
 assert.deepEqual(emitted, ["tree-shake.mjs"], "Unused generator chunks must be removed");
 const bundled = await readFile("consumer-dist/tree-shake.mjs", "utf8");
-assert.doesNotMatch(bundled, /(?:from\s*|import\s*\(?)["'](?:effect|typescript|node:|@elmeragroup\/)/);
+assert.doesNotMatch(bundled, /(?:from\s*|import\s*\(?)["'](?:effect|typescript|undici|node:|@elmeragroup\/)/);
 assert.doesNotMatch(bundled, /generateApiArtifacts|ProjectExtractor|eslintCompatPlugin/);
 assert.doesNotMatch(bundled, /releaseCheckedCommit|retryRelease|release\.tgz|elmera\/release\//);
 assert.ok(bundled.length < 4000, `Error-only consumer retained ${bundled.length} bytes`);

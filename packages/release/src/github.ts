@@ -1,7 +1,9 @@
-import { Brand, Redacted, Schema } from "effect";
+import { Brand, Effect, Redacted, Schema } from "effect";
+import type { Scope } from "effect";
 
-import { resendOnDroppedConnection } from "./connection-retry.ts";
 import { decodeJson } from "./json.ts";
+import { acquireReleaseTransport } from "./release-transport.ts";
+import type { ReleaseTransport, TransportRequest } from "./release-transport.ts";
 
 /** GitHub release identity; distinct from a release asset identity even though both are numbers. */
 export type ReleaseId = Brand.Branded<number, "ReleaseId">;
@@ -89,16 +91,19 @@ export type GitHubClient = {
 export type ReleaseEnvironment = {
   repository: string;
   token: Redacted.Redacted<string>;
-  fetch: typeof fetch;
+  fetch: ReleaseTransport;
 };
 
-/** Reads credentials no earlier than the operation that needs them. */
-export function releaseEnvironment(): ReleaseEnvironment {
-  return {
+/**
+ * Reads credentials no earlier than the operation that needs them, and acquires the operation's
+ * own transport, which is released with the scope.
+ */
+export function releaseEnvironment(): Effect.Effect<ReleaseEnvironment, never, Scope.Scope> {
+  return Effect.map(acquireReleaseTransport(), (fetch) => ({
     repository: process.env.GITHUB_REPOSITORY ?? "",
     token: Redacted.make(process.env.GH_TOKEN ?? ""),
-    fetch: resendOnDroppedConnection((input, init) => globalThis.fetch(input, init)),
-  };
+    fetch,
+  }));
 }
 
 /**
@@ -119,16 +124,24 @@ export function createGitHubClient(environment: ReleaseEnvironment): GitHubClien
     options: GitHubRequest & { allow404?: boolean } = {}
   ): Promise<Response | undefined> {
     const method = options.method ?? "GET";
-    const headers = new Headers({
+    const headers = {
       Authorization: `Bearer ${token}`,
       Accept: options.accept ?? "application/vnd.github+json",
       "X-GitHub-Api-Version": "2022-11-28",
-    });
-    const init: RequestInit = { method, headers, signal: AbortSignal.timeout(120_000) };
-    if (options.body !== undefined) {
-      init.body = options.body;
-      headers.set("Content-Type", options.body instanceof Blob ? "application/gzip" : "application/json");
-    }
+    };
+    const signal = AbortSignal.timeout(120_000);
+    const init: TransportRequest =
+      options.body === undefined
+        ? { method, headers, signal }
+        : {
+            method,
+            headers: {
+              ...headers,
+              "Content-Type": options.body instanceof Blob ? "application/gzip" : "application/json",
+            },
+            body: options.body,
+            signal,
+          };
     const response = await fetcher(url, init);
     if (options.allow404 === true && response.status === 404) return undefined;
     if (!response.ok) throw new Error(`GitHub ${method} failed: ${String(response.status)} ${url}`);

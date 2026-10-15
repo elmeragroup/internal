@@ -15,7 +15,7 @@ describe("registry failures", () => {
     const requested: string[] = [];
     await Effect.runPromise(
       readRegistry("@acme/app", (url) => {
-        requested.push(url instanceof URL ? url.href : url instanceof Request ? url.url : url);
+        requested.push(url);
         return Promise.resolve(new Response("", { status: 404 }));
       })
     );

@@ -399,8 +399,8 @@ describe("shipped live operations", () => {
       const environment: ReleaseEnvironment = {
         repository: "acme/app",
         token: Redacted.make("test-token"),
-        fetch: (input) => {
-          requested.push(input instanceof URL ? input.href : input instanceof Request ? input.url : input);
+        fetch: (url) => {
+          requested.push(url);
           return Promise.resolve(new Response("", { status: 404 }));
         },
       };
@@ -409,7 +409,7 @@ describe("shipped live operations", () => {
         packageDirectory: root,
         packageName: "@acme/app",
       };
-      const operations = createReleaseOperations(() => environment);
+      const operations = createReleaseOperations(Effect.succeed(environment));
       await expect(Effect.runPromise(operations.retryRelease(pkg, "v0.2.0"))).rejects.toThrow(
         "GitHub GET failed: 404"
       );
@@ -426,8 +426,8 @@ describe("shipped live operations", () => {
       const environment: ReleaseEnvironment = {
         repository: "acme/app",
         token: Redacted.make("test-token"),
-        fetch: (input) => {
-          requested.push(input instanceof URL ? input.href : input instanceof Request ? input.url : input);
+        fetch: (url) => {
+          requested.push(url);
           return Promise.resolve(new Response("", { status: 404 }));
         },
       };
@@ -436,7 +436,7 @@ describe("shipped live operations", () => {
         packageDirectory: root,
         packageName: "@acme/app",
       };
-      const operations = createReleaseOperations(() => environment);
+      const operations = createReleaseOperations(Effect.succeed(environment));
       await expect(Effect.runPromise(operations.retryRelease(pkg, "v0.2.0"))).rejects.toThrow(
         "GitHub GET failed: 404"
       );
