@@ -20,6 +20,14 @@ const PackedManifest = Schema.Struct({
   }),
 });
 
+/**
+ * Consumer seam: stamp packed identity, build, pack, verify, and return the archive bytes the
+ * engine records. Retry never calls this.
+ */
+export type PackAndVerify = {
+  pack: (intent: ReleaseIntent) => Uint8Array;
+};
+
 /** Scratch filename inside the scoped temp directory; unrelated to the record's asset name. */
 const scratchArchiveName = "archive.tgz";
 

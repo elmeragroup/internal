@@ -1,8 +1,6 @@
-import { Brand, Effect, Redacted, Schema } from "effect";
-import type { Scope } from "effect";
+import { Brand, Redacted, Schema } from "effect";
 
 import { decodeJson } from "./json.ts";
-import { acquireReleaseTransport } from "./release-transport.ts";
 import type { ReleaseTransport, TransportRequest } from "./release-transport.ts";
 
 /** GitHub release identity; distinct from a release asset identity even though both are numbers. */
@@ -87,33 +85,21 @@ export type GitHubClient = {
   jsonFrom: <A>(url: string, schema: Schema.Codec<A>, label: string) => Promise<A>;
 };
 
-/** Repository and credentials shared by every production port; `fetch` is the injectable transport. */
-export type ReleaseEnvironment = {
+/** The repository, its token, and the `fetch` that carries every GitHub request. */
+export type GitHubConnection = {
   repository: string;
   token: Redacted.Redacted<string>;
   fetch: ReleaseTransport;
 };
 
 /**
- * Reads credentials no earlier than the operation that needs them, and acquires the operation's
- * own transport, which is released with the scope.
- */
-export function releaseEnvironment(): Effect.Effect<ReleaseEnvironment, never, Scope.Scope> {
-  return Effect.map(acquireReleaseTransport(), (fetch) => ({
-    repository: process.env.GITHUB_REPOSITORY ?? "",
-    token: Redacted.make(process.env.GH_TOKEN ?? ""),
-    fetch,
-  }));
-}
-
-/**
  * Builds the authenticated GitHub transport. Throws when the repository does not look like
  * `owner/name` or the token is empty; non-2xx responses fail with the method, status, and URL.
  */
-export function createGitHubClient(environment: ReleaseEnvironment): GitHubClient {
-  const { repository, fetch: fetcher } = environment;
+export function createGitHubClient(connection: GitHubConnection): GitHubClient {
+  const { repository, fetch: fetcher } = connection;
   // The token is unwrapped here and only reaches the Authorization header of this client.
-  const token = Redacted.value(environment.token);
+  const token = Redacted.value(connection.token);
   if (!/^[\w.-]+\/[\w.-]+$/.test(repository) || token === "")
     throw new Error("GitHub repository and token are required");
 
