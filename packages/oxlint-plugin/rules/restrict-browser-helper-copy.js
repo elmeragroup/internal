@@ -38,11 +38,11 @@ export default defineRule({
     type: "problem",
     docs: {
       description:
-        "Forbid local declarations of the shared browser-harness helpers (roleNamed, headingNamed, cssVarColor, textNamed, textboxNamed, stampDensity, px) outside packages/ui/test/themed-browser-render.tsx",
+        "Forbid local declarations of the shared browser-harness helpers (roleNamed, headingNamed, cssVarColor, textNamed, textboxNamed, stampDensity, px) outside packages/fuse/test/themed-browser-render.tsx",
     },
     messages: {
       localCopy:
-        "Import {{helper}} from packages/ui/test/themed-browser-render.tsx. Suites do not re-declare harness helpers.",
+        "Import {{helper}} from packages/fuse/test/themed-browser-render.tsx. Suites do not re-declare harness helpers.",
     },
     schema: [],
   },

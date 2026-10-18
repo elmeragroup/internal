@@ -3,8 +3,8 @@ import restrictPackageRootFromScript from "./restrict-package-root-from-script.j
 
 const tester = createRuleTester();
 const error = { messageId: "usePackageRootFromScript" };
-const paths = "packages/ui/scripts/paths.ts";
-const script = "packages/ui/scripts/size-limit.ts";
+const paths = "packages/fuse/scripts/paths.ts";
+const script = "packages/fuse/scripts/size-limit.ts";
 
 tester.run("elmera/restrict-package-root-from-script", restrictPackageRootFromScript, {
   valid: [
