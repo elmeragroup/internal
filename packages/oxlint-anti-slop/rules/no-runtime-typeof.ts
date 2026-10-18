@@ -1,5 +1,7 @@
 import { defineRule } from "@oxlint/plugins";
 
+import { returnedTypePredicate } from "../shared/function-parameters.ts";
+
 import type { ESTree } from "@oxlint/plugins";
 
 type RuntimeFunction = ESTree.ArrowFunctionExpression | ESTree.Function;
@@ -16,7 +18,7 @@ function isInsideTypeGuard(node: ESTree.Node): boolean {
 	let current: ESTree.Node | null = node.parent;
 	while (current !== null && current.type !== "Program") {
 		if (isRuntimeFunction(current)) {
-			return current.returnType?.typeAnnotation.type === "TSTypePredicate";
+			return returnedTypePredicate(current) !== null;
 		}
 		current = current.parent;
 	}
