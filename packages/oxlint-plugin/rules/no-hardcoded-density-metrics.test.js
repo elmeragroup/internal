@@ -103,7 +103,7 @@ export const recipe = tv({
     },
     {
       name: "Button recipe after density retokenization has no false positives",
-      filename: "packages/ui/src/components/button/button-variants.ts",
+      filename: "packages/fuse/src/components/button/button-variants.ts",
       code: buttonVariantsSource,
     },
     {

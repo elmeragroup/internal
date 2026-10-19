@@ -3,12 +3,12 @@ import noRawClassMap from "./no-raw-class-map.js";
 
 const tester = createRuleTester("tsx");
 const error = { messageId: "rawClassMap" };
-const component = "packages/ui/src/components/card/card.tsx";
+const component = "packages/fuse/src/components/card/card.tsx";
 const docs = "apps/docs/src/components/header.tsx";
-const intl = "packages/ui/src/components/overlay/intl/en-US.ts";
+const intl = "packages/fuse/src/components/overlay/intl/en-US.ts";
 const generated = "apps/docs/src/generated/theme-catalog.ts";
-const testFile = "packages/ui/src/components/card/card.test.ts";
-const typeTest = "packages/ui/src/components/card/card.test-d.tsx";
+const testFile = "packages/fuse/src/components/card/card.test.ts";
+const typeTest = "packages/fuse/src/components/card/card.test-d.tsx";
 
 tester.run("elmera/no-raw-class-map", noRawClassMap, {
   valid: [
@@ -38,7 +38,7 @@ const recipe = tv({
     },
     {
       name: "named cn() constant accepted",
-      filename: "packages/ui/src/components/dropdown-menu/dropdown-menu.tsx",
+      filename: "packages/fuse/src/components/dropdown-menu/dropdown-menu.tsx",
       code: `const dropdownMenuItemClassName = cn(
   selfFocusRingClass,
   menuItemClass,
@@ -48,19 +48,19 @@ const recipe = tv({
     },
     {
       name: "recipe-derived recipe().slot() accepted",
-      filename: "packages/ui/src/styles/utils.ts",
+      filename: "packages/fuse/src/styles/utils.ts",
       code: `export const selfFocusRingClass = focusRing({ target: "self" }).root();
 `,
     },
     {
       name: "recipe-derived itemVariants() accepted",
-      filename: "packages/ui/src/components/selection-item/selection-item.tsx",
+      filename: "packages/fuse/src/components/selection-item/selection-item.tsx",
       code: `const outlineItemClass = itemVariants({ variant: "outline" });
 `,
     },
     {
       name: "recipe-derived slots.base() accepted",
-      filename: "packages/ui/src/react-aria/internal/popover.tsx",
+      filename: "packages/fuse/src/react-aria/internal/popover.tsx",
       code: `const popoverSlots = popoverVariants();
 const popoverBaseClass = popoverSlots.base();
 `,
@@ -80,7 +80,7 @@ const BASE_CLASSES = "text-xs leading-relaxed max-h-160 overflow-auto font-mono"
     },
     {
       name: "browser test file ignored through the .test.tsx arm",
-      filename: "packages/ui/src/components/show/show.browser.test.tsx",
+      filename: "packages/fuse/src/components/show/show.browser.test.tsx",
       code: `const SUITE_CLASSES = { root: "flex gap-2 text-sm" } as const;
 `,
     },
@@ -98,13 +98,13 @@ const BASE_CLASSES = "text-xs leading-relaxed max-h-160 overflow-auto font-mono"
     },
     {
       name: "overlayLayer z-50 keep is not a class map",
-      filename: "packages/ui/src/components/overlay/overlay-classes.ts",
+      filename: "packages/fuse/src/components/overlay/overlay-classes.ts",
       code: `export const overlayLayer = "z-50";
 `,
     },
     {
       name: "non-class map of enums stays quiet",
-      filename: "packages/ui/src/components/meter/meter-constants.ts",
+      filename: "packages/fuse/src/components/meter/meter-constants.ts",
       code: `const METER_CONSTANTS = {
   MODES: { DEFAULT: "default", INVERTED: "inverted" },
   LEVELS: { LOW: "LOW", FULL: "FULL" },
@@ -113,7 +113,7 @@ const BASE_CLASSES = "text-xs leading-relaxed max-h-160 overflow-auto font-mono"
     },
     {
       name: "non-class map of swipe directions stays quiet",
-      filename: "packages/ui/src/components/sheet/sheet.tsx",
+      filename: "packages/fuse/src/components/sheet/sheet.tsx",
       code: `export const SIDE_TO_SWIPE_DIRECTION = {
   top: "up",
   right: "right",
@@ -124,7 +124,7 @@ const BASE_CLASSES = "text-xs leading-relaxed max-h-160 overflow-auto font-mono"
     },
     {
       name: "component constructor map stays quiet",
-      filename: "packages/ui/src/components/alert/alert.tsx",
+      filename: "packages/fuse/src/components/alert/alert.tsx",
       code: `const ALERT_ICONS = {
   default: Info,
   warning: Warning,
@@ -134,7 +134,7 @@ const BASE_CLASSES = "text-xs leading-relaxed max-h-160 overflow-auto font-mono"
     },
     {
       name: "oklch token constants stay quiet",
-      filename: "packages/ui/src/theme/tokens/defaults.ts",
+      filename: "packages/fuse/src/theme/tokens/defaults.ts",
       code: `const INTERNAL_FOREGROUND = "oklch(0.15 0.0041 49.31)";
 export const DEFAULTS = { background: WHITE, foreground: INTERNAL_FOREGROUND } as const;
 `,
@@ -149,7 +149,7 @@ const LANGUAGE_CLASS = "language-";
     },
     {
       name: "generated-file comment with the word block stays quiet",
-      filename: "packages/ui/src/theme/generate-demo-stage-css.ts",
+      filename: "packages/fuse/src/theme/generate-demo-stage-css.ts",
       code: `const GENERATED_FILE_HEADER = \`/**
  * AUTO-GENERATED FILE — DO NOT EDIT DIRECTLY.
  *
@@ -169,7 +169,7 @@ const LANGUAGE_CLASS = "language-";
     },
     {
       name: "satisfies object map flagged",
-      filename: "packages/ui/src/components/radio-group/radio-group.tsx",
+      filename: "packages/fuse/src/components/radio-group/radio-group.tsx",
       code: `const iconButtonSizes = {
   icon: "size-(--control-h-md) [&_svg:not([class*='size-'])]:size-4",
 } as const satisfies Record<string, string>;
@@ -178,7 +178,7 @@ const LANGUAGE_CLASS = "language-";
     },
     {
       name: "nested map flagged",
-      filename: "packages/ui/src/components/selection-item/selection-item.tsx",
+      filename: "packages/fuse/src/components/selection-item/selection-item.tsx",
       code: `export const selectionGroupOrientationClass = {
   group: { vertical: "flex flex-col gap-2", horizontal: "flex flex-wrap gap-4" },
   list: { vertical: "gap-0", horizontal: "flex-row flex-wrap gap-4" },
@@ -188,14 +188,14 @@ const LANGUAGE_CLASS = "language-";
     },
     {
       name: "bare string flagged",
-      filename: "packages/ui/src/components/overlay/overlay-classes.ts",
+      filename: "packages/fuse/src/components/overlay/overlay-classes.ts",
       code: `export const overlayTitleClass = "text-base font-medium font-heading leading-none text-balance";
 `,
       errors: [error],
     },
     {
       name: "1-token hatch-style bg-[…] flagged",
-      filename: "packages/ui/src/styles/utils.ts",
+      filename: "packages/fuse/src/styles/utils.ts",
       code: `export const disabledHatch =
   "bg-[repeating-linear-gradient(45deg,transparent,transparent_8px,rgb(0_0_0/0.02)_8px,rgb(0_0_0/0.02)_16px)]";
 `,
@@ -203,7 +203,7 @@ const LANGUAGE_CLASS = "language-";
     },
     {
       name: "2-token class string flagged",
-      filename: "packages/ui/src/components/field/field-frame.tsx",
+      filename: "packages/fuse/src/components/field/field-frame.tsx",
       code: `export const fieldFrameDescriptionClass = "text-sm text-pretty";
 `,
       errors: [error],
@@ -217,7 +217,7 @@ const LANGUAGE_CLASS = "language-";
     },
     {
       name: "template composing class constants flagged",
-      filename: "packages/ui/src/components/overlay/overlay-classes.ts",
+      filename: "packages/fuse/src/components/overlay/overlay-classes.ts",
       code: `export const overlayPositionerClass = \`isolate \${overlayLayer}\`;
 export const overlayTimedPopupClass = \`\${overlayPopupSurfaceClass} \${overlayPopupMotionClass} \${overlayPopupDurationClass}\`;
 `,
@@ -225,14 +225,14 @@ export const overlayTimedPopupClass = \`\${overlayPopupSurfaceClass} \${overlayP
     },
     {
       name: "1-token duration utility flagged",
-      filename: "packages/ui/src/components/overlay/overlay-classes.ts",
+      filename: "packages/fuse/src/components/overlay/overlay-classes.ts",
       code: `export const overlayPopupDurationClass = "duration-100";
 `,
       errors: [error],
     },
     {
       name: "icon-crossfade tokens flagged",
-      filename: "packages/ui/src/styles/utils.ts",
+      filename: "packages/fuse/src/styles/utils.ts",
       code: `export const iconCrossfadeShown = "blur-0 scale-100 opacity-100";
 `,
       errors: [error],

@@ -3,8 +3,8 @@ import noLocalFocusRing from "./no-local-focus-ring.js";
 
 const tester = createRuleTester("tsx");
 const error = { messageId: "localFocusRing" };
-const adapter = "packages/ui/src/styles/utils.ts";
-const component = "packages/ui/src/components/button/button.tsx";
+const adapter = "packages/fuse/src/styles/utils.ts";
+const component = "packages/fuse/src/components/button/button.tsx";
 
 tester.run("elmera/no-local-focus-ring", noLocalFocusRing, {
   valid: [

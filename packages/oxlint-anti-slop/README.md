@@ -63,6 +63,23 @@ unwrapping with the empty-object predicate that upstream inlines in several
 rules. Keep them, and the rules importing them, when refreshing the vendored
 upstream files.
 
+`no-known-value-widening` classifies `Record<K, V>` and mapped types by their key
+domain through the local `keyDomain` walk in `shared/dictionary-types.ts`. A key
+that admits arbitrary keys (`string`, `number`, `symbol`, `any`, `PropertyKey`,
+`keyof` of `any`, `never`, an open dictionary, or a local interface declaring its
+own index signature, or a union or template literal containing one) makes an open
+dictionary. A finite literal key, directly or through a local
+alias or type argument, does not. A mapped type's `as` clause decides its keys when
+present.
+Inline `Record` and mapped annotations are still reported, as `inline mapped`
+unless the key is open, and accept an empty accumulator `{}`; inline `Pick` and
+`Omit` are reported only when open; behind a local alias, generic or not, only an
+open key is reported, including through `Omit` of literal keys and through `Pick`
+with an open key. `never` is an empty key domain, so `${string}${never}` is not open.
+Alias type arguments are bound with the environment they were written in, so a
+same-named parameter or a nested application reads the caller's meaning. Keep this
+walk when refreshing the vendored upstream files.
+
 ## Tests
 
 Run the rule tests and type-check with Node 24:
