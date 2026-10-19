@@ -43,7 +43,7 @@ export default defineRule({
     type: "problem",
     docs: {
       description:
-        "Forbid focus-state ring classes, outline-(none|hidden), and focus-within border colours outside packages/ui/src/styles/utils.ts",
+        "Forbid focus-state ring classes, outline-(none|hidden), and focus-within border colours outside packages/fuse/src/styles/utils.ts",
     },
     messages: {
       localFocusRing:

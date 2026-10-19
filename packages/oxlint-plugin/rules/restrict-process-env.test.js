@@ -3,8 +3,8 @@ import restrictProcessEnv from "./restrict-process-env.js";
 
 const tester = createRuleTester();
 const error = { messageId: "restrictedAccess" };
-const validator = "packages/ui/src/theme/validate-theme.ts";
-const component = "packages/ui/src/components/button/button.tsx";
+const validator = "packages/fuse/src/theme/validate-theme.ts";
+const component = "packages/fuse/src/components/button/button.tsx";
 
 tester.run("elmera/restrict-process-env", restrictProcessEnv, {
   valid: [
@@ -63,7 +63,7 @@ tester.run("elmera/restrict-process-env", restrictProcessEnv, {
     },
     {
       name: "a filename merely ending with the validator suffix is not the validator",
-      filename: "packages/ui/src/theme/validate-theme.test.ts",
+      filename: "packages/fuse/src/theme/validate-theme.test.ts",
       code: `if (process.env.NODE_ENV === "production") {}
 `,
       errors: [error],

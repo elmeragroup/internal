@@ -3,9 +3,9 @@ import restrictFocusRingCall from "./restrict-focus-ring-call.js";
 
 const tester = createRuleTester("tsx");
 const error = { messageId: "restrictedCall" };
-const utils = "packages/ui/src/styles/utils.ts";
-const link = "packages/ui/src/react-aria/link/link.tsx";
-const component = "packages/ui/src/components/button/button.tsx";
+const utils = "packages/fuse/src/styles/utils.ts";
+const link = "packages/fuse/src/react-aria/link/link.tsx";
+const component = "packages/fuse/src/components/button/button.tsx";
 
 tester.run("elmera/restrict-focus-ring-call", restrictFocusRingCall, {
   valid: [
@@ -23,13 +23,13 @@ tester.run("elmera/restrict-focus-ring-call", restrictFocusRingCall, {
     },
     {
       name: "recipe-output tests may call the recipe",
-      filename: "packages/ui/src/styles/utils.test.ts",
+      filename: "packages/fuse/src/styles/utils.test.ts",
       code: `expect(selfFocusRingClass).toBe(focusRing({ target: "self" }).root());
 `,
     },
     {
       name: "browser suites may call the recipe through the .test.tsx arm",
-      filename: "packages/ui/src/components/show/show.browser.test.tsx",
+      filename: "packages/fuse/src/components/show/show.browser.test.tsx",
       code: `const live = focusRing({ target: "state", isFocusVisible }).root();
 `,
     },
@@ -50,7 +50,7 @@ tester.run("elmera/restrict-focus-ring-call", restrictFocusRingCall, {
     },
     {
       name: "component may not call focusRing with a live isFocusVisible",
-      filename: "packages/ui/src/react-aria/calendar/calendar.tsx",
+      filename: "packages/fuse/src/react-aria/calendar/calendar.tsx",
       code: `focusRing({ target: "state", isFocusVisible }).root();
 `,
       errors: [error],
