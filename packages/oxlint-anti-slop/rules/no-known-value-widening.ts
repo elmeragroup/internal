@@ -93,7 +93,11 @@ function functionName(sourceCode: SourceCode, owner: FunctionExpression | null):
 }
 
 function isDictionaryAccumulatorTarget(destination: WideningTarget): boolean {
-	return destination.kind === "open dictionary" || destination.kind === "generic container";
+	return (
+		destination.kind === "inline mapped" ||
+		destination.kind === "generic container" ||
+		destination.kind === "open dictionary"
+	);
 }
 
 function hasParentAssertion(node: ESTree.Node): boolean {

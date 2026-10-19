@@ -31,6 +31,7 @@ tester.run("anti-slop/no-unsafe-dictionary-type", noUnsafeDictionaryTypeRule, {
 		"interface Owner { readonly id: string } type A = Record<string, object & Owner>;",
 		"type Wrap<T> = { readonly wrapped: T }; type Inner<T, U> = { readonly value: T } & Wrap<U>; type Outer<T, U> = Record<string, Inner<T, U>>; declare function f<T, U>(): Outer<T, U>;",
 		"type Value = unknown; type Dictionary<Value extends { id: string }> = Record<string, Value>;",
+		"type Index<T> = Record<string, T>; type Swap<T, U> = Index<U>; type A = Swap<unknown, string>;",
 		"type Value = unknown; function f() { type Value = { id: string }; type D = Record<string, Value>; }",
 		"function f() { type D = Record<string, Value>; } type Value = { id: string };",
 		'import { Record } from "./local"; function f() { type A = Record<string, unknown>; }',
@@ -72,6 +73,14 @@ tester.run("anti-slop/no-unsafe-dictionary-type", noUnsafeDictionaryTypeRule, {
 		{ code: "type Source = Record<string, unknown>; type A = Pick<Source, string>;", errors: 2 },
 		{ code: "type Source = Record<string, unknown>; type A = Omit<Source, never>;", errors: 2 },
 		{ code: "type Index<T> = Record<string, T>; type A = Index<unknown>;", errors: 1 },
+		{
+			code: "type Value = unknown; type Index<Value> = Record<string, Value>; type A = Index<Value>;",
+			errors: 1,
+		},
+		{
+			code: "type Index<T> = Record<string, T>; type Swap<T, U> = Index<U>; type A = Swap<string, unknown>;",
+			errors: 1,
+		},
 		{ code: "interface A { [key: string]: unknown }", errors: [error] },
 		{ code: "type A = Readonly<Record<string, unknown>>;", errors: 1 },
 		{ code: "type A = Record<string, Readonly<unknown>>;", errors: [error] },
