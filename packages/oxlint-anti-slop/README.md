@@ -17,6 +17,16 @@ part of upstream. Keep them, their `index.ts` registrations, and
 `[A-Z][A-Z0-9]*-\d+`), for the bare ticket ids that count as a tracker reference.
 The root `.oxlintrc.json` sets it to `ELM-\d+`.
 
+`no-unknown-parameters` takes one option, `allowInTypeGuards` (default `false`),
+matching `no-runtime-typeof`. When it is on, an `unknown` parameter is accepted if
+the function's own return type is a type predicate or assertion that names it
+(`value is T`, `asserts value is T`, `asserts value`, or `this is T` for an
+explicit `this` parameter). Other `unknown` parameters of the same function are
+still reported, and so is an overload implementation that returns `boolean`
+while only its overload signatures declare the predicate. Both rules detect the
+predicate with `returnedTypePredicate` in `shared/function-parameters.ts`. Keep the
+option and the helper when refreshing the vendored upstream files.
+
 `no-slop-comments` and `no-narration-comments` offer a `removeComment` suggestion
 only when the deletion cannot join tokens or drop a line terminator: `//` comments,
 and block comments that start or end their line. Inline block comments with code on

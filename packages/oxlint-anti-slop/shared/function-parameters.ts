@@ -50,6 +50,18 @@ export function functionLikeVisitors(check: (node: FunctionLikeNode) => void) {
 }
 
 /**
+ * The type predicate a function-like node declares as its return type: `value is T`,
+ * `asserts value is T`, `asserts value`, or the `this` forms of each.
+ *
+ * @param node - The function-like node to inspect.
+ * @returns The predicate, or null when the return type is absent or not a predicate.
+ */
+export function returnedTypePredicate(node: FunctionLikeNode): ESTree.TSTypePredicate | null {
+	const returnType = node.returnType?.typeAnnotation;
+	return returnType?.type === "TSTypePredicate" ? returnType : null;
+}
+
+/**
  * Find a parameter's type annotation through parameter properties, rest elements, and defaults.
  *
  * @param parameter - The parameter pattern to inspect.
