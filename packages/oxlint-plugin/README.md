@@ -33,7 +33,7 @@ shared helpers: `filename-normalizer.js` (POSIX path checks, test-file predicate
 ## Fixed-path assumptions
 
 Owners, quarantines, and skips are recognized by path suffix. Lint runs from the repository root so
-filenames contain the package path (`packages/ui/...`).
+filenames contain the package path (`packages/fuse/...`).
 
 | Rule                                | Assumption                                                                                                                            |
 | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
@@ -42,7 +42,7 @@ filenames contain the package path (`packages/ui/...`).
 | `no-field-part-jsx`                 | Exact labeled-composite paths such as `src/components/text-field/text-field.tsx`                                                      |
 | `no-hardcoded-density-metrics`      | A file-level `--control-h-` pin counts only when it appears in code; a comment that mentions the variable is documentation, not a pin |
 | `no-local-focus-ring`               | Owner `src/styles/utils.ts`                                                                                                           |
-| `no-rac-outside-quarantine`         | Quarantine is exactly `packages/ui/src/react-aria/**`; another package's `src/react-aria/` is not the quarantine                      |
+| `no-rac-outside-quarantine`         | Quarantine is exactly `packages/fuse/src/react-aria/**`; another package's `src/react-aria/` is not the quarantine                    |
 | `no-raw-class-map`                  | Skips `*.test.ts(x)`, `*.test-d.tsx`, `/intl/`, and `/generated/`                                                                     |
 | `restrict-browser-helper-copy`      | Owner `test/themed-browser-render.tsx`; every other file is a suite                                                                   |
 | `restrict-focus-ring-call`          | Owners `src/styles/utils.ts` and `src/react-aria/link/link.tsx`, plus any test file                                                   |

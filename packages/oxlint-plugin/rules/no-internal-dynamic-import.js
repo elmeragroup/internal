@@ -23,7 +23,7 @@ export default defineRule({
     schema: [],
     messages: {
       noDynamicImport:
-        "The library never lazy-loads internally. Dynamic import() is forbidden in packages/ui/src.",
+        "The library never lazy-loads internally. Dynamic import() is forbidden in packages/fuse/src.",
     },
   },
 });

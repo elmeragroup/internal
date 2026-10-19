@@ -2,8 +2,8 @@ import { createRuleTester } from "../rule-tester.js";
 import enforceVariantStandard from "./enforce-variant-standard.js";
 
 const tester = createRuleTester("tsx");
-const variants = "packages/ui/src/components/button/button-variants.ts";
-const component = "packages/ui/src/components/button/button.tsx";
+const variants = "packages/fuse/src/components/button/button-variants.ts";
+const component = "packages/fuse/src/components/button/button.tsx";
 
 tester.run("elmera/enforce-variant-standard", enforceVariantStandard, {
   valid: [

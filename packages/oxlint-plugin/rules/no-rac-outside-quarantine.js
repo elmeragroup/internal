@@ -6,11 +6,11 @@ import { isForbiddenRacSpecifier } from "../forbidden-rac-packages.js";
 /** @import { ESTree } from "@oxlint/plugins" */
 
 /**
- * The quarantine is exactly `packages/ui/src/react-aria/**`. Matching the full
+ * The quarantine is exactly `packages/fuse/src/react-aria/**`. Matching the full
  * package-relative segment keeps an unrelated `src/react-aria/` (another
  * package, another checkout) from counting as the quarantine.
  */
-const QUARANTINE_DIR_RE = /(?:^|\/)packages\/ui\/src\/react-aria\//;
+const QUARANTINE_DIR_RE = /(?:^|\/)packages\/fuse\/src\/react-aria\//;
 
 /**
  * @param {string} filename
@@ -35,10 +35,10 @@ export default defineRule({
     type: "problem",
     docs: {
       description:
-        "Forbid react-aria-components, react-aria, @internationalized/date, and the scoped @react-aria/* / @react-stately/* packages outside packages/ui/src/react-aria/**",
+        "Forbid react-aria-components, react-aria, @internationalized/date, and the scoped @react-aria/* / @react-stately/* packages outside packages/fuse/src/react-aria/**",
     },
     messages: {
-      quarantined: "`{{specifier}}` may only be imported from packages/ui/src/react-aria/** (quarantine).",
+      quarantined: "`{{specifier}}` may only be imported from packages/fuse/src/react-aria/** (quarantine).",
     },
     schema: [],
   },

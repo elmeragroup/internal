@@ -45,7 +45,7 @@ export default defineRule({
   meta: {
     type: "problem",
     docs: {
-      description: "Forbid dirname(fileURLToPath(import.meta.url)) outside packages/ui/scripts/paths.ts",
+      description: "Forbid dirname(fileURLToPath(import.meta.url)) outside packages/fuse/scripts/paths.ts",
     },
     messages: {
       usePackageRootFromScript:
