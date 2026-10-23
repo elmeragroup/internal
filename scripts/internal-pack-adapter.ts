@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import type { PackAndVerify, ReleaseIntent } from "@elmeragroup/release";
 
 import { readJsonObject } from "./lib/json-object.mjs";
+import { withoutReleaseCredentials } from "./lib/release-credentials.ts";
 import { runCommand } from "./lib/run-command.ts";
 import { archivePath, releaseLayout } from "./release.ts";
 
@@ -12,6 +13,10 @@ import { archivePath, releaseLayout } from "./release.ts";
  * recreates the archive directory), runs the packed-consumer checks, and returns the archive bytes.
  * The `finally` restore covers an ordinary failure, but this is meant for the disposable CI
  * checkout: a killed process leaves the manifest and lockfile rewritten.
+ *
+ * The child commands install and run dependency code, so they run without the GitHub tokens and
+ * the OIDC request pair. The engine reads its GitHub token before packing, and npm requests its
+ * OIDC token only after `pack` returns.
  *
  * The layout and lockfile paths resolve inside the operation, so importing this adapter performs
  * no filesystem I/O.
@@ -27,9 +32,10 @@ export const internalPackAndVerify: PackAndVerify = {
       manifest.version = intent.version;
       manifest.elmeraRelease = { commit: intent.commit, channel: intent.channel };
       writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
-      runCommand("pnpm", ["install", "--lockfile-only"], checkoutRoot);
-      runCommand("pnpm", ["packages:pack"], checkoutRoot);
-      runCommand("pnpm", ["test:packed-consumer"], checkoutRoot);
+      const env = withoutReleaseCredentials(process.env);
+      runCommand("pnpm", ["install", "--lockfile-only"], checkoutRoot, env);
+      runCommand("pnpm", ["packages:pack"], checkoutRoot, env);
+      runCommand("pnpm", ["test:packed-consumer"], checkoutRoot, env);
     } finally {
       writeFileSync(manifestPath, manifestBytes);
       writeFileSync(lockfilePath, lockfileBytes);

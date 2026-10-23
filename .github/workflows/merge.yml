@@ -55,14 +55,16 @@ jobs:
   release:
     needs: checks
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # The called workflow cannot hold more than this grant. npm's trusted publishing needs
+    # `id-token: write` here and in publish-release.yml, and npm validates this file's name.
     permissions:
       contents: write
       pull-requests: read
+      id-token: write
     uses: ./.github/workflows/publish-release.yml
     with:
       source_commit: ${{ github.sha }}
     secrets:
-      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
       RELEASE_GITHUB_TOKEN: ${{ secrets.RELEASE_GITHUB_TOKEN }}
 
   version:

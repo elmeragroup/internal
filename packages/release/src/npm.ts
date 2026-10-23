@@ -85,9 +85,9 @@ export function createNpmPublisher(pkg: ReleasePackage): NpmPublisher {
   function runNpm(args: readonly string[]): Effect.Effect<void, ReleaseError> {
     return lift(() => {
       // npm writes its publish notice and progress to stderr. Stdout stays
-      // attached, stdin stays closed so npm can never block on a prompt (CI
-      // authentication is token-based), and stderr is captured to name a
-      // failure and re-emitted after a success; progress is not live, but the
+      // attached, stdin stays closed so npm can never block on a prompt (neither
+      // a token nor trusted publishing prompts), and stderr is captured to name
+      // a failure and re-emitted after a success; progress is not live, but the
       // CI log keeps the full trace.
       const result = spawnSync("npm", args, {
         cwd: pkg.checkoutRoot,

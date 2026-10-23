@@ -60,8 +60,9 @@ includes the compiler. Importing lint entries does not load TypeScript or Effect
 can remove unused exports. Future browser-safe helpers belong in separate entries; the root remains
 the convenient artifact generator.
 
-npm OIDC covers publish commands, not `dist-tag` updates ([ADR 0004](docs/adr/0004-pack-and-verify-is-the-consumer-seam.md)).
-Resolving promotion authentication is an open prerequisite for UI adoption.
+The release workflow authenticates both the npm publication and the `dist-tag` promotion through
+trusted publishing, and the engine spawns npm with the workflow's environment
+([ADR 0008](docs/adr/0008-npm-trusted-publishing-for-publish-and-promotion.md)).
 
 ## Development
 
@@ -139,11 +140,16 @@ intent, then uploads to npm under `pending`. It verifies the registry's archive 
 commit, and only then updates `canary` or `latest`. Finally it makes the GitHub release visible.
 `pending` is an internal staging tag, not a supported installation channel.
 
-If publication or finalization fails after the archive was saved, run **Publish Release** manually
-from `main` and supply its record tag. The retry uses the original archive, even if main has advanced.
+If publication or finalization fails after the archive was saved, add the `publish-release.yml`
+trusted-publisher entry on npm ([Repository setup](#repository-setup)), then run **Publish Release**
+manually from `main` and supply its record tag. The retry uses the original archive, even if main has advanced.
 An existing npm version must match both the archive integrity and source commit. A mismatch fails;
 it is never treated as a successful retry. The retry also finishes an interrupted channel update or
 GitHub release finalization.
+
+A retry publishes without provenance. npm signs provenance for `GITHUB_SHA`, and a dispatch runs at
+the head of `main`, which can be later than the commit the recorded archive came from. The workflow
+sets `NPM_CONFIG_PROVENANCE=false` for the retry command only.
 
 If preparation failed before the archive was uploaded, rerun the original **Merge** workflow's failed
 jobs. That rebuilds the original checked commit using its reserved version. The manual retry workflow
@@ -154,8 +160,31 @@ leave gaps in canary numbering.
 
 ### Repository setup
 
-- Set the Actions secret `NPM_TOKEN` to a token that can publish `@elmeragroup/internal` and update its
-  npm tags. npm reads and writes use the public npm registry.
+- The **publish** job authenticates to npm through trusted publishing and holds no npm token. It runs
+  in the GitHub environment `npm`, which only `main` can deploy to. npm reads and writes use the
+  public npm registry.
+- On npm, add a trusted publisher to `@elmeragroup/internal` for repository `elmeragroup/internal`,
+  workflow `merge.yml` and environment `npm`. For a `workflow_call`, npm validates the calling
+  workflow's filename, so the entry names `merge.yml`, not the called `publish-release.yml`.
+- A manual **Publish Release** retry validates as `publish-release.yml`. Add that entry, with the
+  same repository and environment, only when a retry is needed.
+- Check "Allow npm publish" and "Allow npm dist-tag" on each entry. The engine publishes under
+  `pending` and then runs `npm dist-tag add`.
+- An entry expires if it hasn't completed a successful publish within 2 days of its creation. An
+  expired entry can't be used or edited, so delete it and create a new one. Add each entry shortly
+  before the run that uses it.
+- `npm dist-tag` authenticates over OIDC from npm 11.21.0
+  ([npm/cli#10038](https://github.com/npm/cli/pull/10038)), and the npm bundled with
+  `.node-version` is older. The [publish workflow](.github/workflows/publish-release.yml) installs
+  an exact npm before the engine runs. That global install skips pnpm's `minimumReleaseAge` check,
+  so raise the pin only to a release older than the window in `pnpm-workspace.yaml`.
+- Keep the package's publishing access at "Require two-factor authentication and disallow bypass
+  2fa tokens". That setting stops every npm token from publishing the package and leaves trusted
+  publishing working. Delete the `NPM_TOKEN` Actions secret after the first trusted publication.
+- Build and publish share a job. The pack adapter removes the GitHub tokens and the OIDC request
+  pair from the environment of its build and verification commands, but a same-user process can
+  still read an ancestor process's environment and request an OIDC token. Closing that gap needs a
+  publish job that never builds, which waits on a prepare-only engine operation.
 - Allow GitHub Actions to create pull requests. The workflows request scoped content, PR, and workflow
   permissions for release records, the version PR, and explicit PR-check dispatch.
 - For historical commits whose workflow files differ from current main, GitHub can require the
