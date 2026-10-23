@@ -99,11 +99,69 @@ describe("release workflow gates", () => {
       step("publish-release", "publish", "Publish checked commit or retry recorded archive").run,
       "run"
     );
-    expect(publish).toContain('pnpm release:run main "$SOURCE_COMMIT"');
-    expect(publish).toContain('pnpm release:run retry "$RECORD_TAG"');
+    const lines = publish.split("\n").map((line) => line.trim());
+    expect(lines).toContain('pnpm release:run main "$SOURCE_COMMIT"');
+    // npm signs provenance for GITHUB_SHA, but a retry dispatch runs at main's head while it
+    // uploads an archive recorded for an earlier commit. Only the retry turns provenance off.
+    expect(lines.filter((line) => line.includes("NPM_CONFIG_PROVENANCE"))).toEqual([
+      'NPM_CONFIG_PROVENANCE=false pnpm release:run retry "$RECORD_TAG"',
+    ]);
     expect(readJsonObject(join(repoRoot, "packages/internal/package.json")).publishConfig).toEqual({
       access: "public",
     });
+  });
+});
+
+describe("release workflow npm authentication", () => {
+  const releasePermissions = { contents: "write", "pull-requests": "read", "id-token": "write" };
+
+  it("grants id-token: write on both sides of the publish call", () => {
+    // The called workflow cannot hold more than its caller grants.
+    expect(workflow("publish-release").permissions).toEqual(releasePermissions);
+    expect(job("merge", "release").permissions).toEqual(releasePermissions);
+  });
+
+  it("publishes from the npm environment that the trusted-publisher entries name", () => {
+    expect(job("publish-release", "publish").environment).toBe("npm");
+  });
+
+  it("passes only the GitHub release token through the call", () => {
+    const call = asRecord(asRecord(workflow("publish-release").on, "triggers").workflow_call, "call");
+    expect(call.secrets).toEqual({ RELEASE_GITHUB_TOKEN: { required: false } });
+    expect(job("merge", "release").secrets).toEqual({
+      RELEASE_GITHUB_TOKEN: "${{ secrets.RELEASE_GITHUB_TOKEN }}",
+    });
+  });
+
+  it("gives the engine step no npm token", () => {
+    const engine = step("publish-release", "publish", "Publish checked commit or retry recorded archive");
+    expect(engine.env).toEqual({
+      GH_TOKEN: "${{ secrets.RELEASE_GITHUB_TOKEN || github.token }}",
+      SOURCE_COMMIT: "${{ inputs.source_commit }}",
+      RECORD_TAG: "${{ inputs.record_tag }}",
+    });
+  });
+
+  it("installs an exact npm that promotes over OIDC before the engine runs, on both paths", () => {
+    const steps = asRecordArray(job("publish-release", "publish").steps, "steps");
+    const pin = steps.find((candidate) =>
+      asString(candidate.run ?? "", "run").startsWith("npm install --global npm@")
+    );
+    if (pin === undefined) throw new Error("publish-release/publish has no npm install step");
+    expect(pin).not.toHaveProperty("if");
+    const version = /^npm install --global npm@(\d+)\.(\d+)\.(\d+)$/u.exec(asString(pin.run, "run").trim());
+    if (version === null) throw new Error("the npm pin must name an exact version");
+    // npm documents 11.21.0 as the first release whose `dist-tag` authenticates over OIDC
+    // (npm/cli#10038). The npm bundled with .node-version is older.
+    const [major, minor] = [Number(version[1]), Number(version[2])];
+    expect(
+      major > 11 || (major === 11 && minor >= 21),
+      `${version[0]} must install npm 11.21.0 or later`
+    ).toBe(true);
+    const engine = steps.findIndex(
+      (candidate) => candidate.name === "Publish checked commit or retry recorded archive"
+    );
+    expect(engine).toBeGreaterThan(steps.indexOf(pin));
   });
 });
 

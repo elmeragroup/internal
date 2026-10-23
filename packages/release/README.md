@@ -94,7 +94,11 @@ Returning a `Uint8Array` is the supported contract.
 Needed when operations run, not at import:
 
 - `git`
-- `npm` (publish and dist-tag updates)
+- `npm` (publish and dist-tag updates). The engine runs the first `npm` on `PATH` with the inherited
+  environment, so the calling workflow owns npm authentication. Trusted publishing of the
+  `dist-tag` promotion needs npm 11.21.0 or later. An adapter that strips credentials does so only
+  around its own child processes, because the engine's npm calls read the OIDC request variables
+  after `pack` returns.
 - `@changesets/cli` in the **consuming checkout** (`pkg.checkoutRoot`), never from this package's
   location, for `checkReleasePr` and `releaseCheckedCommit` (not for `retryRelease`). Planning uses
   `status --output` with a relative plan file and does not pass `--since`. The base branch must
