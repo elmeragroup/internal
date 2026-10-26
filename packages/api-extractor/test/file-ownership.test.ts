@@ -36,6 +36,21 @@ describe("backend source-file ownership classification", () => {
       { kind: "typescript", library: "standard-library" },
     ],
     [
+      "Unix tsrs platform-package library",
+      "/repo/node_modules/.pnpm/@tsrs+linux-x64-gnu@0.18.0/node_modules/@tsrs/linux-x64-gnu/lib.dom.d.ts",
+      { kind: "typescript", library: "standard-library" },
+    ],
+    [
+      "Windows-shaped tsrs platform-package library",
+      String.raw`C:\repo\node_modules\@tsrs\darwin-arm64\lib.es2022.d.ts`,
+      { kind: "typescript", library: "standard-library" },
+    ],
+    [
+      "tsrs SDK declaration",
+      "/repo/node_modules/tsrs/dist/api/sync/api.d.ts",
+      { kind: "dependency", packageName: "tsrs" },
+    ],
+    [
       "Unix TypeScript non-standard declaration",
       "/repo/node_modules/typescript/lib/index.d.ts",
       { kind: "typescript", library: "toolchain" },

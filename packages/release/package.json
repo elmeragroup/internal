@@ -12,7 +12,7 @@
   },
   "scripts": {
     "build": "node ../../scripts/build-package.ts",
-    "type-check": "tsc --noEmit",
+    "type-check": "tsrs --noEmit",
     "test": "vitest run"
   },
   "dependencies": {
@@ -22,8 +22,8 @@
   "devDependencies": {
     "@elmeragroup/typescript-config": "workspace:*",
     "@types/node": "catalog:",
-    "typescript": "catalog:",
-    "vitest": "catalog:"
+    "vitest": "catalog:",
+    "tsrs": "catalog:"
   },
   "types": "./dist/index.d.ts",
   "engines": {

@@ -4,13 +4,13 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
 import { runIfMain } from "../cli.ts";
-import { packageVersion } from "../files.ts";
+import { compilerIdentity, compilerScriptPath } from "../compiler.ts";
+import { pinnedTypeScript7Compiler } from "../fixture-contracts.ts";
 import { conformanceTypecheckPlan, conformanceFixtureManifest } from "../fixture-plans.ts";
 import type { ConformanceFixture } from "../fixture-plans.ts";
 
 const packageDirectory = resolve(import.meta.dirname, "../..");
 const fixtureDirectory = join(packageDirectory, "test/fixtures");
-const compilerScript = resolve(packageDirectory, "node_modules/typescript/bin/tsc");
 const typecheckCommandPrefix = "node scripts/conformance/typecheck.ts" as const;
 const typecheckCompilerOptions = [
   "--ignoreConfig",
@@ -60,7 +60,7 @@ function diagnosticsFrom(output: string): readonly string[] {
 }
 
 function runTsc(definition: ConformanceFixture, inputPath: string, cwd: string): TypecheckResult {
-  const result = spawnSync(process.execPath, [compilerScript, ...typecheckCompilerOptions, inputPath], {
+  const result = spawnSync(process.execPath, [compilerScriptPath(), ...typecheckCompilerOptions, inputPath], {
     cwd,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
@@ -107,9 +107,9 @@ function cliFixture(): ConformanceFixture {
   if (definition === undefined) throw new Error(`Unknown Issue 14 fixture: ${fixtureName ?? "<missing>"}`);
   if (
     process.argv[process.argv.indexOf("--pretty") + 1] !== "false" ||
-    packageVersion("typescript") !== "7.0.2"
+    compilerIdentity().compiler !== pinnedTypeScript7Compiler
   ) {
-    throw new Error("Issue 14 typecheck command requires --pretty false and typescript@7.0.2.");
+    throw new Error(`Issue 14 typecheck command requires --pretty false and ${pinnedTypeScript7Compiler}.`);
   }
   return definition;
 }

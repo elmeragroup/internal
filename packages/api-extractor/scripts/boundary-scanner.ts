@@ -90,6 +90,9 @@ function stripComments(source: string): string {
  * Detects compiler imports by scanning all string/template literals after
  * comments have been removed. This intentionally covers static, type-only,
  * side-effect, dynamic/template, and require forms with one lexical rule.
+ * The compiler API is `tsrs/unstable/*`, and any `typescript` specifier stays
+ * a compiler import; the bare `tsrs` entry and `tsrs/package.json` carry only
+ * version metadata, so scripts may read the compiler identity from them.
  */
 export function scanCompilerImports(source: string): readonly string[] {
   const cleaned = stripComments(source);
@@ -119,7 +122,7 @@ export function scanCompilerImports(source: string): readonly string[] {
     const literal = cleaned.slice(literalStart, index);
     const before = cleaned.slice(0, literalStart - 1).trimEnd();
     if (/(?:\bfrom|\bimport|\brequire(?:\.resolve)?)\s*(?:\(\s*)?$/u.test(before)) {
-      const prefix = /^typescript(?:\/|$)/u.exec(literal)?.[0];
+      const prefix = /^(?:typescript(?:\/|$)|tsrs\/unstable(?:\/|$))/u.exec(literal)?.[0];
       if (prefix !== undefined) matches.push(prefix);
     }
     quote = undefined;

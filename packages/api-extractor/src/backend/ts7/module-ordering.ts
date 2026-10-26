@@ -1,6 +1,6 @@
-import { SyntaxKind } from "typescript/unstable/ast";
-import type { SourceFile } from "typescript/unstable/ast";
-import type { Symbol as TsSymbol } from "typescript/unstable/sync";
+import { SyntaxKind } from "tsrs/unstable/ast";
+import type { SourceFile } from "tsrs/unstable/ast";
+import type { Symbol as TsSymbol } from "tsrs/unstable/sync";
 
 import { memoizeSubjectFact } from "./module-walk-memo.ts";
 import type { TsgoModuleSession } from "./module.ts";

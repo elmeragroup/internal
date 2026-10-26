@@ -1,8 +1,17 @@
 import { dirname, resolve } from "node:path";
-import { API } from "typescript/unstable/sync";
-import type { Project } from "typescript/unstable/sync";
+import { serverFS } from "tsrs/unstable/fs";
+import type { FileSystemCallbacks } from "tsrs/unstable/fs";
+import { API } from "tsrs/unstable/sync";
+import type { Project } from "tsrs/unstable/sync";
 
-import { BackendError, ConfigError, safeCause } from "../../errors.ts";
+import {
+  BackendError,
+  ConfigError,
+  compilerStartError,
+  projectMissingError,
+  projectOpenError,
+  safeCause,
+} from "../../errors.ts";
 import type { InternalOpenProjectOptions } from "../../internal/project-options.ts";
 import { definedFields } from "../../optional-fields.ts";
 import type { ProjectFileSystem } from "../../options.ts";
@@ -14,21 +23,51 @@ import { TsgoExtractionSession } from "./session.ts";
 
 type OpenedProject = { readonly api: API; readonly project: Project };
 
-function toTypeScriptFileSystem(fileSystem: ProjectFileSystem | undefined) {
+/**
+ * Translates the public filesystem seam to the compiler's callbacks.
+ *
+ * The public seam returns `undefined` to fall back to the disk and `null` for a missing file. The
+ * TypeScript 7.1 callbacks need every member and spell those outcomes `serverFS.useOS` and
+ * `undefined`. Virtual files have no disk metadata, so a seam that answers existence also answers
+ * `stat` through those answers.
+ */
+function toTypeScriptFileSystem(fileSystem: ProjectFileSystem | undefined): FileSystemCallbacks | undefined {
   if (fileSystem === undefined) return undefined;
+  const { directoryExists, fileExists, getAccessibleEntries, readFile, realpath } = fileSystem;
   return {
-    directoryExists: fileSystem.directoryExists,
-    fileExists: fileSystem.fileExists,
-    getAccessibleEntries: (directoryName: string) => {
-      const entries = fileSystem.getAccessibleEntries?.(directoryName);
-      return entries === undefined
-        ? undefined
-        : { files: [...entries.files], directories: [...entries.directories] };
-    },
-    readFile: fileSystem.readFile,
-    realpath: fileSystem.realpath,
-    writeFile: fileSystem.writeFile,
-    removeFile: fileSystem.removeFile,
+    directoryExists:
+      directoryExists === undefined
+        ? serverFS.useOS
+        : (directoryName: string) => directoryExists(directoryName) ?? serverFS.useOS,
+    fileExists:
+      fileExists === undefined
+        ? serverFS.useOS
+        : (fileName: string) => fileExists(fileName) ?? serverFS.useOS,
+    getAccessibleEntries:
+      getAccessibleEntries === undefined
+        ? serverFS.useOS
+        : (directoryName: string) => {
+            const entries = getAccessibleEntries(directoryName);
+            return entries === undefined
+              ? serverFS.useOS
+              : {
+                  files: [...entries.files],
+                  directories: [...entries.directories],
+                  symlinks: undefined,
+                };
+          },
+    readFile:
+      readFile === undefined
+        ? serverFS.useOS
+        : (fileName: string) => {
+            const contents = readFile(fileName);
+            if (contents === undefined) return serverFS.useOS;
+            return contents ?? undefined;
+          },
+    realpath: realpath === undefined ? serverFS.useOS : (path: string) => realpath(path) ?? serverFS.useOS,
+    stat: directoryExists === undefined && fileExists === undefined ? serverFS.useOS : serverFS.fakeStat,
+    writeFile: fileSystem.writeFile ?? serverFS.useOS,
+    removeFile: fileSystem.removeFile ?? serverFS.useOS,
   };
 }
 
@@ -43,11 +82,7 @@ function createApi(options: InternalOpenProjectOptions): OpenedProject {
       collectTiming: options.collectTiming,
     });
   } catch (cause) {
-    throw new BackendError({
-      message: `Could not start TypeScript compiler for ${tsconfigPath}`,
-      cause: safeCause(cause),
-      filePath: tsconfigPath,
-    });
+    throw compilerStartError(tsconfigPath, cause);
   }
   try {
     return { api, project: openProject(api, tsconfigPath) };
@@ -70,20 +105,12 @@ function openProject(api: API, tsconfigPath: string): Project {
   }
   let project: Project | undefined;
   try {
-    project = api.updateSnapshot({ openProjects: [tsconfigPath] }).getProject(tsconfigPath);
+    project = api.createSnapshot({ openProjects: [tsconfigPath] }).getConfiguredProject(tsconfigPath);
   } catch (cause) {
-    throw new BackendError({
-      message: `Could not open TypeScript project ${tsconfigPath}`,
-      cause: safeCause(cause),
-      filePath: tsconfigPath,
-    });
+    throw projectOpenError(tsconfigPath, cause);
   }
   if (project === undefined) {
-    throw new BackendError({
-      message: `TypeScript did not open project ${tsconfigPath}`,
-      cause: tsconfigPath,
-      filePath: tsconfigPath,
-    });
+    throw projectMissingError(tsconfigPath);
   }
   const diagnostics = project.program.getConfigFileParsingDiagnostics();
   if (diagnostics.length > 0) {

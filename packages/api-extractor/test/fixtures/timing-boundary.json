@@ -24,7 +24,7 @@
       "budget": {
         "maxFetchedToMaterializedRatio": 1.2,
         "maxRequestCount": 148,
-        "maxBytesReceived": 33303,
+        "maxBytesReceived": 137000,
         "bytesReceivedPathLengthHeadroom": 32768
       }
     },
@@ -46,7 +46,7 @@
       "budget": {
         "maxFetchedToMaterializedRatio": 1.2,
         "maxRequestCount": 83,
-        "maxBytesReceived": 22577,
+        "maxBytesReceived": 121000,
         "bytesReceivedPathLengthHeadroom": 32768
       }
     },
@@ -68,7 +68,8 @@
       "budget": {
         "maxFetchedToMaterializedRatio": 120,
         "maxRequestCount": 187,
-        "maxBytesReceived": 980000
+        "maxBytesReceived": 1060000,
+        "bytesReceivedPathLengthHeadroom": 65536
       }
     },
     {
@@ -89,7 +90,8 @@
       "budget": {
         "maxFetchedToMaterializedRatio": 145,
         "maxRequestCount": 433,
-        "maxBytesReceived": 3200000
+        "maxBytesReceived": 3590000,
+        "bytesReceivedPathLengthHeadroom": 524288
       }
     }
   ],

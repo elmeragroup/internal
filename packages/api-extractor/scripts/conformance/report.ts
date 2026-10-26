@@ -13,9 +13,10 @@ import { definedFields } from "../../src/optional-fields.ts";
 import { writeArtifactBatchOrThrow } from "../artifact-batch-writer.ts";
 import type { ArtifactBatchItem } from "../artifact-batch-writer.ts";
 import { runIfMain } from "../cli.ts";
-import { decodeJson, packageVersion, posixRelative, sha256File } from "../files.ts";
+import { compilerIdentity } from "../compiler.ts";
+import { decodeJson, posixRelative, sha256File } from "../files.ts";
 import { fixtureEvidenceCatalog } from "../fixture-catalog.ts";
-import { pinnedTypeScript7Compiler } from "../fixture-contracts.ts";
+import { pinnedTypeScript7Compiler, pinnedTypeScriptVersion } from "../fixture-contracts.ts";
 import {
   assertTs7DivergenceEvidence,
   canonicalDifferencePaths,
@@ -424,9 +425,12 @@ export type FixtureExtractionValue = {
 export type FixtureExtraction = (inputPath: string) => Effect.Effect<FixtureExtractionValue, unknown>;
 
 function assertCompilerIdentity(): void {
-  const actual = "typescript@" + packageVersion("typescript");
-  if (actual !== pinnedTypeScript7Compiler) {
-    throw new Error(`Issue 14 conformance requires ${pinnedTypeScript7Compiler}; found ${actual}.`);
+  const actual = compilerIdentity();
+  if (actual.compiler !== pinnedTypeScript7Compiler || actual.typescript !== pinnedTypeScriptVersion) {
+    throw new Error(
+      `Issue 14 conformance requires ${pinnedTypeScript7Compiler} (TypeScript ${pinnedTypeScriptVersion}); ` +
+        `found ${actual.compiler} (TypeScript ${actual.typescript}).`
+    );
   }
 }
 
@@ -685,7 +689,8 @@ export async function writeAdditionalTs7Evidence(
         content: `${JSON.stringify(
           {
             fixture: definition.fixture,
-            compiler: "typescript@" + packageVersion("typescript"),
+            compiler: compilerIdentity().compiler,
+            typescript: compilerIdentity().typescript,
             sourceOracle: "output.json",
             comparison: "exact",
             divergence: {

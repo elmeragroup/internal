@@ -76,7 +76,8 @@ losses use `warnings`; the extractor never logs them automatically.
 
 ## Guarantees and boundaries
 
-Only `src/backend/ts7/**` imports TypeScript 7's unstable native API. The backend turns compiler
+Only `src/backend/ts7/**` imports the compiler's unstable native API, `tsrs/unstable/*` (tsrs
+ports TypeScript 7.1). The backend turns compiler
 state into opaque handles and primitive facts. `src/parser.ts` and `src/parse/**` own the semantic
 policy: recursion, aliases, generics, containers, mapped types, callables, classes, modules,
 external types, warnings, and React component recognition.
@@ -120,9 +121,10 @@ Consumers should branch on `code` and structured fields, not parse `message` tex
 holding an `input.*` file is a fixture, `output.json` makes it a conformance fixture,
 `output.tsgo.json` makes that a reviewed TypeScript 7 divergence, `ts7-oracle.json` is the
 divergence record, and `warnings.tsgo.json` supplies the warning oracle and its code order.
-`test/fixtures/fixtures.json` holds only what a filename cannot state: IPC ceilings, the fixture
-type-checked through a virtual upstream dependency, the two locally generated oracles, and the
-projects the type-check plan skips. `scripts/fixture-plans.ts` projects the plans the gates run;
+`test/fixtures/fixtures.json` holds only what a filename cannot state: IPC ceilings and the reason for
+their byte sizes, the fixture
+type-checked through a virtual upstream dependency, the two locally generated oracles, the
+projects the type-check plan skips, and the diagnostics a project must report. `scripts/fixture-plans.ts` projects the plans the gates run;
 suite grouping and order belong to the suite that asserts them (`test/support/fixture-suites.ts`).
 The catalog validates itself once, when its module loads; nothing downstream re-validates. Plans and
 records describe the boundary and conformance checks. The stored plan ids `issue02` and `issue14` stay as they are, because the immutable baseline records the
@@ -211,6 +213,14 @@ pnpm run check:all
 evidence half (catalog, boundary, fixture type-checks, conformance and the three timing plans). The
 individual commands are listed in `package.json`; run the one that covers what you changed while
 iterating.
+
+Every check here, including `type-check` and the evidence scripts, compiles with the pinned tsrs.
+Evidence records the compiler as `tsrs@<version>` with the TypeScript version it ports. The immutable
+Issue 02 baseline and reviewed divergence records written earlier still name `typescript@7.0.2`;
+the checks reproduce them with tsrs, and `--write-ts7` re-pins a record when it is refreshed.
+TypeScript 7.1 reports TS7031 on the immutable `component-source` input, so `fixtures.json` records
+those two diagnostics under `expectedTypecheckDiagnostics` and the package `tsconfig.json` excludes
+that file.
 
 Timing reports are evidence, not benchmarks. `scripts/timing.ts --plan <issue02|issue14|externalSelection>`
 runs one plan. Deterministic counters must match exactly and scheduler-sensitive durations are

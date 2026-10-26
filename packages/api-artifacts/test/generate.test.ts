@@ -1,6 +1,9 @@
+import { execFile } from "node:child_process";
 import { mkdtemp, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
+import { promisify } from "node:util";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { ApiArtifactsDriftError, ApiArtifactsError, generateApiArtifacts } from "../src/index.ts";
@@ -86,9 +89,9 @@ describe("generateApiArtifacts", () => {
   });
 
   it("names TypeScript's default library `typescript` wherever the compiler installed it", async () => {
-    // TypeScript 7 installs its default library inside a per-platform package, such as
-    // `@typescript/typescript-linux-x64`, so an artifact naming that package would differ by the
-    // machine that generated it.
+    // tsrs installs its default library inside a per-platform package, such as
+    // `@tsrs/linux-x64-gnu`, so an artifact naming that package would differ by the machine that
+    // generated it.
     const root = await fixture(`export type Props = Intl.NumberFormatOptions & {
   /** Label shown on the button. */
   label: string;
@@ -96,9 +99,39 @@ describe("generateApiArtifacts", () => {
 export function Button({ label }: Props) { return label; }
 export const Compound = { Root: Button };
 `);
-    const part = (await generateApiArtifacts(options(root))).components[0]?.parts[0];
+    const component = (await generateApiArtifacts(options(root))).components[0];
+    const part = component?.parts[0];
     expect(part?.forwardedFrom).toEqual(["typescript"]);
     expect(part?.forwardedCount).toBeGreaterThan(0);
+    expect(component?.text).not.toMatch(/@tsrs|@typescript\//u);
+  });
+
+  it("rejects with the typed BackendError when the native compiler binary is missing", async () => {
+    const root = await fixture();
+    const missingBinary = path.join(root, "missing-tsrs-binary");
+    const entry = pathToFileURL(path.resolve(import.meta.dirname, "../src/index.ts")).href;
+    // The binary is located when the compiler starts, so a fresh process sees the override.
+    const script = `
+      import { generateApiArtifacts } from ${JSON.stringify(entry)};
+      try {
+        await generateApiArtifacts(${JSON.stringify(options(root))});
+        process.stdout.write(JSON.stringify({ outcome: "generated" }));
+      } catch (error) {
+        process.stdout.write(JSON.stringify({ outcome: "rejected", error }));
+      }
+    `;
+    const { stdout } = await promisify(execFile)(
+      process.execPath,
+      ["--input-type=module", "--eval", script],
+      { env: { ...process.env, TSRS_BINARY: missingBinary } }
+    );
+    const result: unknown = JSON.parse(stdout);
+    expect(result).toMatchObject({
+      outcome: "rejected",
+      error: { _tag: "BackendError", filePath: path.join(root, "tsconfig.json") },
+    });
+    expect(stdout).toContain("native tsrs binary");
+    expect(stdout).toContain(missingBinary);
   });
 
   it("checks without writing and preserves mtimes on unchanged generation", async () => {

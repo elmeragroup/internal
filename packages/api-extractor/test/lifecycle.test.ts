@@ -21,7 +21,7 @@ childProcess.spawn = ((...args: Parameters<typeof originalSpawn>) => {
 syncBuiltinESMExports();
 
 const { Effect, Layer, Schema } = await import("effect");
-const { ConfigError, ProjectExtractor } = await import("../src/index.ts");
+const { BackendError, ConfigError, ProjectExtractor } = await import("../src/index.ts");
 const { openTsgoProject } = await import("../src/backend/ts7/project.ts");
 const { CompilerBackend } = await import("../src/backend/service.ts");
 const { projectExtractorLayer } = await import("../src/extractor.ts");
@@ -96,76 +96,104 @@ async function waitForProcessExit(child: ChildProcess): Promise<void> {
   }
 }
 
+type ChildAcquisition = { readonly status: number | null; readonly stdout: string; readonly stderr: string };
+
+/** Acquires a live project in a fresh Node process and reports its typed failure as JSON on stdout. */
+async function acquireProjectInChild(
+  projectTsconfigPath: string,
+  env: NodeJS.ProcessEnv = process.env
+): Promise<ChildAcquisition> {
+  const packageEntry = pathToFileURL(resolve(import.meta.dirname, "../src/index.ts")).href;
+  const childScript = `
+    import { Cause, Effect, Option } from "effect";
+    import { ProjectExtractor } from ${JSON.stringify(packageEntry)};
+
+    const exit = await Effect.runPromiseExit(
+      Effect.scoped(
+        Effect.gen(function* () {
+          yield* ProjectExtractor;
+          return "unexpected-success";
+        }).pipe(
+          Effect.provide(ProjectExtractor.live({
+            tsconfigPath: ${JSON.stringify(projectTsconfigPath)}
+          }))
+        )
+      )
+    );
+    if (exit._tag === "Success") {
+      process.stderr.write("Project acquisition unexpectedly succeeded");
+      process.exitCode = 2;
+    } else {
+      const error = Cause.findErrorOption(exit.cause);
+      if (Option.isNone(error)) {
+        process.stderr.write("Project acquisition failed without a typed error");
+        process.exitCode = 3;
+      } else {
+        process.stdout.write(JSON.stringify(error.value));
+      }
+    }
+  `;
+
+  const child = childProcess.spawn(process.execPath, ["--input-type=module", "--eval", childScript], {
+    cwd: resolve(import.meta.dirname, ".."),
+    env,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  child.stdout.setEncoding("utf8");
+  child.stderr.setEncoding("utf8");
+  let stdout = "";
+  let stderr = "";
+  child.stdout.on("data", (chunk: string) => {
+    stdout += chunk;
+  });
+  child.stderr.on("data", (chunk: string) => {
+    stderr += chunk;
+  });
+
+  const status = await new Promise<number | null>((resolveStatus, rejectStatus) => {
+    const timeout = setTimeout(() => {
+      child.kill("SIGKILL");
+      rejectStatus(
+        new Error(`Live project acquisition did not release its process within five seconds: ${stderr}`)
+      );
+    }, 5_000);
+    child.once("error", (error) => {
+      clearTimeout(timeout);
+      rejectStatus(error);
+    });
+    child.once("exit", (code) => {
+      clearTimeout(timeout);
+      resolveStatus(code);
+    });
+  });
+  return { status, stdout, stderr };
+}
+
 describe("ProjectExtractor native compiler lifecycle", () => {
   it("exits within five seconds after live project acquisition rejects an invalid configuration", async () => {
-    const packageEntry = pathToFileURL(resolve(import.meta.dirname, "../src/index.ts")).href;
-    const childScript = `
-      import { Cause, Effect, Option } from "effect";
-      import { ProjectExtractor } from ${JSON.stringify(packageEntry)};
-
-      const exit = await Effect.runPromiseExit(
-        Effect.scoped(
-          Effect.gen(function* () {
-            yield* ProjectExtractor;
-            return "unexpected-success";
-          }).pipe(
-            Effect.provide(ProjectExtractor.live({
-              tsconfigPath: ${JSON.stringify(invalidTsconfigPath)}
-            }))
-          )
-        )
-      );
-      if (exit._tag === "Success") {
-        process.stderr.write("Project acquisition unexpectedly succeeded");
-        process.exitCode = 2;
-      } else {
-        const error = Cause.findErrorOption(exit.cause);
-        if (Option.isNone(error)) {
-          process.stderr.write("Project acquisition failed without a typed error");
-          process.exitCode = 3;
-        } else {
-          process.stdout.write(JSON.stringify(error.value));
-        }
-      }
-    `;
-
-    const child = childProcess.spawn(process.execPath, ["--input-type=module", "--eval", childScript], {
-      cwd: resolve(import.meta.dirname, ".."),
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-    child.stdout.setEncoding("utf8");
-    child.stderr.setEncoding("utf8");
-    let stdout = "";
-    let stderr = "";
-    child.stdout.on("data", (chunk: string) => {
-      stdout += chunk;
-    });
-    child.stderr.on("data", (chunk: string) => {
-      stderr += chunk;
-    });
-
-    const status = await new Promise<number | null>((resolveStatus, rejectStatus) => {
-      const timeout = setTimeout(() => {
-        child.kill("SIGKILL");
-        rejectStatus(
-          new Error(`Live project acquisition did not release its process within five seconds: ${stderr}`)
-        );
-      }, 5_000);
-      child.once("error", (error) => {
-        clearTimeout(timeout);
-        rejectStatus(error);
-      });
-      child.once("exit", (code) => {
-        clearTimeout(timeout);
-        resolveStatus(code);
-      });
-    });
+    const { status, stdout, stderr } = await acquireProjectInChild(invalidTsconfigPath);
 
     expect(status, stderr).toBe(0);
     const failure = Schema.decodeUnknownSync(ConfigError)(JSON.parse(stdout));
     expect(failure._tag).toBe("ConfigError");
     expect(failure.tsconfigPath).toBe(invalidTsconfigPath);
     expect(failure.message).toContain(invalidTsconfigPath);
+  });
+
+  it("reports a missing native compiler binary as a typed backend failure", async () => {
+    const missingBinary = resolve(fixtureDirectory, "missing-tsrs-binary");
+    const { status, stdout, stderr } = await acquireProjectInChild(tsconfigPath, {
+      ...process.env,
+      TSRS_BINARY: missingBinary,
+    });
+
+    expect(status, stderr).toBe(0);
+    const failure = Schema.decodeUnknownSync(BackendError)(JSON.parse(stdout));
+    expect(failure._tag).toBe("BackendError");
+    expect(failure.filePath).toBe(tsconfigPath);
+    expect(failure.message).toContain("native tsrs binary");
+    expect(failure.message).toContain("Linux x64/arm64");
+    expect(failure.cause).toContain(missingBinary);
   });
 
   it("unregisters closed sessions while retaining active project cleanup", () => {

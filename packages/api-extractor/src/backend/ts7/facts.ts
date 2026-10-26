@@ -4,8 +4,8 @@
  * into its own sibling (`class-facts.ts` style) before anything else lands here.
  */
 
-import type { InterfaceDeclaration, Node, TypeNode } from "typescript/unstable/ast";
-import { SyntaxKind } from "typescript/unstable/ast";
+import type { InterfaceDeclaration, Node, TypeNode } from "tsrs/unstable/ast";
+import { SyntaxKind } from "tsrs/unstable/ast";
 import {
   isEnumMember,
   isIdentifier,
@@ -14,16 +14,17 @@ import {
   isQualifiedName,
   isTypeReferenceNode,
   isTypeNode,
-} from "typescript/unstable/ast/is";
-import { SignatureKind, SymbolFlags, TypeFlags } from "typescript/unstable/sync";
+} from "tsrs/unstable/ast/is";
+import { SignatureKind, SymbolFlags, TypeFlags } from "tsrs/unstable/sync";
 import type {
   Checker,
   NodeHandle,
   Program,
   Signature,
   Symbol as TsSymbol,
+  TupleType,
   Type,
-} from "typescript/unstable/sync";
+} from "tsrs/unstable/sync";
 
 import { definedFields, flagFields } from "../../optional-fields.ts";
 import { typeFlagNames } from "../../warnings.ts";
@@ -224,7 +225,7 @@ function typeOfSymbol(
             declarationHandle.kind === SyntaxKind.EnumDeclaration)
         ? session.checker.getDeclaredTypeOfSymbol(target)
         : session.checker.getTypeOfSymbol(target);
-  return type === undefined ? undefined : session.typeHandle(type);
+  return session.typeHandle(type);
 }
 
 function typeAtNode(session: TsgoFactsSession, handle: BackendNodeReference): BackendTypeHandle | undefined {
@@ -232,7 +233,7 @@ function typeAtNode(session: TsgoFactsSession, handle: BackendNodeReference): Ba
   const type = isTypeNode(raw)
     ? session.checker.getTypeFromTypeNode(raw)
     : session.checker.getTypeAtLocation(raw);
-  return type === undefined ? undefined : session.typeHandle(type);
+  return session.typeHandle(type);
 }
 
 function typeFacts(session: TsgoFactsSession, handle: BackendTypeHandle): BackendTypeFacts {
@@ -287,18 +288,17 @@ function typeFacts(session: TsgoFactsSession, handle: BackendTypeHandle): Backen
  * Recovers the tuple *target* behind a checker type, or `undefined` when the
  * type is not a tuple.
  *
- * `ObjectFlags.Tuple` only ever sits on the uninstantiated tuple target. An
- * authored `[string, number]` reaches the API as a type *reference* to that
- * target, and `Type.isTupleType()` is a plain `objectFlags & Tuple` test, so
- * asking the reference alone reports `false` for every ordinary tuple. Reading
- * through `getTarget()` is what makes the tuple visible, and it is also where
- * `elementFlags`, `fixedLength`, and `readonly` live.
+ * An authored `[string, number]` reaches the API as a type *reference* to an
+ * uninstantiated tuple target. `elementFlags`, `fixedLength`, and `readonly`
+ * live only on that target, which `Type.isTupleTypeTarget()` identifies;
+ * `Type.isTupleType()` answers for the reference instead. A generic tuple type
+ * that is its own target is accepted directly.
  */
-function tupleTarget(type: Type): Type | undefined {
-  if (type.isTupleType()) return type;
+function tupleTarget(type: Type): TupleType | undefined {
+  if (type.isTupleTypeTarget()) return type;
   if (!type.isTypeReference()) return undefined;
   const target = type.getTarget();
-  return target.isTupleType() ? target : undefined;
+  return target.isTupleTypeTarget() ? target : undefined;
 }
 
 function enumFacts(
@@ -322,8 +322,7 @@ function enumFacts(
     const memberType = session.checker.getTypeOfSymbol(member);
     const value = declaration === undefined ? undefined : session.checker.getConstantValue(declaration);
     const inferredValue =
-      value ??
-      (memberType?.isLiteralType() === true && isLiteral(memberType.value) ? memberType.value : undefined);
+      value ?? (memberType.isLiteralType() && isLiteral(memberType.value) ? memberType.value : undefined);
     // A merged namespace member (the namespace's `const` in an enum merge) has
     // no enum-member declaration, yet it resolves to its literal value and is
     // emitted below. Warn only when no literal value could be recovered, which
@@ -473,7 +472,7 @@ function signatureFacts(session: TsgoFactsSession, handle: BackendSignatureHandl
     parameters: signature.getParameters().map((parameter) => session.symbolHandle(parameter)),
     typeParameters: signature.getTypeParameters().map((parameter) => session.typeHandle(parameter)),
     ...definedFields({
-      returnType: returnType === undefined ? undefined : session.typeHandle(returnType),
+      returnType: session.typeHandle(returnType),
       declaration: signature.declaration && session.declarationHandle(signature.declaration),
     }),
   };
@@ -512,7 +511,6 @@ function propertiesOfType(
       if (clause.token !== SyntaxKind.ExtendsKeyword) continue;
       for (const heritage of clause.types) {
         const heritageType = session.checker.getTypeAtLocation(heritage);
-        if (heritageType === undefined) continue;
         for (const property of session.checker.getPropertiesOfType(heritageType)) add(property);
       }
     }
@@ -523,8 +521,7 @@ function propertiesOfType(
 
 function propertyType(session: TsgoFactsSession, handle: BackendSymbolHandle): BackendTypeHandle | undefined {
   const property = session.symbol(handle, "propertyType");
-  const type = session.checker.getTypeOfSymbol(property);
-  return type === undefined ? undefined : session.typeHandle(type);
+  return session.typeHandle(session.checker.getTypeOfSymbol(property));
 }
 
 /**
@@ -597,7 +594,7 @@ function isArrayType(session: TsgoFactsSession, handle: BackendTypeHandle): bool
 function isReadonlyType(session: TsgoFactsSession, handle: BackendTypeHandle): boolean {
   const type = session.type(handle, "isReadonlyType");
   const tuple = tupleTarget(type);
-  if (tuple !== undefined) return tuple.isTupleType() && tuple.readonly;
+  if (tuple !== undefined) return tuple.readonly;
   if (!type.isTypeReference()) return false;
   const target = type.getTarget();
   const symbol = target.getSymbol();

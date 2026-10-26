@@ -24,8 +24,9 @@ export * from "./fixture-contracts.ts";
  * `warnings.tsgo.json` supplies the warning oracle and its code order. The
  * only hand-maintained facts are the ones no filename can state — IPC
  * ceilings, the one fixture type-checked through a virtual upstream
- * dependency, the two locally generated oracles, and the projects the
- * type-check plan skips — and they live in `test/fixtures/fixtures.json`.
+ * dependency, the two locally generated oracles, the projects the
+ * type-check plan skips, and the diagnostics a project is expected to
+ * report — and they live in `test/fixtures/fixtures.json`.
  */
 
 const fixtureRoot = resolve(import.meta.dirname, "..", "test", "fixtures");
@@ -48,10 +49,18 @@ const FixtureBudgetsSchema = Schema.Struct({
         maxBytesReceived: Schema.Number,
       })
     ),
+    bytesReceivedReason: Schema.NonEmptyString,
   }),
   virtualUpstreamDependency: Schema.Array(Schema.String),
   locallyGeneratedOracles: Schema.Array(Schema.String),
   excludedTypecheckProjects: Schema.Array(Schema.String),
+  expectedTypecheckDiagnostics: Schema.Array(
+    Schema.Struct({
+      project: Schema.String,
+      reason: Schema.NonEmptyString,
+      diagnostics: Schema.NonEmptyArray(Schema.NonEmptyString),
+    })
+  ),
 });
 
 /** A warning oracle is the reviewed warning list, in the order the extractor reports it. */

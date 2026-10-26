@@ -27,11 +27,11 @@
     "check:all": "pnpm run format:check && pnpm run lint && pnpm run build && pnpm run type-check && pnpm run test && pnpm run ci:checks",
     "test:conformance": "node scripts/conformance/report.ts --check",
     "report:conformance": "node scripts/conformance/report.ts --write",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsrs --noEmit"
   },
   "dependencies": {
     "effect": "catalog:",
-    "typescript": "catalog:"
+    "tsrs": "catalog:"
   },
   "devDependencies": {
     "@elmeragroup/typescript-config": "workspace:*",

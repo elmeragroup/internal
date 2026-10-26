@@ -11,5 +11,5 @@
     }
   },
   "include": ["src", "test", "scripts", "vitest.config.ts"],
-  "exclude": ["test/fixtures/module-imports-only/**"]
+  "exclude": ["test/fixtures/module-imports-only/**", "test/fixtures/component-source/input.tsx"]
 }

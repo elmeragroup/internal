@@ -7,7 +7,20 @@
  * own.
  */
 
-export const pinnedTypeScript7Compiler = "typescript@7.0.2" as const;
+/** The compiler package current evidence is produced with: tsrs, a Rust port of TypeScript 7. */
+export const pinnedTypeScript7Compiler = "tsrs@0.18.0-ts7.1.0-dev.20260929" as const;
+
+/** The microsoft/TypeScript version the pinned compiler ports; its semantics are TypeScript 7.1's. */
+export const pinnedTypeScriptVersion = "7.1.0-dev.20260929" as const;
+
+/**
+ * The compiler that recorded evidence before the move to tsrs.
+ *
+ * The immutable Issue 02 baseline in `test/fixtures/timing-boundary.json` names it forever, and a
+ * reviewed divergence record names it until `--write-ts7` refreshes that record. Checks still
+ * reproduce every such record with the pinned compiler.
+ */
+export const previousTypeScript7Compiler = "typescript@7.0.2" as const;
 
 export type OracleDisposition = "immutable-upstream" | "reviewed-divergence" | "generated" | "not-applicable";
 export type ConformanceDisposition = "unchanged" | "reviewed-ts7";
@@ -75,8 +88,19 @@ export type FixtureBudgets = {
   readonly timing: {
     readonly boundary: readonly BoundaryBudget[];
     readonly externalSelection: readonly ExternalSelectionBudget[];
+    /** Why the bytes-received ceilings have their current size; bytes vary with protocol and path. */
+    readonly bytesReceivedReason: string;
   };
   readonly virtualUpstreamDependency: readonly string[];
   readonly locallyGeneratedOracles: readonly string[];
   readonly excludedTypecheckProjects: readonly string[];
+  /**
+   * Projects whose immutable inputs report diagnostics under the pinned compiler. The gate still
+   * compiles them and requires exactly these lines, so any other diagnostic fails it.
+   */
+  readonly expectedTypecheckDiagnostics: readonly {
+    readonly project: string;
+    readonly reason: string;
+    readonly diagnostics: readonly [string, ...string[]];
+  }[];
 };

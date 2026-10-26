@@ -1,12 +1,13 @@
-import type { Node } from "typescript/unstable/ast";
-import { SyntaxKind } from "typescript/unstable/ast";
+import type { Node } from "tsrs/unstable/ast";
+import { SyntaxKind } from "tsrs/unstable/ast";
 import {
   isClassDeclaration,
+  isExpressionWithTypeArguments,
   isInterfaceDeclaration,
   isTypeAliasDeclaration,
   isTypeReferenceNode,
-} from "typescript/unstable/ast/is";
-import type { Checker, Symbol as TsSymbol, Type } from "typescript/unstable/sync";
+} from "tsrs/unstable/ast/is";
+import type { Checker, Symbol as TsSymbol, Type } from "tsrs/unstable/sync";
 
 import { isInternalSymbolName } from "../contracts.ts";
 import type { CompilerDeclaration } from "./declarations.ts";
@@ -48,7 +49,10 @@ export function extendsTypes(
   const extendsTypes: { name: string; resolvedName?: string }[] = [];
   for (const clause of clauses) {
     for (const typeExpr of clause.types) {
-      const baseTypeName = typeExpr.expression.getText();
+      // TypeScript 7.1 types heritage elements as either node kind; both name the base type.
+      const baseTypeName = (
+        isExpressionWithTypeArguments(typeExpr) ? typeExpr.expression : typeExpr.typeName
+      ).getText();
       const firstArgument =
         heritageUtilityTypes.has(baseTypeName) && (typeExpr.typeArguments?.length ?? 0) > 0
           ? typeExpr.typeArguments?.[0]

@@ -21,13 +21,13 @@
   },
   "scripts": {
     "build": "node ../../scripts/build-package.ts",
-    "type-check": "tsc --noEmit",
+    "type-check": "tsrs --noEmit",
     "test": "vitest run"
   },
   "dependencies": {
     "@elmeragroup/api-extractor": "workspace:*",
     "effect": "catalog:",
-    "typescript": "catalog:"
+    "tsrs": "catalog:"
   },
   "devDependencies": {
     "@elmeragroup/typescript-config": "workspace:*",

@@ -9,7 +9,7 @@ await writeFile(
   "reject-compiler.mjs",
   `import { registerHooks } from "node:module";
 registerHooks({ resolve(specifier, context, nextResolve) {
-  if (/^(?:effect|typescript|undici)(?:\\/|$)/.test(specifier)) throw new Error("Unexpected runtime import: " + specifier);
+  if (/^(?:effect|typescript|tsrs|undici)(?:\\/|$)/.test(specifier)) throw new Error("Unexpected runtime import: " + specifier);
   return nextResolve(specifier, context);
 }});
 `

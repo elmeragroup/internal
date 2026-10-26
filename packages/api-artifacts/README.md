@@ -49,9 +49,8 @@ forwarded props. Selecting that dependency through `includeExternalTypes` does n
 documented props to the facade; enrichment applies only to parts with a resolved implementation.
 
 `forwardedFrom` names a prop declared in TypeScript's default library, such as the members of
-`Intl.NumberFormatOptions`, as `typescript`. TypeScript 7 installs that library inside a
-per-platform package such as `@typescript/typescript-linux-x64`, and the artifact must be the same
-on every machine.
+`Intl.NumberFormatOptions`, as `typescript`. tsrs installs that library inside a per-platform
+package such as `@tsrs/linux-x64-gnu`, and the artifact must be the same on every machine.
 
 Each part's `rsc` value is classified from the recovered implementation module's directive prologue
 in the parsed syntax. Only an exact authored `"use client"` or `'use client'` expression statement in

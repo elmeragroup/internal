@@ -10,6 +10,7 @@ import {
   sourceBoundaryViolations,
 } from "./boundary-scanner.ts";
 import { runIfMain } from "./cli.ts";
+import { compilerScriptPath } from "./compiler.ts";
 import { posixRelative } from "./files.ts";
 
 const packageDirectory = resolve(import.meta.dirname, "..");
@@ -17,7 +18,6 @@ const sourceDirectory = join(packageDirectory, "src");
 const declarationDirectory = join(packageDirectory, "dist");
 const publicIndex = join(declarationDirectory, "index.d.ts");
 const tsconfigPath = join(packageDirectory, "tsconfig.build.json");
-const compilerScript = resolve(import.meta.dirname, "../node_modules/typescript/bin/tsc");
 
 export type BoundaryCheckResult = {
   readonly sourceFilesChecked: number;
@@ -80,7 +80,7 @@ export function assertFreshDeclarationOutput(options: FreshDeclarationOutputOpti
       execFileSync(
         process.execPath,
         [
-          compilerScript,
+          compilerScriptPath(),
           "--project",
           options.tsconfigPath,
           "--outDir",
