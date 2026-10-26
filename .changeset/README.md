@@ -1,9 +1,7 @@
 # Changesets
 
-Run `pnpm changeset` for changes to published packages. For documentation, CI, or test-only pull requests, use the `no-changeset` GitHub label.
-
-Only `@elmeragroup/internal` is published. Changes to its private extractor, artifact, or lint
-implementations receive a changeset for `@elmeragroup/internal` when they affect consumers.
+[CONTRIBUTING.md](../CONTRIBUTING.md#release-impact) says when a pull request needs a changeset
+and when it carries the `no-changeset` label instead.
 
 Successful main checks create or update the Version Packages PR. Its generated branch receives
 explicitly dispatched checks. Review it and merge when you want to ship stable; its exact main commit
