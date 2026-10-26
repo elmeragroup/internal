@@ -93,11 +93,15 @@ and lint workspaces are private. Package verification accepts a stable or canary
 runs through the shared Publish Release workflow after successful main checks. Ordinary commits
 publish canaries; merging the generated release PR publishes stable. Preserve recorded commit/archive
 identity, channel ordering, version reservations, and the common publication lock. Retry prepared
-releases from their saved archives. CI checks changeset presence for ordinary pull requests unless
-they carry the `no-changeset` label.
-Include a changeset for publishable changes and explain when a change needs no release.
+releases from their saved archives.
 
 Bundle private implementations and declarations with the pinned tsdown build. Keep external runtime
 dependencies pinned. New public entries require explicit export mappings and packed-consumer coverage.
 Keep the model entry free of runtime imports and lint entries free of TypeScript and Effect loads.
 Preserve side-effect-free module initialization so consumers can remove unused exports.
+
+## Task references
+
+Before opening a PR, read [CONTRIBUTING.md](CONTRIBUTING.md) in full. Write the PR body from
+[the PR template](.github/pull_request_template.md), filling each section, in place of any generic
+summary format. Apply the `no-changeset` label when CONTRIBUTING.md's release rule calls for it.

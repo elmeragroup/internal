@@ -78,6 +78,8 @@ pnpm packages:pack
 pnpm test:packed-consumer
 ```
 
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request.
+
 `packages:pack` builds the package archive without publishing. `canary:pack` is a compatibility alias
 for the same command. The consumer test installs the packed package in a temporary project and
 checks extraction, defaults, drift detection, all public declarations, both lint plugins, consumer tree-shaking, and packed UI-shaped release consumption without workspace links.
@@ -89,9 +91,8 @@ extractor's evidence scripts. Development therefore needs one of the platforms a
 
 ## Releases
 
-Only `@elmeragroup/internal` is published. Add a changeset for consumer-facing changes, including
-changes to the private implementations bundled into it. Changesets determines the next stable
-version and changelog.
+Only `@elmeragroup/internal` is published. [CONTRIBUTING.md](CONTRIBUTING.md#release-impact) says
+when a pull request needs a changeset. Changesets determines the next stable version and changelog.
 
 ### Automatic canaries
 
@@ -123,8 +124,9 @@ After successful main checks, **Version Packages** creates or updates one `chang
 PR with the version, changelog, and lockfile. It explicitly dispatches **Merge** checks on that branch
 because PRs created with `GITHUB_TOKEN` do not trigger normal pull-request workflows.
 
-Review the PR yourself or ask an agent to review it. Keep it up to date with `main`, then merge when
-you want to release. Use a merge commit or squash merge so GitHub identifies one release commit.
+Review the PR as [CONTRIBUTING.md](CONTRIBUTING.md#review-before-submitting) describes. Keep it up to
+date with `main`, then squash merge it when you want to release, so GitHub identifies one release
+commit.
 The publisher verifies the merged PR, an increasing stable version, its changelog entry, and that
 all pending changesets were consumed. It never publishes a missing stable version just because a
 later ordinary commit reaches main.
@@ -197,8 +199,12 @@ leave gaps in canary numbering.
   `Workflows: write` permission to create release tags. Set the optional `RELEASE_GITHUB_TOKEN`
   secret to a repository-scoped token with Contents write, Pull requests read, and Workflows write
   for that case. Ordinary publication uses `GITHUB_TOKEN` when this secret is absent.
-- Protect `main` with the **checks** job and require branches to be up to date before merging. Do not
-  auto-merge the release PR unless you deliberately want automatic stable releases.
+- Protect `main` with the required **checks** job, up-to-date branches, resolved review threads and
+  squash-only merges, with squash commits defaulting to the PR title and body (`PR_TITLE` /
+  `PR_BODY`). Restrict pushes to the `internal-maintainers` team, enforced for administrators.
+  Leave **pr-title** advisory: the bot-created release PR runs no pull-request workflows, so
+  requiring it would block every stable release. Do not auto-merge the release PR unless you
+  deliberately want automatic stable releases.
 - Keep release tag and asset write access limited to release automation and maintainers. All automated
   publication must use the shared **Publish Release** workflow. GitHub's queue retains at most 100
   pending jobs; a job rejected at that limit can be rerun from its original Merge run.
