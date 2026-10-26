@@ -22,8 +22,8 @@ catalogs:
       specifier: 19.3.0
       version: 19.3.0
     effect:
-      specifier: 4.0.3
-      version: 4.0.3
+      specifier: 4.0.6
+      version: 4.0.6
     esbuild:
       specifier: 0.28.2
       version: 0.28.2
@@ -94,7 +94,7 @@ importers:
         version: 26.6.5
       effect:
         specifier: 'catalog:'
-        version: 4.0.3
+        version: 4.0.6
       esbuild:
         specifier: 'catalog:'
         version: 0.28.2
@@ -133,7 +133,7 @@ importers:
         version: link:../api-extractor
       effect:
         specifier: 'catalog:'
-        version: 4.0.3
+        version: 4.0.6
       tsrs:
         specifier: 'catalog:'
         version: 0.18.0-ts7.1.0-dev.20260929
@@ -158,7 +158,7 @@ importers:
     dependencies:
       effect:
         specifier: 'catalog:'
-        version: 4.0.3
+        version: 4.0.6
       tsrs:
         specifier: 'catalog:'
         version: 0.18.0-ts7.1.0-dev.20260929
@@ -192,7 +192,7 @@ importers:
         version: 1.89.0
       effect:
         specifier: 'catalog:'
-        version: 4.0.3
+        version: 4.0.6
       tsrs:
         specifier: 'catalog:'
         version: 0.18.0-ts7.1.0-dev.20260929
@@ -273,7 +273,7 @@ importers:
     dependencies:
       effect:
         specifier: 'catalog:'
-        version: 4.0.3
+        version: 4.0.6
       undici:
         specifier: 'catalog:'
         version: 8.11.2
@@ -1231,8 +1231,8 @@ packages:
       oxc-resolver:
         optional: true
 
-  effect@4.0.3:
-    resolution: {integrity: sha512-LoWn/Uwwx0JjHSDmBAAahx8sB+klzM6vsZovnbYowBNw6B4QScJLRLBByO61plvNiycx7HPN8FnsWUCu0eXW5w==}
+  effect@4.0.6:
+    resolution: {integrity: sha512-Tc3mkzuLR6t6P9dhLt0D2GrxYtmU5td4XEJEiXCmILz53IRIfJyHsKZWjTA3xEjiwpNTtXBgI4iqYPxMztBDrw==}
 
   empathic@2.1.0:
     resolution: {integrity: sha512-AnfC1ATldl49/cvZdLPDjBfrRNwbDO05aibiOtzQu3qtlbJtomNLhF30HEtn/7iBz50dlMECqATo3fG0LrdEgw==}
@@ -2496,7 +2496,7 @@ snapshots:
 
   dts-resolver@3.0.0: {}
 
-  effect@4.0.3: {}
+  effect@4.0.6: {}
 
   empathic@2.1.0: {}
 
