@@ -99,10 +99,7 @@ async function waitForProcessExit(child: ChildProcess): Promise<void> {
 type ChildAcquisition = { readonly status: number | null; readonly stdout: string; readonly stderr: string };
 
 /** Acquires a live project in a fresh Node process and reports its typed failure as JSON on stdout. */
-async function acquireProjectInChild(
-  projectTsconfigPath: string,
-  env: NodeJS.ProcessEnv = process.env
-): Promise<ChildAcquisition> {
+async function acquireProjectInChild(projectTsconfigPath: string): Promise<ChildAcquisition> {
   const packageEntry = pathToFileURL(resolve(import.meta.dirname, "../src/index.ts")).href;
   const childScript = `
     import { Cause, Effect, Option } from "effect";
@@ -136,7 +133,6 @@ async function acquireProjectInChild(
 
   const child = childProcess.spawn(process.execPath, ["--input-type=module", "--eval", childScript], {
     cwd: resolve(import.meta.dirname, ".."),
-    env,
     stdio: ["ignore", "pipe", "pipe"],
   });
   child.stdout.setEncoding("utf8");
@@ -182,18 +178,24 @@ describe("ProjectExtractor native compiler lifecycle", () => {
 
   it("reports a missing native compiler binary as a typed backend failure", async () => {
     const missingBinary = resolve(fixtureDirectory, "missing-tsrs-binary");
-    const { status, stdout, stderr } = await acquireProjectInChild(tsconfigPath, {
-      ...process.env,
-      TSRS_BINARY: missingBinary,
-    });
+    vi.stubEnv("TSRS_BINARY", missingBinary);
+    try {
+      const failure = await Effect.runPromise(
+        Effect.scoped(
+          Effect.gen(function* () {
+            yield* ProjectExtractor;
+          }).pipe(Effect.provide(ProjectExtractor.live({ tsconfigPath })))
+        ).pipe(Effect.flip)
+      );
 
-    expect(status, stderr).toBe(0);
-    const failure = Schema.decodeUnknownSync(BackendError)(JSON.parse(stdout));
-    expect(failure._tag).toBe("BackendError");
-    expect(failure.filePath).toBe(tsconfigPath);
-    expect(failure.message).toContain("native tsrs binary");
-    expect(failure.message).toContain("Linux x64/arm64");
-    expect(failure.cause).toContain(missingBinary);
+      expect(failure).toBeInstanceOf(BackendError);
+      expect(failure).toMatchObject({ _tag: "BackendError", filePath: tsconfigPath });
+      expect(failure.message).toContain("native tsrs binary");
+      expect(failure.message).toContain("Linux x64/arm64");
+      expect(failure.cause).toContain(missingBinary);
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it("unregisters closed sessions while retaining active project cleanup", () => {

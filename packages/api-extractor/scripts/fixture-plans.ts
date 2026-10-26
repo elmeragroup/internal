@@ -199,29 +199,8 @@ function deriveTypecheckPlan(catalog: readonly FixtureEvidenceRecord[]): readonl
 /** The type-check run plan for this package's fixture tree. */
 export const conformanceTypecheckPlan = deriveTypecheckPlan(fixtureEvidenceCatalog);
 
-/** One fixture project the package type-check gate compiles, with the diagnostics it must report. */
-export type TypecheckProjectPlanEntry = {
-  readonly project: string;
-  readonly expectedDiagnostics: readonly string[];
-};
-
-/**
- * Derives the package type-check plan: every fixture `tsconfig.json` in path order, minus the
- * recorded exclusions, each paired with its recorded diagnostics.
- *
- * Expectations are matched against the projects this walk schedules, so an expectation can only
- * name a project the gate actually compiles, and only once.
- *
- * @param root - The fixture root directory.
- * @param budgets - The hand-maintained fixture facts.
- * @returns The plan entries, sorted by project path.
- * @throws When an expectation names an unscheduled project (missing, excluded, or not a
- *   `tsconfig.json`) or names a project more than once.
- */
-export function deriveTypecheckProjectPlan(
-  root: string,
-  budgets: FixtureBudgets
-): readonly TypecheckProjectPlanEntry[] {
+/** Every type-checkable fixture project, in path order, minus the recorded exclusions. */
+export function deriveTypecheckProjects(root: string, budgets: FixtureBudgets): readonly string[] {
   const projects: string[] = [];
   const walk = (directory: string, relative: string): void => {
     for (const entry of readdirSync(directory, { withFileTypes: true })) {
@@ -232,29 +211,18 @@ export function deriveTypecheckProjectPlan(
       }
       if (!entry.name.endsWith("tsconfig.json")) continue;
       if (budgets.excludedTypecheckProjects.includes(child)) continue;
-      projects.push(child);
+      projects.push(`test/fixtures/${child}`);
     }
   };
   walk(root, "");
-  const scheduled = new Set(projects);
-  const expectations = new Map<string, readonly string[]>();
-  for (const { project, diagnostics } of budgets.expectedTypecheckDiagnostics) {
-    if (!scheduled.has(project)) {
-      throw new Error(`fixtures.json expects diagnostics from an unscheduled type-check project: ${project}`);
-    }
-    if (expectations.has(project)) {
-      throw new Error(`fixtures.json expects diagnostics from ${project} more than once`);
-    }
-    expectations.set(project, diagnostics);
-  }
-  return projects.sort().map((project) => ({
-    project: `test/fixtures/${project}`,
-    expectedDiagnostics: expectations.get(project) ?? [],
-  }));
+  return projects.sort();
 }
 
-/** Every fixture project the package type-check gate compiles, with the diagnostics it must report. */
-export const packageFixtureTypecheckPlan = deriveTypecheckProjectPlan(fixtureTreeRoot, fixtureBudgets);
+/** Every fixture project the package type-check gate compiles, in path order. */
+export const packageFixtureTypecheckPlan: readonly { readonly project: string }[] = deriveTypecheckProjects(
+  fixtureTreeRoot,
+  fixtureBudgets
+).map((project) => ({ project }));
 
 /** Selects every fixture that has a warning oracle, with the oracle file and its code order. */
 export function deriveWarningEvidencePlan(catalog: readonly FixtureEvidenceRecord[]): readonly {

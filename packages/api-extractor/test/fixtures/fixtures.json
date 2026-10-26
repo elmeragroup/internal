@@ -41,25 +41,7 @@
     ],
     "bytesReceivedReason": "TypeScript 7.1's API protocol, which tsrs ports, sends every symbol as a SymbolReference that repeats its owner's full source-file descriptor (file name, path, content hash) and returns each project's absolute file names twice (parsedCommandLine.fileNames and rootFiles), where TypeScript 7.0.2 sent a bare symbol id. Bytes therefore grew and scale with the checkout path; request counts and every other counter are unchanged, so the walk is no denser. Each maxBytesReceived is at or above the tsrs measurement from a 130-character workspace root, and each bytesReceivedPathLengthHeadroom covers at least 64 more path characters at the measured bytes per character."
   },
-  "virtualUpstreamDependency": [
-    "module-imports-only"
-  ],
-  "locallyGeneratedOracles": [
-    "render-prop-union",
-    "template-literal-union-prop"
-  ],
-  "excludedTypecheckProjects": [
-    "basic/invalid-tsconfig.json",
-    "conformance-tsconfig.json"
-  ],
-  "expectedTypecheckDiagnostics": [
-    {
-      "project": "component-source/tsconfig.json",
-      "reason": "TypeScript 7.1 reports TS7031 for a property destructured without a default from a parameter whose default is `{}`; TypeScript 7.0.2 inferred it silently, and typescript@7.1.0-beta reports the same two diagnostics. input.tsx is immutable evidence, so the gate requires exactly these diagnostics and fails on any other.",
-      "diagnostics": [
-        "test/fixtures/component-source/input.tsx(12,63): error TS7031: Binding element 'enabled' implicitly has an 'any' type.",
-        "test/fixtures/component-source/input.tsx(74,73): error TS7031: Binding element 'enabled' implicitly has an 'any' type."
-      ]
-    }
-  ]
+  "virtualUpstreamDependency": ["module-imports-only"],
+  "locallyGeneratedOracles": ["render-prop-union", "template-literal-union-prop"],
+  "excludedTypecheckProjects": ["basic/invalid-tsconfig.json", "conformance-tsconfig.json"]
 }

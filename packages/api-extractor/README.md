@@ -123,8 +123,8 @@ holding an `input.*` file is a fixture, `output.json` makes it a conformance fix
 divergence record, and `warnings.tsgo.json` supplies the warning oracle and its code order.
 `test/fixtures/fixtures.json` holds only what a filename cannot state: IPC ceilings and the reason for
 their byte sizes, the fixture
-type-checked through a virtual upstream dependency, the two locally generated oracles, the
-projects the type-check plan skips, and the diagnostics a project must report. `scripts/fixture-plans.ts` projects the plans the gates run;
+type-checked through a virtual upstream dependency, the two locally generated oracles, and the
+projects the type-check plan skips. `scripts/fixture-plans.ts` projects the plans the gates run;
 suite grouping and order belong to the suite that asserts them (`test/support/fixture-suites.ts`).
 The catalog validates itself once, when its module loads; nothing downstream re-validates. Plans and
 records describe the boundary and conformance checks. The stored plan ids `issue02` and `issue14` stay as they are, because the immutable baseline records the
@@ -218,9 +218,6 @@ Every check here, including `type-check` and the evidence scripts, compiles with
 Evidence records the compiler as `tsrs@<version>` with the TypeScript version it ports. The immutable
 Issue 02 baseline and reviewed divergence records written earlier still name `typescript@7.0.2`;
 the checks reproduce them with tsrs, and `--write-ts7` re-pins a record when it is refreshed.
-TypeScript 7.1 reports TS7031 on the immutable `component-source` input, so `fixtures.json` records
-those two diagnostics under `expectedTypecheckDiagnostics` and the package `tsconfig.json` excludes
-that file.
 
 Timing reports are evidence, not benchmarks. `scripts/timing.ts --plan <issue02|issue14|externalSelection>`
 runs one plan. Deterministic counters must match exactly and scheduler-sensitive durations are

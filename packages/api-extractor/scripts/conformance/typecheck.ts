@@ -59,8 +59,13 @@ function diagnosticsFrom(output: string): readonly string[] {
     .map((line) => line.replaceAll(packageDirectory, "<package>"));
 }
 
-function runTsc(definition: ConformanceFixture, inputPath: string, cwd: string): TypecheckResult {
-  const result = spawnSync(process.execPath, [compilerScriptPath(), ...typecheckCompilerOptions, inputPath], {
+function runTsc(
+  definition: ConformanceFixture,
+  inputPath: string,
+  cwd: string,
+  compilerScript: string
+): TypecheckResult {
+  const result = spawnSync(process.execPath, [compilerScript, ...typecheckCompilerOptions, inputPath], {
     cwd,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
@@ -76,7 +81,11 @@ function runTsc(definition: ConformanceFixture, inputPath: string, cwd: string):
   };
 }
 
-function typecheckWithVirtualDependency(definition: ConformanceFixture, inputPath: string): TypecheckResult {
+function typecheckWithVirtualDependency(
+  definition: ConformanceFixture,
+  inputPath: string,
+  compilerScript: string
+): TypecheckResult {
   const temporaryRoot = mkdtempSync(join(tmpdir(), "api-extractor-issue14-typecheck-"));
   const stagedInput = join(temporaryRoot, "test/fixtures/module-imports-only/input.ts");
   const stagedDependency = join(temporaryRoot, "src/models/export.ts");
@@ -88,17 +97,18 @@ function typecheckWithVirtualDependency(definition: ConformanceFixture, inputPat
     writeFileSync(stagedInput, input);
     writeFileSync(stagedDependency, "export class ExportNode {}\n");
     symlinkSync(join(packageDirectory, "node_modules"), join(temporaryRoot, "node_modules"), "junction");
-    return runTsc(definition, stagedInput, temporaryRoot);
+    return runTsc(definition, stagedInput, temporaryRoot, compilerScript);
   } finally {
     rmSync(temporaryRoot, { recursive: true, force: true });
   }
 }
 
-export function typecheckFixture(definition: ConformanceFixture): TypecheckResult {
+/** Type-checks one fixture with the compiler launcher at `compilerScript`, from {@link compilerScriptPath}. */
+export function typecheckFixture(definition: ConformanceFixture, compilerScript: string): TypecheckResult {
   const inputPath = join(fixtureDirectory, definition.fixture, definition.file);
   return issue14TypecheckStrategy(definition) === "virtual-upstream-dependency"
-    ? typecheckWithVirtualDependency(definition, inputPath)
-    : runTsc(definition, inputPath, packageDirectory);
+    ? typecheckWithVirtualDependency(definition, inputPath, compilerScript)
+    : runTsc(definition, inputPath, packageDirectory, compilerScript);
 }
 
 function cliFixture(): ConformanceFixture {
@@ -115,7 +125,7 @@ function cliFixture(): ConformanceFixture {
 }
 
 function main(): void {
-  const result = typecheckFixture(cliFixture());
+  const result = typecheckFixture(cliFixture(), compilerScriptPath());
   console.log(JSON.stringify(result, null, 2));
   if (result.status !== "pass") process.exitCode = 1;
 }

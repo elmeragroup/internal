@@ -13,7 +13,7 @@ import { definedFields } from "../../src/optional-fields.ts";
 import { writeArtifactBatchOrThrow } from "../artifact-batch-writer.ts";
 import type { ArtifactBatchItem } from "../artifact-batch-writer.ts";
 import { runIfMain } from "../cli.ts";
-import { compilerIdentity } from "../compiler.ts";
+import { compilerIdentity, compilerScriptPath } from "../compiler.ts";
 import { decodeJson, posixRelative, sha256File } from "../files.ts";
 import { fixtureEvidenceCatalog } from "../fixture-catalog.ts";
 import { pinnedTypeScript7Compiler, pinnedTypeScriptVersion } from "../fixture-contracts.ts";
@@ -47,6 +47,12 @@ const reportPath = join(fixtureDirectory, "conformance.json");
 const upstreamCommit = pinnedUpstream.commit;
 // The catalog derives the conformance inventory; nothing here restates its size.
 const expectedFixtureCount = conformanceFixtureManifest.length;
+
+/** Type-checks every conformance fixture, resolving the compiler launcher once. */
+function typecheckAll(): TypecheckResult[] {
+  const compilerScript = compilerScriptPath();
+  return conformanceFixtureManifest.map((definition) => typecheckFixture(definition, compilerScript));
+}
 
 /**
  * The exclusive mode one conformance invocation selects. Flags are parsed once
@@ -689,8 +695,7 @@ export async function writeAdditionalTs7Evidence(
         content: `${JSON.stringify(
           {
             fixture: definition.fixture,
-            compiler: compilerIdentity().compiler,
-            typescript: compilerIdentity().typescript,
+            ...compilerIdentity(),
             sourceOracle: "output.json",
             comparison: "exact",
             divergence: {
@@ -792,7 +797,7 @@ async function refreshWarningEvidence(
     throw new Error("--write-warnings requires a verified pinned upstream reference before extraction.");
   }
   const warningOverrides = await extractWarningEvidence(selections);
-  const typechecks = conformanceFixtureManifest.map(typecheckFixture);
+  const typechecks = typecheckAll();
   const extractions = await extractAll(warningOverrides);
   const measured = reportFrom(typechecks, extractions, referenceCheck);
   assertReferenceEvidence(measured.referenceCheck, true);
@@ -924,7 +929,7 @@ async function main(): Promise<void> {
     case "check": {
       assertManifest();
       const referenceCheck = auditPinnedReference(command.referenceRequired ? "required" : "optional");
-      const typechecks = conformanceFixtureManifest.map(typecheckFixture);
+      const typechecks = typecheckAll();
       const extractions = await extractAll();
       const measured = reportFrom(typechecks, extractions, referenceCheck);
       if (command.mode === "write") {

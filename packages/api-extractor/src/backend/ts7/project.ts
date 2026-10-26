@@ -23,6 +23,13 @@ import { TsgoExtractionSession } from "./session.ts";
 
 type OpenedProject = { readonly api: API; readonly project: Project };
 
+/** Lifts a seam callback whose `undefined` means "ask the disk" into a compiler callback. */
+function orUseOS<Result>(
+  callback: ((path: string) => Result | undefined) | undefined
+): ((path: string) => Result | typeof serverFS.useOS) | typeof serverFS.useOS {
+  return callback === undefined ? serverFS.useOS : (path: string) => callback(path) ?? serverFS.useOS;
+}
+
 /**
  * Translates the public filesystem seam to the compiler's callbacks.
  *
@@ -35,14 +42,8 @@ function toTypeScriptFileSystem(fileSystem: ProjectFileSystem | undefined): File
   if (fileSystem === undefined) return undefined;
   const { directoryExists, fileExists, getAccessibleEntries, readFile, realpath } = fileSystem;
   return {
-    directoryExists:
-      directoryExists === undefined
-        ? serverFS.useOS
-        : (directoryName: string) => directoryExists(directoryName) ?? serverFS.useOS,
-    fileExists:
-      fileExists === undefined
-        ? serverFS.useOS
-        : (fileName: string) => fileExists(fileName) ?? serverFS.useOS,
+    directoryExists: orUseOS(directoryExists),
+    fileExists: orUseOS(fileExists),
     getAccessibleEntries:
       getAccessibleEntries === undefined
         ? serverFS.useOS
@@ -64,7 +65,7 @@ function toTypeScriptFileSystem(fileSystem: ProjectFileSystem | undefined): File
             if (contents === undefined) return serverFS.useOS;
             return contents ?? undefined;
           },
-    realpath: realpath === undefined ? serverFS.useOS : (path: string) => realpath(path) ?? serverFS.useOS,
+    realpath: orUseOS(realpath),
     stat: directoryExists === undefined && fileExists === undefined ? serverFS.useOS : serverFS.fakeStat,
     writeFile: fileSystem.writeFile ?? serverFS.useOS,
     removeFile: fileSystem.removeFile ?? serverFS.useOS,

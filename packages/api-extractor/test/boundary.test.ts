@@ -50,7 +50,8 @@ describe("compiler boundary", () => {
     expect(scanCompilerImports('import "typescriptx";')).toEqual([]);
     expect(scanCompilerImports('import { version } from "tsrs";')).toEqual([]);
     expect(scanCompilerImports('require.resolve("tsrs/package.json");')).toEqual([]);
-    expect(scanCompilerImports('import "tsrs/unstablex";')).toEqual([]);
+    expect(scanCompilerImports('import "tsrs/unstablex";')).not.toEqual([]);
+    expect(scanCompilerImports('import "tsrs/other";')).not.toEqual([]);
   });
 
   it("scans compiler imports in every supported source extension", () => {

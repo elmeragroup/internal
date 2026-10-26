@@ -9,7 +9,7 @@ export type LabelProps = {
   options?: { enabled?: boolean };
 };
 
-export function DirectFunction({ label = "direct", options: { enabled } = {} }: LabelProps) {
+export function DirectFunction({ label = "direct", options: { enabled = false } = {} }: LabelProps) {
   return label ?? null;
 }
 
@@ -71,7 +71,7 @@ export const SatisfiesWrapped = memo(
 
 export const NonNullWrapped = memo((({ label = "nonnull" }: LabelProps) => label ?? null)!);
 
-export const WrappedOptions = memo(function WrappedOptions({ options: { enabled } = {} }: LabelProps) {
+export const WrappedOptions = memo(function WrappedOptions({ options: { enabled = false } = {} }: LabelProps) {
   return enabled ?? null;
 });
 

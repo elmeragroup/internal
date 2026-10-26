@@ -94,13 +94,4 @@ export type FixtureBudgets = {
   readonly virtualUpstreamDependency: readonly string[];
   readonly locallyGeneratedOracles: readonly string[];
   readonly excludedTypecheckProjects: readonly string[];
-  /**
-   * Projects whose immutable inputs report diagnostics under the pinned compiler. The gate still
-   * compiles them and requires exactly these lines, so any other diagnostic fails it.
-   */
-  readonly expectedTypecheckDiagnostics: readonly {
-    readonly project: string;
-    readonly reason: string;
-    readonly diagnostics: readonly [string, ...string[]];
-  }[];
 };

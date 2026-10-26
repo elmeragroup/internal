@@ -14,7 +14,7 @@ import {
 import type { FixtureBudgets, FixtureEvidenceRecord } from "../scripts/fixture-catalog.ts";
 import {
   deriveConformancePlan,
-  deriveTypecheckProjectPlan,
+  deriveTypecheckProjects,
   externalSelectionTimingFixtures,
   boundaryTimingFixtures,
   conformanceFixtureManifest,
@@ -35,7 +35,6 @@ const emptyBudgets: FixtureBudgets = {
   virtualUpstreamDependency: [],
   locallyGeneratedOracles: [],
   excludedTypecheckProjects: [],
-  expectedTypecheckDiagnostics: [],
 };
 
 /** Writes one fixture tree on disk: the input the catalog derives every record from. */
@@ -128,7 +127,6 @@ describe("fixture catalog derivation", () => {
       virtualUpstreamDependency: ["virtual"],
       locallyGeneratedOracles: ["local-oracle"],
       excludedTypecheckProjects: ["skipped/tsconfig.json"],
-      expectedTypecheckDiagnostics: [],
     };
     const root = writeFixtureTree({
       "fixtures.json": JSON.stringify(budgets),
@@ -166,9 +164,7 @@ describe("fixture catalog derivation", () => {
     expect(byId.get("virtual")?.typecheck.strategy).toBe("virtual-upstream-dependency");
     expect(byId.get("local-oracle")?.conformance).toBe(false);
     expect(byId.get("local-oracle")?.oracle.disposition).toBe("generated");
-    expect(deriveTypecheckProjectPlan(root, budgets)).toEqual([
-      { project: "test/fixtures/timed/tsconfig.json", expectedDiagnostics: [] },
-    ]);
+    expect(deriveTypecheckProjects(root, budgets)).toEqual(["test/fixtures/timed/tsconfig.json"]);
   });
 
   it("rejects records that break the evidence contract", () => {
@@ -255,72 +251,6 @@ describe("the package's own fixture catalog", () => {
     for (const project of projects) {
       expect(existsSync(resolve(fixtureRoot, "../..", project))).toBe(true);
     }
-  });
-
-  it("requires exactly the recorded diagnostics from a project that reports them", () => {
-    for (const expected of fixtureBudgets.expectedTypecheckDiagnostics) {
-      const entry = packageFixtureTypecheckPlan.find(
-        (candidate) => candidate.project === `test/fixtures/${expected.project}`
-      );
-      expect(entry?.expectedDiagnostics).toEqual(expected.diagnostics);
-    }
-    const quiet = packageFixtureTypecheckPlan.filter(
-      (entry) =>
-        !fixtureBudgets.expectedTypecheckDiagnostics.some(
-          (expected) => entry.project === `test/fixtures/${expected.project}`
-        )
-    );
-    expect(quiet.every((entry) => entry.expectedDiagnostics.length === 0)).toBe(true);
-  });
-
-  it("pairs recorded diagnostics with the one scheduled project they name", () => {
-    const root = writeFixtureTree({ "a/tsconfig.json": "{}", "b/tsconfig.json": "{}" });
-    const diagnostics = ["a/input.ts(1,1): error TS1: recorded"] as const;
-    expect(
-      deriveTypecheckProjectPlan(root, {
-        ...emptyBudgets,
-        expectedTypecheckDiagnostics: [{ project: "a/tsconfig.json", reason: "recorded", diagnostics }],
-      })
-    ).toEqual([
-      { project: "test/fixtures/a/tsconfig.json", expectedDiagnostics: diagnostics },
-      { project: "test/fixtures/b/tsconfig.json", expectedDiagnostics: [] },
-    ]);
-  });
-
-  it.each([
-    ["a missing project", "missing/tsconfig.json"],
-    ["an excluded project", "skipped/tsconfig.json"],
-    ["a file the plan never compiles", "basic/input.ts"],
-  ])("rejects expected diagnostics for %s", (_label, project) => {
-    const root = writeFixtureTree({
-      "skipped/tsconfig.json": "{}",
-      "basic/tsconfig.json": "{}",
-      "basic/input.ts": "export {};\n",
-    });
-    expect(() =>
-      deriveTypecheckProjectPlan(root, {
-        ...emptyBudgets,
-        excludedTypecheckProjects: ["skipped/tsconfig.json"],
-        expectedTypecheckDiagnostics: [
-          { project, reason: "recorded", diagnostics: ["input.ts(1,1): error TS1: recorded"] },
-        ],
-      })
-    ).toThrow(`unscheduled type-check project: ${project}`);
-  });
-
-  it("rejects a project whose diagnostics are recorded twice", () => {
-    const root = writeFixtureTree({ "basic/tsconfig.json": "{}" });
-    const expectation = {
-      project: "basic/tsconfig.json",
-      reason: "recorded",
-      diagnostics: ["input.ts(1,1): error TS1: recorded"] as const,
-    };
-    expect(() =>
-      deriveTypecheckProjectPlan(root, {
-        ...emptyBudgets,
-        expectedTypecheckDiagnostics: [expectation, expectation],
-      })
-    ).toThrow("expects diagnostics from basic/tsconfig.json more than once");
   });
 
   it("pairs every output.tsgo.json with a reviewed ts7-oracle.json reason", () => {
