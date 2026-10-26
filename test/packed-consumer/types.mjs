@@ -44,8 +44,8 @@ const parts: readonly ApiPart[] = result.components.flatMap(component => compone
 void parts;
 `
 );
-const compilerRoot = path.dirname(internalRequire.resolve("typescript/package.json"));
-execFileSync(process.execPath, [path.join(compilerRoot, "bin/tsc"), "-p", "tsconfig.json"], {
+const compilerRoot = path.dirname(internalRequire.resolve("tsrs/package.json"));
+execFileSync(process.execPath, [path.join(compilerRoot, "bin/tsrs"), "-p", "tsconfig.json"], {
   stdio: "inherit",
 });
 await writeFile(
@@ -70,7 +70,7 @@ await writeFile(
     files: ["model-consumer.ts"],
   })
 );
-execFileSync(process.execPath, [path.join(compilerRoot, "bin/tsc"), "-p", "tsconfig.model.json"], {
+execFileSync(process.execPath, [path.join(compilerRoot, "bin/tsrs"), "-p", "tsconfig.model.json"], {
   stdio: "inherit",
 });
 console.log("Consumer declarations passed.");

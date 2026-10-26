@@ -1,5 +1,5 @@
-import type { Node, TypeNode } from "typescript/unstable/ast";
-import { SyntaxKind } from "typescript/unstable/ast";
+import type { Node, TypeNode } from "tsrs/unstable/ast";
+import { SyntaxKind } from "tsrs/unstable/ast";
 import {
   isArrayTypeNode,
   isAsExpression,
@@ -41,7 +41,7 @@ import {
   isTypeReferenceNode,
   isUnionTypeNode,
   isVariableDeclaration,
-} from "typescript/unstable/ast/is";
+} from "tsrs/unstable/ast/is";
 
 import { definedFields } from "../../optional-fields.ts";
 import type {

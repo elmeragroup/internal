@@ -1,7 +1,7 @@
 import { mkdtemp, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ApiArtifactsDriftError, ApiArtifactsError, generateApiArtifacts } from "../src/index.ts";
 
@@ -52,6 +52,7 @@ function options(projectRoot: string) {
   };
 }
 afterEach(async () => {
+  vi.unstubAllEnvs();
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
 
@@ -86,9 +87,9 @@ describe("generateApiArtifacts", () => {
   });
 
   it("names TypeScript's default library `typescript` wherever the compiler installed it", async () => {
-    // TypeScript 7 installs its default library inside a per-platform package, such as
-    // `@typescript/typescript-linux-x64`, so an artifact naming that package would differ by the
-    // machine that generated it.
+    // tsrs installs its default library inside a per-platform package, such as
+    // `@tsrs/linux-x64-gnu`, so an artifact naming that package would differ by the machine that
+    // generated it.
     const root = await fixture(`export type Props = Intl.NumberFormatOptions & {
   /** Label shown on the button. */
   label: string;
@@ -96,9 +97,27 @@ describe("generateApiArtifacts", () => {
 export function Button({ label }: Props) { return label; }
 export const Compound = { Root: Button };
 `);
-    const part = (await generateApiArtifacts(options(root))).components[0]?.parts[0];
+    const component = (await generateApiArtifacts(options(root))).components[0];
+    const part = component?.parts[0];
     expect(part?.forwardedFrom).toEqual(["typescript"]);
     expect(part?.forwardedCount).toBeGreaterThan(0);
+    expect(component?.text).not.toMatch(/@tsrs|@typescript\//u);
+  });
+
+  it("rejects with the typed BackendError when the native compiler binary is missing", async () => {
+    const root = await fixture();
+    const missingBinary = path.join(root, "missing-tsrs-binary");
+    vi.stubEnv("TSRS_BINARY", missingBinary);
+    let failure: unknown;
+    try {
+      await generateApiArtifacts(options(root));
+    } catch (error) {
+      failure = error;
+    }
+    expect(failure).toMatchObject({ _tag: "BackendError", filePath: path.join(root, "tsconfig.json") });
+    const serialized = JSON.stringify(failure);
+    expect(serialized).toContain("native tsrs binary");
+    expect(serialized).toContain(missingBinary);
   });
 
   it("checks without writing and preserves mtimes on unchanged generation", async () => {

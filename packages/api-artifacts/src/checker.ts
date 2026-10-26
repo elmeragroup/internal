@@ -1,9 +1,10 @@
 import path from "node:path";
-import type { SourceFile } from "typescript/unstable/ast";
-import { isExpressionStatement, isStringLiteral } from "typescript/unstable/ast/is";
-import { API, NodeBuilderFlags, SignatureKind, SymbolFlags } from "typescript/unstable/sync";
-import type { Checker, Program, Symbol as TsSymbol, Type } from "typescript/unstable/sync";
+import type { SourceFile } from "tsrs/unstable/ast";
+import { isExpressionStatement, isStringLiteral } from "tsrs/unstable/ast/is";
+import { API, SignatureKind, SymbolFlags, TypeFormatFlags } from "tsrs/unstable/sync";
+import type { Checker, Program, Project, Symbol as TsSymbol, Type } from "tsrs/unstable/sync";
 
+import { compilerStartError, projectMissingError, projectOpenError } from "@elmeragroup/api-extractor";
 import type { ComponentSourceRequest, ComponentSourceResult } from "@elmeragroup/api-extractor";
 
 import type { ApiPart, ApiProp, RscStatus } from "./model.ts";
@@ -16,13 +17,27 @@ export type LibraryProject = {
   close: () => void;
 };
 
-/** Opens the configured project. Callers must close the result. */
+/**
+ * Opens the configured project. Callers must close the result.
+ *
+ * @throws The extractor's typed `BackendError` when the compiler cannot start, such as on a
+ *   platform without a tsrs binary, or cannot open the project.
+ */
 export function openLibraryProject(tsconfigPath: string, projectRoot: string): LibraryProject {
-  const api = new API({ cwd: projectRoot });
+  let api: API;
   try {
-    const snapshot = api.updateSnapshot({ openProjects: [tsconfigPath] });
-    const project = snapshot.getProject(tsconfigPath);
-    if (project === undefined) throw new Error(`Could not open the project at ${tsconfigPath}`);
+    api = new API({ cwd: projectRoot });
+  } catch (cause) {
+    throw compilerStartError(tsconfigPath, cause);
+  }
+  try {
+    let project: Project | undefined;
+    try {
+      project = api.createSnapshot({ openProjects: [tsconfigPath] }).getConfiguredProject(tsconfigPath);
+    } catch (cause) {
+      throw projectOpenError(tsconfigPath, cause);
+    }
+    if (project === undefined) throw projectMissingError(tsconfigPath);
     return {
       projectRoot,
       checker: project.checker,
@@ -54,9 +69,9 @@ export function readRscStatus(sourceFile: SourceFile): RscStatus {
 
 /**
  * Package name a forwarded prop comes from, e.g. `@base-ui/react` or `react`. TypeScript's default
- * library is `typescript` wherever the compiler installed it: TypeScript 7 ships it inside a
- * per-platform package such as `@typescript/typescript-linux-x64`, and an artifact must not depend
- * on the machine that generated it.
+ * library is `typescript` wherever the compiler installed it: tsrs ships it inside a per-platform
+ * package such as `@tsrs/linux-x64-gnu`, and an artifact must not depend on the machine that
+ * generated it.
  */
 function declaringPackage(context: LibraryProject, declarationPath: string): string | null {
   if (context.program.getSourceFileMetadata(declarationPath)?.isDefaultLibrary === true) {
@@ -182,8 +197,7 @@ function printType(checker: Checker, type: Type | undefined): string | null {
   if (type === undefined || type.isErrorType()) {
     return null;
   }
-  // TypeScript 7 exposes the shared NoTruncation printer bit through NodeBuilderFlags.
-  const printed = checker.typeToString(type, undefined, NodeBuilderFlags.NoTruncation);
+  const printed = checker.typeToString(type, undefined, TypeFormatFlags.NoTruncation);
   return printed === "" ? null : printed;
 }
 
@@ -300,7 +314,7 @@ export function componentPartRequests(
       continue;
     }
     const rootType = checker.getTypeOfSymbol(rootSymbol);
-    if (rootType === undefined || rootType.isErrorType()) {
+    if (rootType.isErrorType()) {
       problems.push(`${exportName}: exported value has an unresolvable type`);
       continue;
     }
@@ -311,7 +325,7 @@ export function componentPartRequests(
     const start = parts.length;
     for (const member of checker.getPropertiesOfType(rootType)) {
       const memberType = checker.getTypeOfSymbol(member);
-      if (memberType === undefined || !hasCallSignatures(checker, memberType)) continue;
+      if (!hasCallSignatures(checker, memberType)) continue;
       parts.push({
         name: `${exportName}.${member.name}`,
         exportName,
@@ -411,7 +425,7 @@ function partContractOf(checker: Checker, type: Type): PartContract {
   const parameter = first.getParameters()[0];
   if (parameter === undefined) return { kind: "one", props: { kind: "absent" } };
   const declared = checker.getTypeOfSymbol(parameter);
-  if (declared === undefined || declared.isErrorType()) return { kind: "one", props: { kind: "unresolved" } };
+  if (declared.isErrorType()) return { kind: "one", props: { kind: "unresolved" } };
   const props = new Map<string, TsSymbol>();
   for (const property of checker.getPropertiesOfType(declared)) {
     props.set(property.name, property);

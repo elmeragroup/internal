@@ -31,7 +31,7 @@ afterAll(() => {
 });
 
 const emptyBudgets: FixtureBudgets = {
-  timing: { boundary: [], externalSelection: [] },
+  timing: { boundary: [], externalSelection: [], bytesReceivedReason: "recorded" },
   virtualUpstreamDependency: [],
   locallyGeneratedOracles: [],
   excludedTypecheckProjects: [],
@@ -122,6 +122,7 @@ describe("fixture catalog derivation", () => {
           },
         ],
         externalSelection: [{ fixture: "selected", maxRequestCount: 40, maxBytesReceived: 50 }],
+        bytesReceivedReason: "recorded",
       },
       virtualUpstreamDependency: ["virtual"],
       locallyGeneratedOracles: ["local-oracle"],

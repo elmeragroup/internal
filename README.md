@@ -55,8 +55,11 @@ The package has explicit ESM entries:
 | `@elmeragroup/internal/oxlint/anti-slop`    | Anti-slop Oxlint plugin default export                                    |
 | `@elmeragroup/internal/release`             | Checked-commit publication, recorded-archive retry, and release-PR checks |
 
-TypeScript, Effect, and `@oxlint/plugins` are pinned runtime dependencies. Installing the package
-includes the compiler. Importing lint entries does not load TypeScript or Effect. Consumer bundlers
+tsrs, Effect, and `@oxlint/plugins` are pinned runtime dependencies. Installing the package
+includes the compiler: [tsrs](https://github.com/oxc-project/tsrs), a Rust port of the TypeScript 7
+compiler with TypeScript 7.1 semantics. Its native binary ships only for macOS arm64 and Linux
+x64/arm64 (glibc and musl); on other platforms, artifact generation fails with a `BackendError`.
+Importing lint entries does not load the compiler or Effect. Consumer bundlers
 can remove unused exports. Future browser-safe helpers belong in separate entries; the root remains
 the convenient artifact generator.
 
@@ -80,6 +83,9 @@ for the same command. The consumer test installs the packed package in a tempora
 checks extraction, defaults, drift detection, all public declarations, both lint plugins, consumer tree-shaking, and packed UI-shaped release consumption without workspace links.
 It runs every check against a private snapshot of the archive, so repacking after verification
 requires re-running `pnpm test:packed-consumer` before preparing a release record.
+
+The workspace compiles with the same tsrs pin: type-checks, builds, declaration emit, and the
+extractor's evidence scripts. Development therefore needs one of the platforms above.
 
 ## Releases
 

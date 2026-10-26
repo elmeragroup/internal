@@ -21,8 +21,13 @@ Keep the dependency direction `internal` → `api-artifacts` → `api-extractor`
 
 Use the Node version in `.node-version` and the pnpm version in root `package.json`. Shared dependency
 versions belong in the catalog in `pnpm-workspace.yaml`; use `catalog:` and `workspace:*` references
-where appropriate. Preserve the pinned Effect and TypeScript versions unless upgrading them is part
-of the task.
+where appropriate. Preserve the pinned Effect and tsrs versions unless upgrading them is part of the
+task.
+
+The whole workspace compiles with `tsrs`, a Rust port of the TypeScript 7 compiler that follows
+TypeScript 7.1: type-check scripts, builds, declaration emit, evidence scripts, and the runtime
+`tsrs/unstable/*` API. The `typescript` package is not a dependency. tsrs has native binaries only
+for macOS arm64 and Linux x64/arm64 (glibc and musl).
 
 Run commands from the repository root unless stated otherwise.
 
@@ -59,7 +64,7 @@ path-wide overrides are prohibited. A necessary next-line disable must name one 
 Read [the extractor guide](packages/api-extractor/README.md) before changing its model, backend,
 fixtures, warnings, or timing reports.
 
-- Keep TypeScript's unstable native API inside `src/backend/ts7/**`. Compiler objects and handles
+- Keep the compiler's unstable native API (`tsrs/unstable/*`) inside `src/backend/ts7/**`. Compiler objects and handles
   must not escape into public types.
 - Keep semantic policy in the parser. `src/parse/**` and `src/canonical/**` must remain Effect-free,
   including their transitive value imports.

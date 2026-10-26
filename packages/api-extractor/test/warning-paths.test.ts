@@ -9,8 +9,13 @@ describe("stable warning paths", () => {
       "node_modules/typescript/lib/lib.es5.d.ts"
     );
     expect(
-      stableWarningPath("/repo/node_modules/.pnpm/typescript@7.0.2/node_modules/typescript/lib/lib.dom.d.ts")
+      stableWarningPath(
+        "/repo/node_modules/.pnpm/@tsrs+linux-x64-gnu@0.18.0/node_modules/@tsrs/linux-x64-gnu/lib.dom.d.ts"
+      )
     ).toBe("node_modules/typescript/lib/lib.dom.d.ts");
+    expect(stableWarningPath("C:\\repo\\node_modules\\@tsrs\\darwin-arm64\\lib.es5.d.ts")).toBe(
+      "node_modules/typescript/lib/lib.es5.d.ts"
+    );
     expect(stableWarningPath("C:\\repo\\node_modules\\typescript\\lib\\lib.es5.d.ts")).toBe(
       "node_modules/typescript/lib/lib.es5.d.ts"
     );

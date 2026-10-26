@@ -3,10 +3,11 @@ import { existsSync, readdirSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
+import { compilerScriptPath } from "../scripts/compiler.ts";
+
 const packageDirectory = resolve(import.meta.dirname, "..");
 const scriptsDirectory = join(packageDirectory, "scripts");
 const tsconfigPath = resolve(packageDirectory, "tsconfig.json");
-const compilerScript = resolve(packageDirectory, "node_modules/typescript/bin/tsc");
 
 const sourceExtensions = [".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"] as const;
 const ignoredDirectoryNames = new Set([".cache", ".turbo", "dist", "generated", "node_modules"]);
@@ -48,7 +49,7 @@ describe("script type-check coverage", () => {
 
     const result = spawnSync(
       process.execPath,
-      [compilerScript, "--noEmit", "--incremental", "false", "--listFilesOnly", "-p", tsconfigPath],
+      [compilerScriptPath(), "--noEmit", "--incremental", "false", "--listFilesOnly", "-p", tsconfigPath],
       { cwd: packageDirectory, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }
     );
     if (result.error !== undefined) throw result.error;

@@ -162,7 +162,7 @@ describe("Issue 02 compiler timing boundary", () => {
     if (sample === undefined) throw new Error("Missing re-export timing sample.");
     const overBudget = {
       ...sample,
-      totals: { ...sample.totals, bytesReceived: sample.budget.maxBytesReceived + 1 },
+      totals: { ...sample.totals, bytesReceived: bytesReceivedCeiling(sample.budget) + 1 },
     };
 
     expect(() => assertBytesReceivedBudget(overBudget)).toThrow(/budget exceeded/u);

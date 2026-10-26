@@ -2,12 +2,13 @@ import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 
 import { runIfMain } from "./cli.ts";
+import { compilerScriptPath } from "./compiler.ts";
 import { packageFixtureTypecheckPlan } from "./fixture-plans.ts";
 
 const packageDirectory = resolve(import.meta.dirname, "..");
-const compilerScript = resolve(packageDirectory, "node_modules/typescript/bin/tsc");
 
 function typecheckFixtureProjects(): number {
+  const compilerScript = compilerScriptPath();
   for (const entry of packageFixtureTypecheckPlan) {
     const result = spawnSync(
       process.execPath,

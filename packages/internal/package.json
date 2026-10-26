@@ -4,14 +4,14 @@
   "license": "MIT",
   "scripts": {
     "build": "tsdown",
-    "type-check": "tsc --noEmit",
+    "type-check": "tsrs --noEmit",
     "test": "vitest run"
   },
   "dependencies": {
     "effect": "catalog:",
-    "typescript": "catalog:",
     "@oxlint/plugins": "catalog:",
-    "undici": "catalog:"
+    "undici": "catalog:",
+    "tsrs": "catalog:"
   },
   "devDependencies": {
     "@elmeragroup/typescript-config": "workspace:*",

@@ -19,8 +19,8 @@
     "release:version": "pnpm exec changeset version && pnpm install --lockfile-only",
     "release:run": "pnpm --filter @elmeragroup/release build && node scripts/publish-release.ts",
     "release:check-pr": "pnpm --filter @elmeragroup/release build && node scripts/check-release-pr.ts",
-    "type-check:scripts": "tsc --noEmit -p scripts/tsconfig.json",
-    "type-check:tests": "tsc --noEmit -p test/tsconfig.json"
+    "type-check:scripts": "tsrs --noEmit -p scripts/tsconfig.json",
+    "type-check:tests": "tsrs --noEmit -p test/tsconfig.json"
   },
   "devDependencies": {
     "@changesets/cli": "catalog:",
@@ -34,7 +34,6 @@
     "oxlint": "catalog:",
     "oxlint-tsgolint": "catalog:",
     "turbo": "catalog:",
-    "typescript": "catalog:",
     "vitest": "catalog:",
     "yaml": "catalog:",
     "@elmeragroup/internal": "workspace:*",
@@ -42,7 +41,8 @@
     "@elmeragroup/release": "workspace:*",
     "effect": "catalog:",
     "tsdown": "catalog:",
-    "esbuild": "catalog:"
+    "esbuild": "catalog:",
+    "tsrs": "catalog:"
   },
   "engines": {
     "node": ">=24.13.0 <25"

@@ -8,7 +8,11 @@ import { ModuleNodeSchema } from "../src/model.ts";
 import type { ModuleNode } from "../src/model.ts";
 import { ExtractWarningSchema } from "../src/warnings.ts";
 import type { ExtractWarning } from "../src/warnings.ts";
-import { pinnedTypeScript7Compiler } from "./fixture-catalog.ts";
+import {
+  pinnedTypeScript7Compiler,
+  pinnedTypeScriptVersion,
+  previousTypeScript7Compiler,
+} from "./fixture-contracts.ts";
 
 /** The package's fixture root. */
 export const fixtureDirectory = resolve(import.meta.dirname, "../test/fixtures");
@@ -243,9 +247,25 @@ export function assertBytesReceivedCeiling(evidence: {
   }
 }
 
+/** The compiler a divergence record was reviewed with; tsrs records also name the TypeScript version. */
+const ReviewedCompilerSchema = Schema.Literals([
+  previousTypeScript7Compiler,
+  pinnedTypeScript7Compiler,
+] as const);
+
+function namesTypeScriptVersionWithTsrs(record: {
+  readonly compiler: typeof previousTypeScript7Compiler | typeof pinnedTypeScript7Compiler;
+  readonly typescript?: typeof pinnedTypeScriptVersion;
+}): true | string {
+  return (record.compiler === pinnedTypeScript7Compiler) === (record.typescript !== undefined)
+    ? true
+    : `a ${pinnedTypeScript7Compiler} divergence record, and only one, names its TypeScript version`;
+}
+
 type ReactDivergenceArtifact = {
   readonly fixture: "base-ui-component";
-  readonly compiler: typeof pinnedTypeScript7Compiler;
+  readonly compiler: typeof previousTypeScript7Compiler | typeof pinnedTypeScript7Compiler;
+  readonly typescript?: typeof pinnedTypeScriptVersion;
   readonly sourceOracle: "output.json";
   readonly comparison: "exact";
   readonly divergence: {
@@ -261,7 +281,8 @@ type ReactDivergenceArtifact = {
 
 const ReactDivergenceArtifactSchema = Schema.Struct({
   fixture: Schema.Literal("base-ui-component"),
-  compiler: Schema.Literal(pinnedTypeScript7Compiler),
+  compiler: ReviewedCompilerSchema,
+  typescript: Schema.optionalKey(Schema.Literal(pinnedTypeScriptVersion)),
   sourceOracle: Schema.Literal("output.json"),
   comparison: Schema.Literal("exact"),
   divergence: Schema.Struct({
@@ -274,11 +295,12 @@ const ReactDivergenceArtifactSchema = Schema.Struct({
     /** Legacy reviewed records carry count+digest; newer records may add paths. */
     differencePaths: Schema.optionalKey(Schema.Array(EvidenceTextSchema)),
   }),
-});
+}).check(Schema.makeFilter(namesTypeScriptVersionWithTsrs));
 
 const Ts7DivergenceArtifactSchema = Schema.Struct({
   fixture: Schema.String,
-  compiler: Schema.Literal(pinnedTypeScript7Compiler),
+  compiler: ReviewedCompilerSchema,
+  typescript: Schema.optionalKey(Schema.Literal(pinnedTypeScriptVersion)),
   sourceOracle: Schema.Literal("output.json"),
   comparison: Schema.Literal("exact"),
   divergence: Schema.Struct({
@@ -292,7 +314,7 @@ const Ts7DivergenceArtifactSchema = Schema.Struct({
     /** Exact paths are optional for the legacy records; count+digest remain required. */
     differencePaths: Schema.optionalKey(Schema.Array(EvidenceTextSchema)),
   }),
-});
+}).check(Schema.makeFilter(namesTypeScriptVersionWithTsrs));
 function fixtureFile(fixture: string, file: string, fixtureRoot = fixtureDirectory): string {
   return resolve(fixtureRoot, fixture, file);
 }
@@ -347,6 +369,8 @@ function readWarningOracle(definition: TimingFixture): readonly ExtractWarning[]
  * Normalizes one path for durable warning evidence: TypeScript library paths become
  * `node_modules/typescript/lib/…`, workspace paths become package-relative, and anything
  * outside the package becomes `external/…`, so oracle bytes do not depend on checkout location.
+ * tsrs keeps the library in its per-platform package root (`@tsrs/<platform>/lib.*.d.ts`), which
+ * maps to the same stable path so evidence does not depend on the machine either.
  */
 export function stableWarningPath(filePath: string): string {
   const normalized = filePath.replaceAll("\\", "/");
@@ -355,6 +379,8 @@ export function stableWarningPath(filePath: string): string {
   if (libIndex >= 0) {
     return `node_modules/typescript/lib/${normalized.slice(libIndex + typescriptLibMarker.length)}`;
   }
+  const tsrsLibrary = /\/node_modules\/@tsrs\/[^/]+\/(lib\.[^/]+\.d\.ts)$/u.exec(normalized)?.[1];
+  if (tsrsLibrary !== undefined) return `node_modules/typescript/lib/${tsrsLibrary}`;
   const workspaceRelative = posixRelative(packageDirectory, filePath);
   return workspaceRelative.startsWith("../") ? "external/" + workspaceRelative : workspaceRelative;
 }

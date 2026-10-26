@@ -66,6 +66,53 @@ export class BackendError extends Schema.TaggedError<BackendError>()("BackendErr
   symbolStack: Schema.optionalKey(Schema.Array(Schema.String)),
 }) {}
 
+/**
+ * The compiler process could not start for a project, typically because the native tsrs binary
+ * for this platform is not installed. Every caller that starts the compiler reports it this way.
+ *
+ * @param tsconfigPath - The absolute tsconfig path the compiler was started for.
+ * @param cause - The thrown value; only a safe summary of it is retained.
+ * @returns The typed failure, naming the supported platforms.
+ */
+export function compilerStartError(tsconfigPath: string, cause: unknown): BackendError {
+  return new BackendError({
+    message:
+      `Could not start the TypeScript compiler for ${tsconfigPath}. It needs the native tsrs binary, ` +
+      "which ships for macOS arm64 and Linux x64/arm64 (glibc and musl); the cause names what is missing.",
+    cause: safeCause(cause),
+    filePath: tsconfigPath,
+  });
+}
+
+/**
+ * A started compiler threw while opening the configured project.
+ *
+ * @param tsconfigPath - The absolute tsconfig path that was opened.
+ * @param cause - The thrown value; only a safe summary of it is retained.
+ * @returns The typed failure.
+ */
+export function projectOpenError(tsconfigPath: string, cause: unknown): BackendError {
+  return new BackendError({
+    message: `Could not open TypeScript project ${tsconfigPath}`,
+    cause: safeCause(cause),
+    filePath: tsconfigPath,
+  });
+}
+
+/**
+ * A started compiler opened a snapshot without the configured project.
+ *
+ * @param tsconfigPath - The absolute tsconfig path that was requested.
+ * @returns The typed failure.
+ */
+export function projectMissingError(tsconfigPath: string): BackendError {
+  return new BackendError({
+    message: `TypeScript did not open project ${tsconfigPath}`,
+    cause: tsconfigPath,
+    filePath: tsconfigPath,
+  });
+}
+
 /** The requested file is not a module of the configured TypeScript project. */
 export class FileNotInProgramError extends Schema.TaggedError<FileNotInProgramError>()(
   "FileNotInProgramError",

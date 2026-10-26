@@ -1,5 +1,5 @@
-import type { CallExpression, Node } from "typescript/unstable/ast";
-import { isElementAccessExpression, isStringLiteral } from "typescript/unstable/ast/is";
+import type { CallExpression, Node } from "tsrs/unstable/ast";
+import { isElementAccessExpression, isStringLiteral } from "tsrs/unstable/ast/is";
 
 import { definedFields } from "../../optional-fields.ts";
 import type { BackendNodeFacts, BackendSymbolHandle, BackendSymbolOrigin } from "../contracts.ts";
@@ -58,7 +58,6 @@ function calleeSymbolAt(session: TsgoFactsSession, expression: Node) {
     return undefined;
   }
   const receiverType = session.checker.getTypeAtLocation(expression.expression);
-  if (receiverType === undefined) return undefined;
   const symbol = session.checker.getPropertyOfType(receiverType, expression.argumentExpression.text);
   return symbol === undefined ? undefined : session.symbolHandle(symbol);
 }

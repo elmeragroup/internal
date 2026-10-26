@@ -19,7 +19,15 @@ export {
   type ComponentSourceUnresolvedReason,
 } from "./component-sources.ts";
 export { ProjectExtractor, type ExtractionResult, type ProjectExtractorService } from "./extractor.ts";
-export { BackendError, ConfigError, ExtractError, FileNotInProgramError } from "./errors.ts";
+export {
+  BackendError,
+  ConfigError,
+  ExtractError,
+  FileNotInProgramError,
+  compilerStartError,
+  projectMissingError,
+  projectOpenError,
+} from "./errors.ts";
 export {
   ExtractionResultSchema,
   ModuleNodeSchema,

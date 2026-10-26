@@ -53,7 +53,8 @@ export type CompilerSourceFileMetadata = {
  * defines. The three tests mirror the questions the resolver previously asked
  * inline: packaged sources under any `node_modules` segment are external;
  * TypeScript's own library files (`…/typescript/lib/…`, including
- * `@typescript` toolchain installs) are the standard library; and the wider
+ * `@typescript` toolchain installs, and the root of a tsrs platform package,
+ * `…/@tsrs/<platform>/lib.*.d.ts`) are the standard library; and the wider
  * toolchain question accepts any TypeScript installation's lib directory.
  *
  * An absent metadata record deliberately keeps the path fallback; an explicit
@@ -69,7 +70,9 @@ export function classifySourceFile(
   const pathTypescriptLibDirectory = pathSegments.some(
     (segment, index) =>
       (segment === "typescript" && pathSegments[index + 1] === "lib") ||
-      (segment === "@typescript" && pathSegments[index + 2] === "lib")
+      (segment === "@typescript" && pathSegments[index + 2] === "lib") ||
+      // tsrs ships its default library beside the binary, in the platform package root.
+      (segment === "@tsrs" && index + 3 === pathSegments.length)
   );
   const fileName = pathSegments[pathSegments.length - 1] ?? "";
   const pathExternal = pathSegments.includes("node_modules");

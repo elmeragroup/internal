@@ -1,5 +1,5 @@
-import type { Node, SourceFile } from "typescript/unstable/ast";
-import type { Project } from "typescript/unstable/sync";
+import type { Node, SourceFile } from "tsrs/unstable/ast";
+import type { Project } from "tsrs/unstable/sync";
 
 import type { CompilerDeclaration } from "./declarations.ts";
 

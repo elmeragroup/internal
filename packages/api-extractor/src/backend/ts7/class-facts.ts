@@ -1,5 +1,5 @@
-import type { Node, SyntaxKind } from "typescript/unstable/ast";
-import { SignatureKind } from "typescript/unstable/sync";
+import type { Node, SyntaxKind } from "tsrs/unstable/ast";
+import { SignatureKind } from "tsrs/unstable/sync";
 
 import type { BackendSignatureHandle, BackendTypeHandle } from "../contracts.ts";
 import type { TsgoFactsSession } from "./facts.ts";

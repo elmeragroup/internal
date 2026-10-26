@@ -4,20 +4,20 @@ packages:
 
 catalog:
   "@changesets/cli": 3.0.3
-  "@oxlint/plugins": 1.87.0
+  "@oxlint/plugins": 1.89.0
   "@types/node": 26.6.5
   "@types/react": 19.3.0
   "@types/react-dom": 19.3.0
   eslint-plugin-turbo: 2.11.7
-  effect: 4.0.3
-  oxfmt: 0.72.0
-  oxlint: 1.87.0
+  effect: 4.0.6
+  oxfmt: 0.74.0
+  oxlint: 1.89.0
   oxlint-tsgolint: 7.0.2004
   react: 19.3.0
   esbuild: 0.28.2
   tsdown: 0.23.1
+  tsrs: 0.18.0-ts7.1.0-dev.20260929
   turbo: 2.11.7
-  typescript: 7.0.2
   undici: 8.11.2
   vitest: 5.0.4
   yaml: 2.9.1

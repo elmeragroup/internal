@@ -1,11 +1,8 @@
 import { join } from "node:path";
 
-import {
-  assertNodeMajor,
-  issue02TimingCommand,
-  knownIssue02TimingCommands,
-  packageVersion,
-} from "../files.ts";
+import { compilerIdentity } from "../compiler.ts";
+import { assertNodeMajor, issue02TimingCommand, knownIssue02TimingCommands } from "../files.ts";
+import { pinnedTypeScript7Compiler, previousTypeScript7Compiler } from "../fixture-contracts.ts";
 import {
   assertBytesReceivedBudget,
   assertFetchedToMaterializedRatioBudget,
@@ -77,7 +74,7 @@ function reportFrom(samples: TimingReport["samples"]): TimingReport {
     command: issue02TimingCommand,
     runtime: {
       node: process.versions.node,
-      compiler: "typescript@" + packageVersion("typescript"),
+      compiler: compilerIdentity().compiler,
     },
     samples,
     stopConditions: {
@@ -114,8 +111,12 @@ function checkStoredReport(stored: TimingReport, measured: TimingReport): void {
   }
   assertNodeMajor(stored.runtime.node);
   assertNodeMajor(measured.runtime.node);
-  if (stored.runtime.compiler !== measured.runtime.compiler) {
+  // The stored baseline keeps the compiler that recorded it; the live run uses the pinned one.
+  if (stored.runtime.compiler !== previousTypeScript7Compiler) {
     throw new Error("The timing report compiler pin is stale: " + stored.runtime.compiler);
+  }
+  if (measured.runtime.compiler !== pinnedTypeScript7Compiler) {
+    throw new Error("The live timing compiler is not the pinned compiler: " + measured.runtime.compiler);
   }
   if (stored.decision !== measured.decision) {
     throw new Error("The timing report decision is stale: " + stored.decision + " != " + measured.decision);

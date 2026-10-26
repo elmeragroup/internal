@@ -48,6 +48,7 @@ const FixtureBudgetsSchema = Schema.Struct({
         maxBytesReceived: Schema.Number,
       })
     ),
+    bytesReceivedReason: Schema.NonEmptyString,
   }),
   virtualUpstreamDependency: Schema.Array(Schema.String),
   locallyGeneratedOracles: Schema.Array(Schema.String),

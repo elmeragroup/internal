@@ -1,9 +1,11 @@
+import { pinnedTypeScript7Compiler } from "../fixture-contracts.ts";
+
 /** Stable identity strings shared by the Issue 14 evidence producers and validators. */
 export const issue14ConformanceCommand = "node scripts/conformance/report.ts --check" as const;
 /** The Issue 14 timing command the stored evidence records. */
 export const issue14TimingCommand = "node scripts/timing.ts --plan issue14 --check" as const;
 /** The compiler identity the Issue 14 evidence requires. */
-export const issue14CompilerVersion = "typescript@7.0.2" as const;
+export const issue14CompilerVersion = pinnedTypeScript7Compiler;
 /** The durable timing contract: semantic counters must match exactly. */
 export const issue14TimingStableContract = "semantic-counters-exact" as const;
 /** The wall-clock timing contract: durations are recorded observations, not gates. */
