@@ -1,5 +1,5 @@
-import type { Node, SourceFile } from "tsrs/unstable/ast";
-import type { Project } from "tsrs/unstable/sync";
+import type { Node, SourceFile } from "tsrs/ast";
+import type { Project } from "tsrs/sync";
 
 import type { CompilerDeclaration } from "./declarations.ts";
 
@@ -77,7 +77,7 @@ export class SessionFileTrees {
     // the same operation NodeHandle.resolve uses after fetching the binary tree.
     const tree = sourceFile as SourceFileTree;
     this.trees.set(sourceFile.fileName, tree);
-    if (sourceFile.path !== sourceFile.fileName) this.trees.set(sourceFile.path, tree);
+    this.trees.set(sourceFile.path, tree);
     return tree;
   }
 }

@@ -1,5 +1,5 @@
-import type { Node } from "tsrs/unstable/ast";
-import { SyntaxKind } from "tsrs/unstable/ast";
+import type { Node } from "tsrs/ast";
+import { SyntaxKind } from "tsrs/ast";
 import {
   isAsExpression,
   isElementAccessExpression,
@@ -20,9 +20,9 @@ import {
   isStringLiteral,
   isTypeAssertion,
   isVariableDeclaration,
-} from "tsrs/unstable/ast/is";
-import { SymbolFlags } from "tsrs/unstable/sync";
-import type { Symbol as TsSymbol } from "tsrs/unstable/sync";
+} from "tsrs/ast/is";
+import { SymbolFlags } from "tsrs/sync";
+import type { Symbol as TsSymbol } from "tsrs/sync";
 
 import { definedFields } from "../../optional-fields.ts";
 import type { BackendDeclarationOwnership, BackendModuleOrigin } from "../contracts.ts";

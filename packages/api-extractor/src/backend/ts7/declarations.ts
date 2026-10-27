@@ -1,6 +1,6 @@
-import type { Node } from "tsrs/unstable/ast";
-import { SyntaxKind } from "tsrs/unstable/ast";
-import type { Project } from "tsrs/unstable/sync";
+import type { Node } from "tsrs/ast";
+import { SyntaxKind } from "tsrs/ast";
+import type { Project } from "tsrs/sync";
 
 /** A declaration reference from the native compiler: its path, kind, and lazy node resolver. */
 export type CompilerDeclaration = {

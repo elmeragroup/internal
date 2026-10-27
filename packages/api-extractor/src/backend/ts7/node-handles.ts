@@ -1,5 +1,5 @@
-import type { Node } from "tsrs/unstable/ast";
-import type { NodeHandle } from "tsrs/unstable/sync";
+import type { Node } from "tsrs/ast";
+import type { NodeHandle } from "tsrs/sync";
 
 import type { BackendNodeHandle } from "../contracts.ts";
 import type { HandleRegistry } from "../handles.ts";

@@ -1,13 +1,13 @@
-import type { Node } from "tsrs/unstable/ast";
-import { SyntaxKind } from "tsrs/unstable/ast";
+import type { Node } from "tsrs/ast";
+import { SyntaxKind } from "tsrs/ast";
 import {
   isClassDeclaration,
   isExpressionWithTypeArguments,
   isInterfaceDeclaration,
   isTypeAliasDeclaration,
   isTypeReferenceNode,
-} from "tsrs/unstable/ast/is";
-import type { Checker, Symbol as TsSymbol, Type } from "tsrs/unstable/sync";
+} from "tsrs/ast/is";
+import type { Checker, Symbol as TsSymbol, Type } from "tsrs/sync";
 
 import { isInternalSymbolName } from "../contracts.ts";
 import type { CompilerDeclaration } from "./declarations.ts";

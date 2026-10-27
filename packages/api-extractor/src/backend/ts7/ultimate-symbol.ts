@@ -1,4 +1,4 @@
-import type { Checker, Symbol as TsSymbol } from "tsrs/unstable/sync";
+import type { Checker, Symbol as TsSymbol } from "tsrs/sync";
 
 import { aliasedSymbol } from "./module-resolution.ts";
 

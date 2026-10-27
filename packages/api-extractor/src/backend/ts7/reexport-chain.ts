@@ -1,7 +1,7 @@
-import type { Node, SourceFile } from "tsrs/unstable/ast";
-import { isExportSpecifier, isStringLiteral } from "tsrs/unstable/ast/is";
-import { SymbolFlags } from "tsrs/unstable/sync";
-import type { Symbol as TsSymbol } from "tsrs/unstable/sync";
+import type { Node, SourceFile } from "tsrs/ast";
+import { isExportSpecifier, isStringLiteral } from "tsrs/ast/is";
+import { SymbolFlags } from "tsrs/sync";
+import type { Symbol as TsSymbol } from "tsrs/sync";
 
 import { resolveOwnedDeclaration } from "./declarations.ts";
 import { memoizeWalkFact } from "./module-walk-memo.ts";

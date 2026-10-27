@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
-import type { Node, SourceFile } from "tsrs/unstable/ast";
-import { SyntaxKind } from "tsrs/unstable/ast";
+import type { Node, SourceFile } from "tsrs/ast";
+import { SyntaxKind } from "tsrs/ast";
 import {
   isClassDeclaration,
   isExportAssignment,
@@ -12,9 +12,9 @@ import {
   isNamedExports,
   isNamespaceExport,
   isStringLiteral,
-} from "tsrs/unstable/ast/is";
-import { SymbolFlags } from "tsrs/unstable/sync";
-import type { Checker, Symbol as TsSymbol } from "tsrs/unstable/sync";
+} from "tsrs/ast/is";
+import { SymbolFlags } from "tsrs/sync";
+import type { Checker, Symbol as TsSymbol } from "tsrs/sync";
 
 import { FileNotInProgramError } from "../../errors.ts";
 import { definedFields } from "../../optional-fields.ts";

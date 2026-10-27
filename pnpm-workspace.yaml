@@ -16,7 +16,7 @@ catalog:
   react: 19.3.0
   esbuild: 0.28.2
   tsdown: 0.23.1
-  tsrs: 0.18.0-ts7.1.0-dev.20260929
+  tsrs: 0.20.0-ts7.1.0-beta
   turbo: 2.11.7
   undici: 8.11.2
   vitest: 5.0.4
@@ -30,3 +30,13 @@ allowBuilds:
   "@parcel/watcher": true
 
 minimumReleaseAge: 4320
+
+minimumReleaseAgeExclude:
+  - tsrs@0.20.0-ts7.1.0-beta
+  - "@tsrs/darwin-arm64@0.20.0-ts7.1.0-beta"
+  - "@tsrs/darwin-x64@0.20.0-ts7.1.0-beta"
+  - "@tsrs/linux-arm64-gnu@0.20.0-ts7.1.0-beta"
+  - "@tsrs/linux-arm64-musl@0.20.0-ts7.1.0-beta"
+  - "@tsrs/linux-x64-gnu@0.20.0-ts7.1.0-beta"
+  - "@tsrs/linux-x64-musl@0.20.0-ts7.1.0-beta"
+  - "@tsrs/win32-x64@0.20.0-ts7.1.0-beta"

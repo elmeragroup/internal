@@ -78,7 +78,7 @@ export function compilerStartError(tsconfigPath: string, cause: unknown): Backen
   return new BackendError({
     message:
       `Could not start the TypeScript compiler for ${tsconfigPath}. It needs the native tsrs binary, ` +
-      "which ships for macOS arm64 and Linux x64/arm64 (glibc and musl); the cause names what is missing.",
+      "supported on macOS arm64/x64 and Linux x64/arm64 (glibc and musl); the cause names what is missing.",
     cause: safeCause(cause),
     filePath: tsconfigPath,
   });
