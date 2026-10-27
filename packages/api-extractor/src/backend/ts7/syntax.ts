@@ -1,5 +1,5 @@
-import type { Node, SourceFile } from "tsrs/unstable/ast";
-import { isExportDeclaration, isStringLiteral } from "tsrs/unstable/ast/is";
+import type { Node, SourceFile } from "tsrs/ast";
+import { isExportDeclaration, isStringLiteral } from "tsrs/ast/is";
 
 /**
  * Leaf syntax helpers shared by the module walk and the fact readers. This

@@ -1,7 +1,7 @@
 import { resolve } from "node:path";
-import { isExportDeclaration, isImportDeclaration, isStringLiteral } from "tsrs/unstable/ast/is";
-import { SymbolFlags } from "tsrs/unstable/sync";
-import type { Checker, Symbol as TsSymbol } from "tsrs/unstable/sync";
+import { isExportDeclaration, isImportDeclaration, isStringLiteral } from "tsrs/ast/is";
+import { SymbolFlags } from "tsrs/sync";
+import type { Checker, Symbol as TsSymbol } from "tsrs/sync";
 
 import type { BackendResolvedModule } from "../contracts.ts";
 import type { TsgoModuleSession } from "./module.ts";

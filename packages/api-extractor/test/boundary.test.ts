@@ -34,13 +34,13 @@ function parseModule(session: BackendExtractionSession, filePath: string): Resol
 describe("compiler boundary", () => {
   it("catches every compiler import spelling, including side-effect and template forms", () => {
     const mutations = [
-      'import value from "tsrs/unstable/sync";',
-      'import type { API } from "tsrs/unstable/sync";',
-      'import "tsrs/unstable/sync";',
-      'export * from "tsrs/unstable/sync";',
-      'const dynamic = import("tsrs/unstable/sync");',
-      'const templated = import(`tsrs/unstable/${"sync"}`);',
-      'const required = require("tsrs/unstable/sync");',
+      'import value from "tsrs/sync";',
+      'import type { API } from "tsrs/sync";',
+      'import "tsrs/sync";',
+      'export * from "tsrs/sync";',
+      'const dynamic = import("tsrs/sync");',
+      'const templated = import(`tsrs/${"sync"}`);',
+      'const required = require("tsrs/sync");',
     ];
 
     for (const mutation of mutations) {
@@ -50,17 +50,16 @@ describe("compiler boundary", () => {
     expect(scanCompilerImports('import "typescriptx";')).toEqual([]);
     expect(scanCompilerImports('import { version } from "tsrs";')).toEqual([]);
     expect(scanCompilerImports('require.resolve("tsrs/package.json");')).toEqual([]);
-    expect(scanCompilerImports('import "tsrs/unstablex";')).not.toEqual([]);
-    expect(scanCompilerImports('import "tsrs/other";')).not.toEqual([]);
+    expect(scanCompilerImports('import "tsrsx";')).toEqual([]);
+    for (const subpath of ["ast", "ast/is", "async", "fs", "unstable/sync", "other"]) {
+      expect(scanCompilerImports(`import "tsrs/${subpath}";`), subpath).not.toEqual([]);
+    }
   });
 
   it("scans compiler imports in every supported source extension", () => {
     for (const extension of [".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"]) {
       expect(
-        sourceBoundaryViolations(
-          `/virtual/source${extension}`,
-          'import type { API } from "tsrs/unstable/sync";'
-        )
+        sourceBoundaryViolations(`/virtual/source${extension}`, 'import type { API } from "tsrs/sync";')
       ).toEqual([expect.objectContaining({ path: `/virtual/source${extension}` })]);
     }
   });
@@ -323,11 +322,11 @@ describe("compiler boundary", () => {
       ]) {
         const path = join(directory, relativePath);
         mkdirSync(join(path, ".."), { recursive: true });
-        writeFileSync(path, 'import type { API } from "tsrs/unstable/sync";\n');
+        writeFileSync(path, 'import type { API } from "tsrs/sync";\n');
       }
       const fixturePath = join(directory, "test/fixtures/mutation.ts");
       mkdirSync(join(directory, "test/fixtures"), { recursive: true });
-      writeFileSync(fixturePath, "const mutation = 'import \"tsrs/unstable/sync\";';\n");
+      writeFileSync(fixturePath, "const mutation = 'import \"tsrs/sync\";';\n");
 
       const paths = packageSourceFiles(directory);
       expect(paths).toEqual(

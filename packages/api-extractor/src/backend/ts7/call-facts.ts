@@ -1,5 +1,5 @@
-import type { CallExpression, Node } from "tsrs/unstable/ast";
-import { isElementAccessExpression, isStringLiteral } from "tsrs/unstable/ast/is";
+import type { CallExpression, Node } from "tsrs/ast";
+import { isElementAccessExpression, isStringLiteral } from "tsrs/ast/is";
 
 import { definedFields } from "../../optional-fields.ts";
 import type { BackendNodeFacts, BackendSymbolHandle, BackendSymbolOrigin } from "../contracts.ts";

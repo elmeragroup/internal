@@ -57,8 +57,10 @@ The package has explicit ESM entries:
 
 tsrs, Effect, and `@oxlint/plugins` are pinned runtime dependencies. Installing the package
 includes the compiler: [tsrs](https://github.com/oxc-project/tsrs), a Rust port of the TypeScript 7
-compiler with TypeScript 7.1 semantics. Its native binary ships only for macOS arm64 and Linux
-x64/arm64 (glibc and musl); on other platforms, artifact generation fails with a `BackendError`.
+compiler with TypeScript 7.1 semantics. It is supported on macOS arm64/x64 and Linux x64/arm64
+(glibc and musl); where no native binary is installed, artifact generation fails with a
+`BackendError`. tsrs also ships a Windows x64 binary, but Windows is not supported: extraction path
+identity is not Windows-aware yet.
 Importing lint entries does not load the compiler or Effect. Consumer bundlers
 can remove unused exports. Future browser-safe helpers belong in separate entries; the root remains
 the convenient artifact generator.

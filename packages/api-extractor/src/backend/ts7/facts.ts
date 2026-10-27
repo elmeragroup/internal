@@ -4,8 +4,8 @@
  * into its own sibling (`class-facts.ts` style) before anything else lands here.
  */
 
-import type { InterfaceDeclaration, Node, TypeNode } from "tsrs/unstable/ast";
-import { SyntaxKind } from "tsrs/unstable/ast";
+import type { InterfaceDeclaration, Node, TypeNode } from "tsrs/ast";
+import { SyntaxKind } from "tsrs/ast";
 import {
   isEnumMember,
   isIdentifier,
@@ -14,17 +14,9 @@ import {
   isQualifiedName,
   isTypeReferenceNode,
   isTypeNode,
-} from "tsrs/unstable/ast/is";
-import { SignatureKind, SymbolFlags, TypeFlags } from "tsrs/unstable/sync";
-import type {
-  Checker,
-  NodeHandle,
-  Program,
-  Signature,
-  Symbol as TsSymbol,
-  TupleType,
-  Type,
-} from "tsrs/unstable/sync";
+} from "tsrs/ast/is";
+import { SignatureKind, SymbolFlags, TypeFlags } from "tsrs/sync";
+import type { Checker, NodeHandle, Program, Signature, Symbol as TsSymbol, TupleType, Type } from "tsrs/sync";
 
 import { definedFields, flagFields } from "../../optional-fields.ts";
 import { typeFlagNames } from "../../warnings.ts";

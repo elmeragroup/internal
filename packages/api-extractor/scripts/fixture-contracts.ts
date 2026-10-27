@@ -8,10 +8,10 @@
  */
 
 /** The compiler package current evidence is produced with: tsrs, a Rust port of TypeScript 7. */
-export const pinnedTypeScript7Compiler = "tsrs@0.18.0-ts7.1.0-dev.20260929" as const;
+export const pinnedTypeScript7Compiler = "tsrs@0.20.0-ts7.1.0-beta" as const;
 
 /** The microsoft/TypeScript version the pinned compiler ports; its semantics are TypeScript 7.1's. */
-export const pinnedTypeScriptVersion = "7.1.0-dev.20260929" as const;
+export const pinnedTypeScriptVersion = "7.1.0-beta" as const;
 
 /**
  * The compiler that recorded evidence before the move to tsrs.

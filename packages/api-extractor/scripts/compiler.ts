@@ -6,9 +6,9 @@ import { typescriptVersion, version } from "tsrs";
 
 /** The compiler identity that evidence records: the tsrs package and the TypeScript it ports. */
 export type CompilerIdentity = {
-  /** The installed compiler package, such as `tsrs@0.18.0-ts7.1.0-dev.20260929`. */
+  /** The installed compiler package, such as `tsrs@0.20.0-ts7.1.0-beta`. */
   readonly compiler: string;
-  /** The microsoft/TypeScript version that compiler ports, such as `7.1.0-dev.20260929`. */
+  /** The microsoft/TypeScript version that compiler ports, such as `7.1.0-beta`. */
   readonly typescript: string;
 };
 

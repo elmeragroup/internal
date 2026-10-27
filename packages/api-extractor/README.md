@@ -76,8 +76,9 @@ losses use `warnings`; the extractor never logs them automatically.
 
 ## Guarantees and boundaries
 
-Only `src/backend/ts7/**` imports the compiler's unstable native API, `tsrs/unstable/*` (tsrs
-ports TypeScript 7.1). The backend turns compiler
+Only `src/backend/ts7/**` imports the compiler's native API, the `tsrs/*` subpaths (tsrs
+ports TypeScript 7.1). Scripts may read the compiler identity from the bare `tsrs` entry and
+`tsrs/package.json`, which carry only version metadata. The backend turns compiler
 state into opaque handles and primitive facts. `src/parser.ts` and `src/parse/**` own the semantic
 policy: recursion, aliases, generics, containers, mapped types, callables, classes, modules,
 external types, warnings, and React component recognition.

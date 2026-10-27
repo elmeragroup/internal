@@ -1,8 +1,8 @@
 import path from "node:path";
-import type { SourceFile } from "tsrs/unstable/ast";
-import { isExpressionStatement, isStringLiteral } from "tsrs/unstable/ast/is";
-import { API, SignatureKind, SymbolFlags, TypeFormatFlags } from "tsrs/unstable/sync";
-import type { Checker, Program, Project, Symbol as TsSymbol, Type } from "tsrs/unstable/sync";
+import type { SourceFile } from "tsrs/ast";
+import { isExpressionStatement, isStringLiteral } from "tsrs/ast/is";
+import { API, SignatureKind, SymbolFlags, TypeFormatFlags } from "tsrs/sync";
+import type { Checker, Program, Project, Symbol as TsSymbol, Type } from "tsrs/sync";
 
 import { compilerStartError, projectMissingError, projectOpenError } from "@elmeragroup/api-extractor";
 import type { ComponentSourceRequest, ComponentSourceResult } from "@elmeragroup/api-extractor";

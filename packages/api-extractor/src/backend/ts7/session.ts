@@ -1,7 +1,7 @@
 import { resolve } from "node:path";
-import type { Node, TypeNode } from "tsrs/unstable/ast";
-import { isTypeNode } from "tsrs/unstable/ast/is";
-import type { Checker, Program, Project, Signature, Symbol as TsSymbol, Type } from "tsrs/unstable/sync";
+import type { Node, TypeNode } from "tsrs/ast";
+import { isTypeNode } from "tsrs/ast/is";
+import type { Checker, Program, Project, Signature, Symbol as TsSymbol, Type } from "tsrs/sync";
 
 import { BackendError } from "../../errors.ts";
 import { definedFields } from "../../optional-fields.ts";

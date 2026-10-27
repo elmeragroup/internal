@@ -1,8 +1,8 @@
 import { dirname, resolve } from "node:path";
-import { serverFS } from "tsrs/unstable/fs";
-import type { FileSystemCallbacks } from "tsrs/unstable/fs";
-import { API } from "tsrs/unstable/sync";
-import type { Project } from "tsrs/unstable/sync";
+import { serverFS } from "tsrs/fs";
+import type { FileSystemCallbacks } from "tsrs/fs";
+import { API } from "tsrs/sync";
+import type { Project } from "tsrs/sync";
 
 import {
   BackendError,

@@ -1,5 +1,5 @@
-import type { Node } from "tsrs/unstable/ast";
-import { SyntaxKind } from "tsrs/unstable/ast";
+import type { Node } from "tsrs/ast";
+import { SyntaxKind } from "tsrs/ast";
 
 import { definedFields } from "../../optional-fields.ts";
 import type { BackendDocumentation, BackendNodeReference, BackendSymbolHandle } from "../contracts.ts";

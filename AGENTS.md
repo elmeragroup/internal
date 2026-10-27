@@ -26,8 +26,9 @@ task.
 
 The whole workspace compiles with `tsrs`, a Rust port of the TypeScript 7 compiler that follows
 TypeScript 7.1: type-check scripts, builds, declaration emit, evidence scripts, and the runtime
-`tsrs/unstable/*` API. The `typescript` package is not a dependency. tsrs has native binaries only
-for macOS arm64 and Linux x64/arm64 (glibc and musl).
+`tsrs/*` API. The `typescript` package is not a dependency. The workspace is supported on macOS
+arm64/x64 and Linux x64/arm64 (glibc and musl). tsrs also ships a Windows x64 binary, but Windows is
+not supported: extraction path identity is not Windows-aware yet.
 
 Run commands from the repository root unless stated otherwise.
 
@@ -64,7 +65,7 @@ path-wide overrides are prohibited. A necessary next-line disable must name one 
 Read [the extractor guide](packages/api-extractor/README.md) before changing its model, backend,
 fixtures, warnings, or timing reports.
 
-- Keep the compiler's unstable native API (`tsrs/unstable/*`) inside `src/backend/ts7/**`. Compiler objects and handles
+- Keep the compiler's native API (every `tsrs/*` subpath) inside `src/backend/ts7/**`. Compiler objects and handles
   must not escape into public types.
 - Keep semantic policy in the parser. `src/parse/**` and `src/canonical/**` must remain Effect-free,
   including their transitive value imports.
