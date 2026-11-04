@@ -1,1 +1,3 @@
-{}
+{
+  "oxc.path.tsgolint": "node_modules/.bin/tsrs-lint"
+}

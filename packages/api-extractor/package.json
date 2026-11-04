@@ -14,7 +14,7 @@
     "build": "node ../../scripts/build-package.ts",
     "ci:checks": "pnpm run check:catalog && pnpm run check:boundary && pnpm run test:fixtures && pnpm run test:conformance && pnpm run test:timing && pnpm run test:timing:issue14 && pnpm run test:timing:external-selection",
     "format:check": "oxfmt --check .",
-    "lint": "oxlint . --deny-warnings",
+    "lint": "OXLINT_TSGOLINT_PATH=node_modules/.bin/tsrs-lint oxlint . --deny-warnings",
     "test": "vitest run",
     "test:timing": "node scripts/timing.ts --plan issue02 --check",
     "test:timing:issue14": "node scripts/timing.ts --plan issue14 --check",

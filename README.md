@@ -89,7 +89,11 @@ It runs every check against a private snapshot of the archive, so repacking afte
 requires re-running `pnpm test:packed-consumer` before preparing a release record.
 
 The workspace compiles with the same tsrs pin: type-checks, builds, declaration emit, and the
-extractor's evidence scripts. Development therefore needs one of the platforms above.
+extractor's evidence scripts. Type-aware linting uses it too. The lint scripts point Oxlint at the
+linter built into tsrs with `OXLINT_TSGOLINT_PATH=node_modules/.bin/tsrs-lint`, so the workspace
+does not install `oxlint-tsgolint`. Set that variable when you run `oxlint` directly. The
+workspace's `.vscode/settings.json` sets `oxc.path.tsgolint` to the same launcher for the Oxc
+VS Code extension. Development therefore needs one of the platforms above.
 
 ## Releases
 
