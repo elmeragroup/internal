@@ -29,6 +29,19 @@ Use `mode: "check"` before any generation in CI. It throws `ApiArtifactsDriftErr
 
 Declared public props require JSDoc. Recipe axes use the `*-variants` naming convention. Dependency props are included only when their provenance names a selected package, they have documentation, and the consuming component actually accepts them. Unaccepted extraction warning codes fail generation. Accepted warnings remain in `diagnostics`.
 
+A prop whose type is a finite union of two or more string literals carries `values`. The checker
+expands aliases, drops `undefined` and `null`, removes duplicates and orders the literals by value.
+A `ButtonSize | undefined` prop prints its alias in `type` and lists `["lg", "md", "sm"]` in
+`values`. Booleans and other types omit the field.
+
+When the part's props type is a union, such as `LabelButtonProps | IconButtonProps`, a value can
+need props that other values do not. `requires` maps each such value to its alternatives. Each
+alternative is the extra props of one arm that admits the value, less the props every arm
+requires, and an object passes with every prop of any one alternative. Only minimal alternatives
+stay, each once. Button's `size` lists `{ "icon": [["aria-label"]], … }`, and a value that one
+arm admits with `aria-label` and another with `aria-labelledby` lists
+`[["aria-label"], ["aria-labelledby"]]`. A prop whose values need nothing omits the field.
+
 Each part's `sourcePath`, `rsc`, and prop `defaultValue` come from the authored implementation, not
 from the public call-signature declaration. React `memo` and `forwardRef` wrappers, including nested
 and aliased forms, are followed to that implementation. Checker-backed accepted props, required

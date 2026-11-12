@@ -95,7 +95,7 @@ function enrichPart(
       problems.push(`${current.name}.${property.name}: selected dependency prop has an unresolvable type`);
       continue;
     }
-    additions.push({
+    const addition: ApiProp = {
       name: property.name,
       origin: { packageName },
       type: fact.type,
@@ -103,7 +103,9 @@ function enrichPart(
       defaultValue: facts.source?.defaults.get(property.name) ?? property.documentation?.defaultValue ?? null,
       description,
       required: fact.required,
-    });
+    };
+    if (fact.values !== null) addition.values = fact.values;
+    additions.push(addition);
     handled.add(property.name);
   }
   if (additions.length > current.forwardedCount) {

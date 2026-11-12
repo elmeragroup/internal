@@ -10,8 +10,7 @@ import { componentPartRequests, extractPart, openLibraryProject } from "./checke
 import type { ComponentApi, LibraryProject, PartRequest } from "./checker.ts";
 import { enrichComponents } from "./enrichment.ts";
 import { ApiArtifactsDriftError, ApiArtifactsError } from "./errors.ts";
-import type { ApiArtifactDiagnostic } from "./model.ts";
-import type { ComponentApiArtifact } from "./model.ts";
+import type { ApiArtifactDiagnostic, ApiProp, ComponentApiArtifact } from "./model.ts";
 
 export type ApiArtifactComponent = {
   readonly slug: string;
@@ -119,6 +118,25 @@ function describeComponent(
   };
 }
 
+/**
+ * One prop in the artifact's key order. `values` and `requires` come last, and only when present,
+ * so a prop without them serializes as it did before the fields existed.
+ */
+function serializedProp(prop: ApiProp): ApiProp {
+  const row: ApiProp = {
+    name: prop.name,
+    origin: prop.origin,
+    type: prop.type,
+    shortType: prop.shortType,
+    defaultValue: prop.defaultValue,
+    description: prop.description,
+    required: prop.required,
+  };
+  if (prop.values !== undefined) row.values = prop.values;
+  if (prop.requires !== undefined) row.requires = prop.requires;
+  return row;
+}
+
 /** Extracts and validates the entire inventory before writing any artifact. */
 export async function generateApiArtifacts(
   options: GenerateApiArtifactsOptions
@@ -189,15 +207,7 @@ export async function generateApiArtifacts(
         sourcePath: part.sourcePath,
         forwardedFrom: part.forwardedFrom,
         forwardedCount: part.forwardedCount,
-        props: part.props.map((prop) => ({
-          name: prop.name,
-          origin: prop.origin,
-          type: prop.type,
-          shortType: prop.shortType,
-          defaultValue: prop.defaultValue,
-          description: prop.description,
-          required: prop.required,
-        })),
+        props: part.props.map(serializedProp),
       })),
     };
     const text = `${JSON.stringify(artifact, null, 2)}\n`;

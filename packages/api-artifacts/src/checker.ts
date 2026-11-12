@@ -1,7 +1,7 @@
 import path from "node:path";
 import type { SourceFile } from "tsrs/ast";
 import { isExpressionStatement, isStringLiteral } from "tsrs/ast/is";
-import { API, SignatureKind, SymbolFlags, TypeFormatFlags } from "tsrs/sync";
+import { API, SignatureKind, SymbolFlags, TypeFlags, TypeFormatFlags } from "tsrs/sync";
 import type { Checker, Program, Project, Symbol as TsSymbol, Type } from "tsrs/sync";
 
 import { compilerStartError, projectMissingError, projectOpenError } from "@elmeragroup/api-extractor";
@@ -202,6 +202,103 @@ function printType(checker: Checker, type: Type | undefined): string | null {
 }
 
 /**
+ * The string literals a type admits, without `undefined` and `null`, deduplicated, in checker
+ * order. TypeScript 7 orders string literals by value. `"any"` when the type admits a value that
+ * is not a string literal, such as `string` or `boolean`.
+ */
+function literalMembersOf(type: Type): readonly string[] | "any" {
+  const members = type.isUnionType() ? type.getTypes() : [type];
+  const values: string[] = [];
+  for (const member of members) {
+    if ((member.flags & (TypeFlags.Undefined | TypeFlags.Null)) !== 0) continue;
+    if (!member.isStringLiteralType()) return "any";
+    if (!values.includes(member.value)) values.push(member.value);
+  }
+  return values;
+}
+
+/**
+ * The string literals a prop accepts, when its type is a finite union of two or more of them.
+ * `null` for any other type. The checker expands aliases such as `ButtonSize` into one union,
+ * so this reads the resolved type, where `printType` keeps the alias names.
+ */
+function literalValuesOf(type: Type): readonly string[] | null {
+  const values = literalMembersOf(type);
+  return values !== "any" && values.length >= 2 ? values : null;
+}
+
+/** One arm of a props union: the values it admits for each prop, and the props it requires. */
+type PropsArm = {
+  readonly values: ReadonlyMap<string, readonly string[] | "any">;
+  readonly required: ReadonlySet<string>;
+};
+
+/** The arms of a props type that is a union, such as `LabelButtonProps | IconButtonProps`. */
+function propsArmsOf(checker: Checker, type: Type): readonly PropsArm[] {
+  if (!type.isUnionType()) return [];
+  return type.getTypes().map((arm) => {
+    const values = new Map<string, readonly string[] | "any">();
+    const required = new Set<string>();
+    for (const property of checker.getPropertiesOfType(arm)) {
+      values.set(property.name, literalMembersOf(checker.getTypeOfSymbol(property)));
+      if (!isOptional(property)) required.add(property.name);
+    }
+    return { values, required };
+  });
+}
+
+/** Whether every name of `smaller` is in `larger`. */
+function isSubset(smaller: readonly string[], larger: readonly string[]): boolean {
+  return smaller.every((name) => larger.includes(name));
+}
+
+/**
+ * The props each value of `prop` needs beside it, read from the props union's arms. Each arm
+ * that admits a value gives one alternative, the props it requires less the props every arm
+ * requires. A value passes with any one alternative, so only the minimal ones are kept, each
+ * once. A value that some arm admits with nothing more is left out, and so is the field when no
+ * value needs anything. Button's `size="icon"` needs `[["aria-label"]]`, and a prop that one arm
+ * names through `aria-label` and another through `aria-labelledby` needs
+ * `[["aria-label"], ["aria-labelledby"]]`.
+ */
+function valueRequirementsOf(
+  arms: readonly PropsArm[],
+  prop: string,
+  values: readonly string[]
+): Readonly<Record<string, readonly (readonly string[])[]>> | null {
+  const [first, ...rest] = arms;
+  if (first === undefined) return null;
+  const everywhere = [...first.required].filter((name) => rest.every((arm) => arm.required.has(name)));
+  const requirements: Record<string, readonly (readonly string[])[]> = {};
+  for (const value of values) {
+    const alternatives: (readonly string[])[] = [];
+    for (const arm of arms) {
+      // An arm without the prop admits only its absence, so it never admits a value.
+      const admitted = arm.values.get(prop);
+      if (admitted === undefined || (admitted !== "any" && !admitted.includes(value))) continue;
+      alternatives.push(
+        [...arm.required]
+          .filter((name) => name !== prop && !everywhere.includes(name))
+          .sort(compareUtf16CodeUnits)
+      );
+    }
+    if (alternatives.length === 0 || alternatives.some((needs) => needs.length === 0)) continue;
+    // A set that holds another set is never the cheaper way to pass, so it goes, as do repeats.
+    const minimal = alternatives.filter(
+      (needs, index) =>
+        !alternatives.some(
+          (other, at) => at !== index && isSubset(other, needs) && (other.length < needs.length || at < index)
+        )
+    );
+    requirements[value] = minimal.sort(
+      (left, right) =>
+        left.length - right.length || compareUtf16CodeUnits(left.join("\u0000"), right.join("\u0000"))
+    );
+  }
+  return Object.keys(requirements).length === 0 ? null : requirements;
+}
+
+/**
  * The one-line type a closed reference row shows, or `null` when the printed type is
  * short enough to show in full.
  *
@@ -343,6 +440,8 @@ export function componentPartRequests(
 /** Checker-owned facts for one public prop, including props omitted as forwarded. */
 export type CurrentPartPropFact = {
   readonly type: string | null;
+  /** The prop's string literal options, as `literalValuesOf` reads them. */
+  readonly values: readonly string[] | null;
   readonly required: boolean;
 };
 
@@ -363,8 +462,10 @@ export function readPartPropFact(
   if (property === undefined) {
     return undefined;
   }
+  const type = context.checker.getTypeOfSymbol(property);
   return {
-    type: printType(context.checker, context.checker.getTypeOfSymbol(property)),
+    type: printType(context.checker, type),
+    values: literalValuesOf(type),
     required: !isOptional(property),
   };
 }
@@ -403,7 +504,12 @@ export type ComponentApi = {
 type PropsParameter =
   | { readonly kind: "absent" }
   | { readonly kind: "unresolved" }
-  | { readonly kind: "resolved"; readonly props: ReadonlyMap<string, TsSymbol> };
+  | {
+      readonly kind: "resolved";
+      readonly props: ReadonlyMap<string, TsSymbol>;
+      /** The arms of the props type when it is a union; empty otherwise. */
+      readonly arms: readonly PropsArm[];
+    };
 
 /**
  * What one part's call signatures yield for its published props contract. `none`
@@ -430,7 +536,7 @@ function partContractOf(checker: Checker, type: Type): PartContract {
   for (const property of checker.getPropertiesOfType(declared)) {
     props.set(property.name, property);
   }
-  return { kind: "one", props: { kind: "resolved", props } };
+  return { kind: "one", props: { kind: "resolved", props, arms: propsArmsOf(checker, declared) } };
 }
 
 /**
@@ -444,6 +550,7 @@ function describeProps(
   request: PartRequest,
   source: PartSource,
   props: ReadonlyMap<string, TsSymbol>,
+  arms: readonly PropsArm[],
   problems: string[]
 ): ApiProp[] {
   const { checker } = context;
@@ -451,7 +558,8 @@ function describeProps(
   for (const property of props.values()) {
     const isRecipeAxis = isRecipeAxisProp(property);
     if (!isRecipeAxis && !isOwnProp(context, property)) continue;
-    const printed = printType(checker, checker.getTypeOfSymbol(property));
+    const type = checker.getTypeOfSymbol(property);
+    const printed = printType(checker, type);
     if (printed === null) {
       problems.push(
         `${request.name}.${property.name}: type is unresolvable — the docs build cannot print it (${source.sourcePath})`
@@ -465,7 +573,7 @@ function describeProps(
       );
       continue;
     }
-    rows.push({
+    const row: ApiProp = {
       name: property.name,
       origin: isRecipeAxis ? "recipe-axis" : "declared",
       type: printed,
@@ -473,7 +581,14 @@ function describeProps(
       defaultValue: source.defaults.get(property.name) ?? null,
       description,
       required: !isOptional(property),
-    });
+    };
+    const values = literalValuesOf(type);
+    if (values !== null) {
+      row.values = values;
+      const requires = valueRequirementsOf(arms, property.name, values);
+      if (requires !== null) row.requires = requires;
+    }
+    rows.push(row);
   }
   rows.sort((left, right) => compareUtf16CodeUnits(left.name, right.name));
   return rows;
@@ -516,7 +631,7 @@ function describePart(
         name: request.name,
         rsc: source.rsc,
         sourcePath: source.sourcePath,
-        props: describeProps(context, request, source, contract.props.props, problems),
+        props: describeProps(context, request, source, contract.props.props, contract.props.arms, problems),
         forwardedFrom: forwarded.from,
         forwardedCount: forwarded.count,
       };
