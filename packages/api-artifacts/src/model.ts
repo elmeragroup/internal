@@ -42,6 +42,21 @@ export type ApiProp = {
   description: string;
   /** Whether the public props contract requires the prop. */
   required: boolean;
+  /**
+   * The string literals the prop accepts, when its type is a finite union of two or more of them.
+   * The checker expands aliases, drops `undefined` and `null`, and orders the literals by value,
+   * so a `ButtonSize | undefined` prop lists `["lg", "md", "sm"]`. Booleans and other types omit
+   * the field.
+   */
+  values?: readonly string[];
+  /**
+   * The props a value of `values` needs beside it, keyed by value, when the part's props type is
+   * a union whose arms admit different values. Each inner list is one alternative: the extra props
+   * of one arm that admits the value. A value passes when an object has every prop of any one
+   * alternative. Button's `size="icon"` lists `[["aria-label"]]`. A value that needs nothing is
+   * left out, and so is the field when no value needs anything.
+   */
+  requires?: Readonly<Record<string, readonly (readonly string[])[]>>;
 };
 
 /** One published part of a component, e.g. `Dialog.Content`. */

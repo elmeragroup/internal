@@ -86,6 +86,156 @@ describe("generateApiArtifacts", () => {
     expect(await readFile(path.join(root, "docs/button/api.json"), "utf8")).toBe(component?.text);
   });
 
+  it("lists the string literals a finite union accepts, through aliases and recipe axes", async () => {
+    const root = await fixture(`import type { ButtonVariantProps } from "./button-variants";
+type IconSize = "icon" | "icon-sm";
+type LabelSize = "sm" | "md" | "icon";
+export type Props = ButtonVariantProps & {
+  /** Size of the button. */
+  size?: IconSize | LabelSize | null;
+  /** Whether interaction is disabled. */
+  disabled?: boolean;
+  /** Width as a keyword or a CSS length. */
+  width?: "auto" | number;
+  /** The one supported alignment. */
+  align?: "start";
+};
+export function Button(props: Props) { return String(props.size); }
+export const Compound = { Root: Button };
+`);
+    await writeFile(
+      path.join(root, "button-variants.ts"),
+      `export type ButtonVariantProps = { variant?: "default" | "outline" | "ghost" };\n`
+    );
+    const component = (await generateApiArtifacts(options(root))).components[0];
+    const props = new Map(component?.parts[0]?.props.map((prop) => [prop.name, prop]));
+    // TypeScript 7 orders a union's string literals by value, whatever the source order.
+    expect(props.get("size")?.values).toEqual(["icon", "icon-sm", "md", "sm"]);
+    expect(props.get("variant")).toMatchObject({
+      origin: "recipe-axis",
+      values: ["default", "ghost", "outline"],
+    });
+    expect(props.get("disabled")).not.toHaveProperty("values");
+    expect(props.get("width")).not.toHaveProperty("values");
+    expect(props.get("align")).not.toHaveProperty("values");
+    // A props type that is no union gives no value anything to require.
+    expect(props.get("size")).not.toHaveProperty("requires");
+    // The returned parts are the objects the writer serialized, so their key order is the file's.
+    expect(Object.keys(props.get("size") ?? {})).toEqual([
+      "name",
+      "origin",
+      "type",
+      "shortType",
+      "defaultValue",
+      "description",
+      "required",
+      "values",
+    ]);
+    expect(component?.text).toContain('"values": [\n');
+  });
+
+  it("lists the props a value needs, from the arms of a props union", async () => {
+    const root = await fixture(`type Shared = {
+  /** Label shown on the button. */
+  label: string;
+};
+type IconProps = Shared & {
+  /** Size of the button. */
+  size: "icon" | "icon-sm";
+  /** Name of an icon-only button. */
+  "aria-label": string;
+};
+type LabelProps = Shared & {
+  /** Size of the button. */
+  size?: "sm" | "md";
+  /** Name of an icon-only button. */
+  "aria-label"?: string;
+};
+export type Props = IconProps | LabelProps;
+export function Button(props: Props) { return props.label; }
+export const Compound = { Root: Button };
+`);
+    const props = new Map(
+      (await generateApiArtifacts(options(root))).components[0]?.parts[0]?.props.map((prop) => [
+        prop.name,
+        prop,
+      ])
+    );
+    expect(props.get("size")).toMatchObject({
+      values: ["icon", "icon-sm", "md", "sm"],
+      requires: { icon: [["aria-label"]], "icon-sm": [["aria-label"]] },
+    });
+    // `label` is required in every arm, so no value needs it; `aria-label` has no literal values.
+    expect(props.get("aria-label")).not.toHaveProperty("requires");
+    expect(props.get("label")).not.toHaveProperty("requires");
+  });
+
+  it("keeps each arm that admits a value as an alternative, minimal sets only", async () => {
+    // Shaped like Carousel's naming (`aria-label` or `aria-labelledby`) and SkeletonReveal's
+    // content (`loading` or `data`): every value is admitted by more than one arm.
+    const root = await fixture(`type Named =
+  | {
+      /** Name of the region. */
+      "aria-label": string;
+      /** Id of the element that names the region. */
+      "aria-labelledby"?: string;
+    }
+  | {
+      /** Name of the region. */
+      "aria-label"?: string;
+      /** Id of the element that names the region. */
+      "aria-labelledby": string;
+    };
+type Content =
+  | {
+      /** Whether the content is loading. */
+      loading: boolean;
+      /** Rows to reveal. */
+      data?: undefined;
+      /** How the content appears. */
+      reveal?: "fade" | "none";
+    }
+  | {
+      /** Whether the content is loading. */
+      loading?: undefined;
+      /** Rows to reveal. */
+      data: readonly string[];
+      /** How the content appears. */
+      reveal?: "fade" | "none";
+    }
+  | {
+      /** Whether the content is loading. */
+      loading: boolean;
+      /** Rows to reveal. */
+      data: readonly string[];
+      /** How the content appears. */
+      reveal?: "fade" | "none";
+    };
+export type Props = Named & {
+  /** Direction of the slides. */
+  orientation?: "horizontal" | "vertical";
+} & Content;
+export function Button(props: Props) { return String(props.orientation); }
+export const Compound = { Root: Button };
+`);
+    const props = new Map(
+      (await generateApiArtifacts(options(root))).components[0]?.parts[0]?.props.map((prop) => [
+        prop.name,
+        prop,
+      ])
+    );
+    // Each value passes with either set; the arm needing both `loading` and `data` is no minimal
+    // alternative, and no set appears twice although the arms multiply.
+    const either = [
+      ["aria-label", "data"],
+      ["aria-label", "loading"],
+      ["aria-labelledby", "data"],
+      ["aria-labelledby", "loading"],
+    ];
+    expect(props.get("orientation")?.requires).toEqual({ horizontal: either, vertical: either });
+    expect(props.get("reveal")?.requires).toEqual({ fade: either, none: either });
+  });
+
   it("names TypeScript's default library `typescript` wherever the compiler installed it", async () => {
     // tsrs installs its default library inside a per-platform package, such as
     // `@tsrs/linux-x64-gnu`, so an artifact naming that package would differ by the machine that
@@ -232,6 +382,8 @@ export const Compound = { Root: Button };
  * @default false
  */
 external?: boolean;
+/** External placement. */
+side?: "top" | "bottom";
 undocumented?: string;
 };`
     );
@@ -244,12 +396,20 @@ undocumented?: string;
       allowedWarningCodes: ["unsupported-type-fallback"],
     });
     expect(result.diagnostics.some(({ warning }) => warning.code === "unsupported-type-fallback")).toBe(true);
-    expect(result.components[0]?.parts[0]?.props.map((prop) => prop.name)).toEqual(["external", "label"]);
+    expect(result.components[0]?.parts[0]?.props.map((prop) => prop.name)).toEqual([
+      "external",
+      "label",
+      "side",
+    ]);
     expect(result.components[0]?.parts[0]?.props[0]).toMatchObject({
       origin: { packageName: "fixture-dependency" },
       description: "External description.",
       defaultValue: "false",
       required: false,
+    });
+    expect(result.components[0]?.parts[0]?.props[2]).toMatchObject({
+      origin: { packageName: "fixture-dependency" },
+      values: ["bottom", "top"],
     });
     expect(result.components[0]?.parts[0]?.forwardedCount).toBe(1);
   });
