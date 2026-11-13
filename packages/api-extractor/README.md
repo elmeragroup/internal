@@ -262,10 +262,10 @@ From `packages/api-extractor`, create the ignored development references with:
 git clone https://github.com/michaldudak/typescript-api-extractor.git ../../.ref/typescript-api-extractor
 git -C ../../.ref/typescript-api-extractor checkout --detach e145350
 git clone https://github.com/Effect-TS/effect.git ../../.ref/effect
-git -C ../../.ref/effect checkout --detach effect@4.0.2
+git -C ../../.ref/effect checkout --detach effect@4.1.3
 ```
 
-The Effect reference resolves to commit `269a7c864351231d42e6e95b7fa8f32050df3691`. Runtime
+The Effect reference resolves to commit `7865dbbb7b6a91691921dbb4febedf3ab94a348b`. Runtime
 `effect` remains pinned to that release in `pnpm-workspace.yaml`. Timing evidence gates on Node
 major 24 and records the exact patch as an observation, so any `>=24.13.0 <25` runtime can
 run the package tests.

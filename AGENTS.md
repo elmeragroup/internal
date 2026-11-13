@@ -29,7 +29,7 @@ TypeScript 7.1: type-check scripts, builds, declaration emit, evidence scripts, 
 `tsrs/*` API. The `typescript` package is not a dependency. Type-aware Oxlint also runs on tsrs: the
 lint scripts set `OXLINT_TSGOLINT_PATH=node_modules/.bin/tsrs-lint`, so run Oxlint through
 `pnpm lint` or with that variable set. The workspace is supported on macOS
-arm64/x64 and Linux x64/arm64 (glibc and musl). tsrs also ships a Windows x64 binary, but Windows is
+arm64/x64 and Linux x64/arm64 (glibc and musl). tsrs also ships Windows x64 and arm64 binaries, but Windows is
 not supported: extraction path identity is not Windows-aware yet.
 
 Run commands from the repository root unless stated otherwise.
