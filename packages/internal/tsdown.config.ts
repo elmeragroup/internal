@@ -1,7 +1,5 @@
 import { defineConfig } from "tsdown";
 
-import { tsrsLauncherPath } from "../../scripts/tsrs-launcher.ts";
-
 // A config function keeps importing this module free of filesystem reads; tsdown calls it to build.
 export default defineConfig(() => ({
   entry: {
@@ -15,9 +13,9 @@ export default defineConfig(() => ({
   platform: "node",
   format: "esm",
   target: "node24",
-  // tsrs runs the TypeScript 7 declaration emitter; the plugin only infers that generator from a
-  // `typescript` 7 install, so it is named here. The public launcher selects the platform binary.
-  dts: { generator: "tsgo", tsgo: { path: tsrsLauncherPath(import.meta.dirname) } },
+  // tsrs runs the TypeScript 7 declaration emitter through its own API. The plugin never selects
+  // this generator automatically, so it is named here.
+  dts: { generator: "tsrs" },
   // TS7 declaration generation uses the config directory as its source root.
   tsconfig: "../../tsconfig.bundle.json",
   banner: { dts: '/// <reference lib="esnext.disposable" />' },
