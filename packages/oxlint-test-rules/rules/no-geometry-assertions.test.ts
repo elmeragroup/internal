@@ -18,6 +18,8 @@ ruleTester.run("no-geometry-assertions", noGeometryAssertions, {
   valid: [
     // Hang: a measurement past the traversal's budget is unknown.
     doubledWidth(25),
+    // A negated measurement compared with another is still a relation.
+    "expect(-panel.offsetWidth).toBe(-panel.offsetHeight);",
     // Every alternative a named constant or zero keeps the exemption.
     "const ROW_WIDTH = 320;\nexpect(panel.offsetWidth).toBe(flag ? ROW_WIDTH : 0);",
     // A distance held in a binding or returned by a local function is still a distance.
@@ -63,6 +65,8 @@ ruleTester.run("no-geometry-assertions", noGeometryAssertions, {
   invalid: [
     // A doubled measurement within the budget is still a length.
     { code: doubledWidth(4), errors: [{ messageId: "pixel" }] },
+    // A negated measurement against a pixel literal still pins a length.
+    { code: "expect(-panel.offsetWidth).toBe(-320);", errors: [{ messageId: "pixel" }] },
     // A member read of alternatives, one of which is a measurement.
     {
       code: "expect((flag ? el : { offsetWidth: 0 }).offsetWidth).toBe(320);",

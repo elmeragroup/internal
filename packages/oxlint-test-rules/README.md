@@ -10,18 +10,20 @@ and helpers turned into options.
 
 ## Rules
 
-| Rule                      | Reports                                                                                                                                    | Options                                              |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------- |
-| `no-test-retry`           | `retry`, `repeats` or `retries` that may be other than `0` or `false` on a test, suite or `vi.setConfig`; in a non-test file, any such key | none                                                 |
-| `no-wall-clock`           | a real-clock capture (`Date.now()`, `performance.now()`, `process.hrtime()`, `new Date()`) that is subtracted or asserted                  | `fakeClockHelpers`                                   |
-| `no-fixed-delay`          | a non-zero `setTimeout`, timer import, `sleep`, `delay`, `page.waitForTimeout` or live `Effect.sleep` outside a fake clock or polling loop | `waitHelpers`, `realWaitHelpers`, `fakeClockHelpers` |
-| `no-source-reading-tests` | `readFileSync`, `readFile` or `readFileString` of a code module the test did not write, or a `?raw` import of one                          | none                                                 |
-| `no-class-assertions`     | an assertion on an element's class the test did not supply                                                                                 | none                                                 |
-| `no-geometry-assertions`  | a measured layout length asserted against a pixel number or pixel string                                                                   | none                                                 |
+| Rule                      | Reports                                                                                                                                                              | Options                                              |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| `no-test-retry`           | `retry`, `repeats` or `retries` that may be other than `0` or `false` on a test, suite or `vi.setConfig`; in a file not named `*.test.*` or `*.spec.*`, any such key | none                                                 |
+| `no-wall-clock`           | a real-clock capture (`Date.now()`, `performance.now()`, `process.hrtime()`, `new Date()`) that is subtracted or asserted                                            | `fakeClockHelpers`                                   |
+| `no-fixed-delay`          | a non-zero `setTimeout`, timer import, `sleep`, `delay`, `page.waitForTimeout` or live `Effect.sleep` outside a fake clock or polling loop                           | `waitHelpers`, `realWaitHelpers`, `fakeClockHelpers` |
+| `no-source-reading-tests` | `readFileSync`, `readFile` or `readFileString` of a code module the test did not write, or a `?raw` import of one                                                    | none                                                 |
+| `no-class-assertions`     | an assertion on an element's class the test did not supply                                                                                                           | none                                                 |
+| `no-geometry-assertions`  | a measured layout length asserted against a pixel number or pixel string                                                                                             | none                                                 |
 
 Each rule's JSDoc states its full scope: what it allows (`Date.now() - HOUR`, `retry: 0`, a zero
 delay, a delay under `vi.useFakeTimers()`, a class the test passed in, a relation between two
-measurements) and what it does not follow.
+measurements) and what it does not follow. `no-fixed-delay` and `no-wall-clock` do not follow a test
+registered through a local wrapper that forwards its body to `it`, or a timer or clock read in a
+class method (`new C().m()`): each is judged without its test's fake clock.
 
 ### Options
 
@@ -57,7 +59,7 @@ same way, keyed by everything its result depends on; `shared/traversal.guard.tes
 rule on self-referencing and doubled values and fails on a crash or a run that does not finish.
 
 - `shared/value.ts` holds the values and their pure operations; `derive` is the one way provenance
-  (`narrowed`, `named`, `via`) is marked. `shared/mutations.ts` indexes in-place mutations.
+  (`named`, `via`) is marked. `shared/mutations.ts` indexes in-place mutations.
 - `shared/quantify.ts` is the one rule for alternatives: a value violates when any alternative does,
   and earns an exemption only when every alternative qualifies and none is unknown.
 - `shared/source-paths.ts` is `no-source-reading-tests`' path model: spelling, listed files, and

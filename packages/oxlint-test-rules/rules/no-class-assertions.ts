@@ -3,7 +3,7 @@ import type { ESTree, Rule } from "@oxlint/plugins";
 import { memberName, nameChain, propertyKeyName } from "../shared/ast-names.ts";
 import { descendants, unwrap } from "../shared/ast-walk.ts";
 import { allQualify, firstViolation } from "../shared/quantify.ts";
-import { calleeNames, evaluate, returnedValues } from "../shared/resolve.ts";
+import { calleeApis, evaluate, returnedValues } from "../shared/resolve.ts";
 import { assertionOf, evidenceSets, reachOf } from "../shared/test-context.ts";
 import { Analysis, pairKey } from "../shared/traversal.ts";
 import type { EvidenceKey } from "../shared/traversal.ts";
@@ -213,7 +213,7 @@ export const noClassAssertions: Rule = {
       }
       if (node.type !== "CallExpression") return false;
       const [argument] = node.arguments;
-      if (calleeNames(context, node.callee).includes("Array.from")) {
+      if (calleeApis(context, node.callee).includes("Array.from")) {
         return argument !== undefined && evaluate(context, argument).some((from) => readsClasses(from));
       }
       return evaluate(context, node.callee).some((callee) => {
@@ -225,7 +225,7 @@ export const noClassAssertions: Rule = {
 
     /** Whether any alternative of an attribute name is `"class"`. */
     const namesClass = (node: ESTree.Node): boolean =>
-      evaluate(context, node).some((name) => name.kind === "string" && name.value === "class");
+      stringValues(evaluate(context, node)).includes("class");
 
     /**
      * The classes one actual alternative asks about when it is a membership test:

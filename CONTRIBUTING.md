@@ -77,9 +77,8 @@ could not check. When regenerated evidence or reports change, explain each seman
 ### Test value
 
 The [authoring gate](.agents/skills/test-audit/SKILL.md#authoring-gate) decides whether a change gets
-a test. Every added or changed test answers each gate question in the PR's Test value section: the
-behavior and its oracle, the regression that turns it red, why the keeper misses it, and whether it
-needs a test-only seam. A behavior change without a new test names the gate's reason instead.
+a test. Every added or changed test answers each gate question in the PR's Test value section. A
+behavior change without a new test names the gate's reason instead.
 
 <a id="release-impact"></a>
 

@@ -60,8 +60,37 @@ ruleTester.run("no-test-retry", noTestRetry, {
     { code: recursiveGraph(24), filename: TEST },
     // A value the evaluator cannot know is no evidence of a rerun.
     { code: 'let retry = 2;\nretry = 0;\nit("once", { retry }, () => {});', filename: TEST },
+    // A parameter default applies only for `undefined`: `null` and `0` keep their own value.
+    {
+      code: 'function register(name, retry = 2) {\n  it(name, { retry }, body);\n}\nregister("once", null);\nregister("once", 0);',
+      filename: TEST,
+    },
+    // Arguments spread from an unknown list, and a count changed in place, prove no rerun.
+    {
+      code: "function register(name, retry) {\n  it(name, { retry }, body);\n}\nregister(...args);",
+      filename: TEST,
+    },
+    { code: 'const opts = { retry: 1 };\nopts.retry--;\nit("once", opts, () => {});', filename: TEST },
+    // A `*.spec.*` file is a test file, so a product's `retries` option in it is data.
+    {
+      code: 'const client = makeClient({ retries: 3 });\ntest("loads", async () => {});',
+      filename: "/repo/e2e/checkout.spec.ts",
+    },
   ],
   invalid: [
+    // A parameter default applies when the argument is missing or `undefined`.
+    {
+      code: 'function register(name, retry = 2) {\n  it(name, { retry }, body);\n}\nregister("once");',
+      filename: TEST,
+      errors: [{ messageId: "rerun", line: 2 }],
+    },
+    {
+      code: 'function register(name, retry = 2) {\n  it(name, { retry }, body);\n}\nregister("once", undefined);',
+      filename: TEST,
+      errors: [{ messageId: "rerun", line: 2 }],
+    },
+    // `retry: true` reruns.
+    { code: 'it("x", { retry: true }, () => {});', filename: TEST, errors: [{ messageId: "rerun" }] },
     // A call site that passes a rerun makes the helper's retry rerun.
     {
       code: 'function register(name, retry) {\n  it(name, { retry }, body);\n}\nregister("once", 0);\nregister("flaky", 2);',

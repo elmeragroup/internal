@@ -53,13 +53,12 @@ export type AltBody =
   | { readonly kind: "unknown" };
 
 /**
- * One value an expression may hold: what it is, whether a property read reached it (`narrowed`),
- * whether a name reached it (`named`): a binding, a property of a named value, a call's return,
- * or a primitive operation on a named operand; and the local calls whose returns carried it out
+ * One value an expression may hold: what it is, whether a name reached it (`named`): a binding, a
+ * property of a named value, a call's return, or a primitive operation on a named operand; and the
+ * local calls whose returns carried it out
  * (`via`), outermost first, so a consumer can judge it at the invocation that produced it.
  */
 export type Alt = AltBody & {
-  readonly narrowed: boolean;
   readonly named: boolean;
   readonly via: ReadonlyArray<ESTree.CallExpression>;
 };
@@ -75,7 +74,7 @@ export type Derivation =
 
 /**
  * A value as reached through a derivation: the one way the evaluator marks provenance. A
- * projection is `narrowed`, `named` when its container is, and carries its container's calls
+ * projection is `named` when its container is, and carries its container's calls
  * before its own; a return is `named` and carries the call before its own; a name is `named`.
  *
  * @param value - The value as its own expression holds it.
@@ -87,7 +86,6 @@ export function derive(value: Alt, derivation: Derivation): Alt {
     case "projection":
       return {
         ...value,
-        narrowed: true,
         named: value.named || derivation.container.named,
         via: [...derivation.container.via, ...value.via],
       };
@@ -99,13 +97,13 @@ export function derive(value: Alt, derivation: Derivation): Alt {
 }
 
 /**
- * An alternative reached neither through a property read nor through a name.
+ * An alternative reached through no name and carried by no call.
  *
  * @param body - What it is.
  * @returns The alternative.
  */
 export function plain(body: AltBody): Alt {
-  return { ...body, narrowed: false, named: false, via: [] };
+  return { ...body, named: false, via: [] };
 }
 
 /** A value the evaluator cannot know: never evidence for an exemption or a violation. */
@@ -204,7 +202,7 @@ export function fromPrimitive(value: Primitive, from: ReadonlyArray<Alt> = []): 
     if (typeof value === "number") return { kind: "number", value };
     return { kind: "boolean", value };
   };
-  return { ...body(), narrowed: false, named: isNamed, via: [] };
+  return { ...body(), named: isNamed, via: [] };
 }
 
 /**
@@ -258,6 +256,17 @@ export function nullishness(alternative: Alt): "nullish" | "present" | "either" 
 }
 
 /**
+ * Whether a destructuring or parameter default may apply to a value: it does for `undefined`, and
+ * may for a value the evaluator does not hold. `null` keeps its own value, as in JavaScript.
+ *
+ * @param value - One alternative.
+ * @returns Whether the default may apply.
+ */
+export function mayTakeDefault(value: Alt): boolean {
+  return value.kind === "undefined" || nullishness(value) === "either";
+}
+
+/**
  * A value with a default applied as JavaScript applies a destructuring or parameter default: the
  * default where an alternative is `undefined`, beside the alternative where it may be (a value the
  * evaluator does not hold), and nothing for an alternative that is never `undefined`.
@@ -269,8 +278,8 @@ export function nullishness(alternative: Alt): "nullish" | "present" | "either" 
 export function withDefault(values: ReadonlyArray<Alt>, fallback: () => ReadonlyArray<Alt>): Alt[] {
   return alternatives(
     ...values.map((value): ReadonlyArray<Alt> => {
-      if (value.kind === "undefined") return fallback();
-      return nullishness(value) === "either" ? [value, ...fallback()] : [value];
+      if (!mayTakeDefault(value)) return [value];
+      return value.kind === "undefined" ? fallback() : [value, ...fallback()];
     })
   );
 }
@@ -285,7 +294,9 @@ export function withDefault(values: ReadonlyArray<Alt>, fallback: () => Readonly
  */
 export function entryFor(object: Alt, key: string): PropertyEntry | "unknown" | undefined {
   if (object.kind !== "object") return "unknown";
-  for (const entry of [...object.entries].reverse()) {
+  for (let index = object.entries.length - 1; index >= 0; index -= 1) {
+    const entry = object.entries[index];
+    if (entry === undefined) continue;
     if (entry._tag === "unopened-spread") return "unknown";
     if (entry.key === key) return entry;
   }

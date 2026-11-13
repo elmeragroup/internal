@@ -112,6 +112,11 @@ ruleTester.run("no-class-assertions", noClassAssertions, {
     },
     // A doubled class list within the budget still reads classes.
     { code: doubledClassList(3), errors: [{ messageId: "pinned" }] },
+    // A class list copied by `Array.from` still reads classes.
+    {
+      code: 'expect(Array.from(button.classList)).toContain("h-9");',
+      errors: [{ messageId: "pinned", data: { token: "h-9" } }],
+    },
     // An imported class the test does not supply is still the component's own.
     {
       code: 'import { MARKER, OTHER } from "./fixtures";\nit("x", () => {\n  render(<Button className={OTHER} />);\n  expect(button).toHaveClass(MARKER);\n});',

@@ -7,7 +7,7 @@ import { calleeApis, evaluate } from "../shared/resolve.ts";
 import { isTestFile } from "../shared/source-file.ts";
 import { callSitesOf, runnerRoots } from "../shared/test-context.ts";
 import { Analysis } from "../shared/traversal.ts";
-import { entryFor, nullishness } from "../shared/value.ts";
+import { entryFor, mayTakeDefault } from "../shared/value.ts";
 import type { Alt } from "../shared/value.ts";
 
 /** The option keys that rerun a test: Vitest's `retry` and `repeats`, Playwright's `retries`. */
@@ -80,10 +80,7 @@ function reruns(context: Context, alternative: Alt): boolean {
 
 /** Whether an argument that may be `undefined` takes a default that reruns. */
 function withDefaultReruns(context: Context, argument: ESTree.Node, fallback: ESTree.Node): boolean {
-  return (
-    evaluate(context, argument).some((value) => nullishness(value) !== "present") &&
-    rerunsIn(context, fallback)
-  );
+  return evaluate(context, argument).some(mayTakeDefault) && rerunsIn(context, fallback);
 }
 
 /**
@@ -137,7 +134,7 @@ export const noTestRetry: Rule = {
             const setting = firstViolation(options, (alternative) => {
               const entry = entryFor(alternative, key);
               if (entry === undefined || entry === "unknown") return undefined;
-              return rerunKeyOf(entry.property) === undefined ? undefined : entry.property;
+              return rerunsIn(context, entry.value) ? entry.property : undefined;
             });
             if (setting !== undefined) check(setting);
           }

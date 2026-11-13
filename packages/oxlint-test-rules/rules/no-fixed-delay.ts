@@ -1,10 +1,10 @@
 import type { Context, ESTree, Rule } from "@oxlint/plugins";
 
 import { descendants, isFunction, isPromiseCallback, unwrap, within } from "../shared/ast-walk.ts";
-import { captureSite, FAKE_CLOCK_HELPERS_SCHEMA, isSimulated } from "../shared/fake-clock.ts";
-import type { FakeClockHelper } from "../shared/fake-clock.ts";
+import { captureAway, FAKE_CLOCK_HELPERS_SCHEMA, isSimulated } from "../shared/fake-clock.ts";
+import type { ClockCapture, FakeClockHelper } from "../shared/fake-clock.ts";
 import { anyViolates } from "../shared/quantify.ts";
-import { calleeNames, evaluate } from "../shared/resolve.ts";
+import { calleeApis, evaluate } from "../shared/resolve.ts";
 import { ruleOptions } from "../shared/rule-options.ts";
 import { isolated } from "../shared/traversal.ts";
 import { targetOf, UNDEFINED, withDefault } from "../shared/value.ts";
@@ -52,16 +52,12 @@ const STEPS = new Set(["+=", "-="]);
 type Wait = {
   readonly delay: ReadonlyArray<Alt> | undefined;
   readonly fakeable: boolean;
-  /** Where the timer read the global a fake clock replaces, when that is not the call itself. */
-  readonly capture: Capture | undefined;
+  /**
+   * Where the timer read the global a fake clock replaces, when that is not the call itself
+   * (`captureAway`): the wait is judged there, since the alias keeps whatever the slot held.
+   */
+  readonly capture: ClockCapture | undefined;
 };
-
-/**
- * Where a timer read the global slot a fake clock replaces (`captureSite`), away from the call that
- * waits (`const later = setTimeout` at module scope), and the local calls that carried it there:
- * the wait is judged there, since the alias keeps whatever the slot held when it ran.
- */
-type Capture = { readonly at: ESTree.Node; readonly via: ReadonlyArray<ESTree.CallExpression> };
 
 /**
  * A wait a local function hands a parameter to when it runs: the function that owns the parameter
@@ -73,7 +69,7 @@ type Forward = {
   readonly index: number;
   readonly fakeable: boolean;
   /** Where the timer read its global outside the forwarding function, if it did. */
-  readonly capture: Capture | undefined;
+  readonly capture: ClockCapture | undefined;
 };
 
 /** Whether a function is a `new Promise` executor, which runs as soon as the promise is created. */
@@ -249,11 +245,12 @@ function isInPollingLoop(context: Context, node: ESTree.Node): boolean {
  * that built it passed, so building one (`const later = makeLater(100)`) waits nothing.
  *
  * Scope: follows what `resolve.ts` follows, for the timer and for the delay. Beyond that: an
- * imported wait helper the options do not name is not recognised; a local
- * helper is a wait only through a recognised wait it hands its parameter to, so one that waits
- * another way (spinning on `performance.now()`) is not; and imported and promise timers, `wait` and
- * `page.waitForTimeout` count as real waits under any fake clock, since Vitest's fake timers patch
- * only the globals.
+ * imported wait helper the options do not name is not recognised; a local helper is a wait only
+ * through a recognised wait it hands its parameter to, so one that waits another way (spinning on
+ * `performance.now()`) is not; imported and promise timers, `wait` and `page.waitForTimeout` count
+ * as real waits under any fake clock, since Vitest's fake timers patch only the globals; and a test
+ * registered through a local wrapper that forwards its body to `it`, and a timer in a class method
+ * (`new C().m()`), are judged without their test, so that test's fake clock does not cover them.
  */
 export const noFixedDelay: Rule = {
   meta: {
@@ -287,7 +284,8 @@ export const noFixedDelay: Rule = {
     const onLiveClock = (node: ESTree.Node): boolean => {
       for (let parent = node.parent; parent !== null; parent = parent.parent) {
         if (parent.type !== "CallExpression") continue;
-        if (calleeNames(context, parent.callee).some((name) => LIVE_TESTS.test(name))) return true;
+        if (calleeApis(context, parent.callee).some((name) => name !== undefined && LIVE_TESTS.test(name)))
+          return true;
       }
       return false;
     };
@@ -300,7 +298,7 @@ export const noFixedDelay: Rule = {
     const callbackWait = (
       call: ESTree.CallExpression,
       fakeable: boolean,
-      capture: Capture | undefined
+      capture: ClockCapture | undefined
     ): Wait => {
       const [first, second] = call.arguments;
       if (second !== undefined) return { delay: valuesOf(second), fakeable, capture };
@@ -321,11 +319,8 @@ export const noFixedDelay: Rule = {
       if (target.module !== undefined && TIMER_MODULES.has(target.module)) {
         return name === "setTimeout" ? callbackWait(call, false, undefined) : undefined;
       }
-      if (target.module === undefined && name === "setTimeout") {
-        const site = captureSite(callee, "setTimeout");
-        const away = site !== undefined && !within(site, call);
-        return callbackWait(call, true, away ? { at: site, via: callee.via } : undefined);
-      }
+      if (target.module === undefined && name === "setTimeout")
+        return callbackWait(call, true, captureAway(callee, "setTimeout", call));
       if (target.path.length === 2 && target.path[1] === PAGE_WAIT)
         return { delay: first, fakeable: false, capture: undefined };
       // A helper named as a real wait waits for real, whether or not it is also a wait helper.
@@ -456,13 +451,9 @@ export const noFixedDelay: Rule = {
      */
     const waitsForReal = (call: ESTree.CallExpression, { delay, fakeable, capture }: Wait): boolean =>
       delay !== undefined &&
-      anyViolates(
-        delay,
-        (alternative) =>
-          isNonZeroDelay(alternative) &&
-          (!fakeable ||
-            !isSimulated(context, capture?.at ?? call, "setTimeout", fakeClockHelpers, capture?.via ?? []))
-      );
+      anyViolates(delay, isNonZeroDelay) &&
+      (!fakeable ||
+        !isSimulated(context, capture?.at ?? call, "setTimeout", fakeClockHelpers, capture?.via ?? []));
 
     return {
       CallExpression(node) {

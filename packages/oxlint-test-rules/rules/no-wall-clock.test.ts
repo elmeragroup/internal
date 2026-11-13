@@ -3,6 +3,21 @@ import { noWallClock } from "./no-wall-clock.ts";
 
 ruleTester.run("no-wall-clock", noWallClock, {
   valid: [
+    // A capture offset by a value the file does not hold as a number builds a timestamp; it measures nothing.
+    'import { HOUR } from "./constants.ts";\nit("a", () => {\n  const cutoff = Date.now() - HOUR;\n  log(cutoff);\n});',
+    'it("a", () => {\n  const daysAgo = (days) => new Date(Date.now() - days * 86_400_000);\n  log(daysAgo(2));\n});',
+    // The age of a fixture date, and the difference of two dates derived from one injected now.
+    'it("a", () => {\n  const born = new Date("2000-01-01");\n  log(Date.now() - born.getTime());\n});',
+    'it("a", () => {\n  const now = new Date();\n  const tomorrow = addDays(now, 1);\n  expect(tomorrow.getTime() - now.getTime()).toBe(86_400_000);\n});',
+    // `vi.setSystemTime` without fake timers installs a clock that fakes Date (Vitest 5.1).
+    'beforeEach(() => {\n  vi.setSystemTime(new Date("2024-01-01T00:00:00Z"));\n});\nit("a", () => {\n  const start = Date.now();\n  vi.setSystemTime(start + 5000);\n  expect(Date.now() - start).toBe(5000);\n});',
+    // `vitest` is exported beside `vi` with the same API.
+    'import { vitest } from "vitest";\nit("a", () => {\n  vitest.useFakeTimers();\n  const start = Date.now();\n  vitest.advanceTimersByTime(5);\n  expect(Date.now() - start).toBe(5);\n});',
+    // Playwright registers hooks as `test.beforeEach` and `test.beforeAll`.
+    'test.beforeEach(async ({ page }) => {\n  await page.clock.install();\n});\ntest("t", async ({ page }) => {\n  const start = await page.evaluate(() => Date.now());\n  await page.clock.runFor(1000);\n  expect((await page.evaluate(() => Date.now())) - start).toBe(1000);\n});',
+    // A test registered through an extended `test` runs its own body and its suite's hooks.
+    'import { test as base } from "vitest";\nconst test = base.extend({});\ntest("a", () => {\n  vi.useFakeTimers();\n  const start = Date.now();\n  vi.advanceTimersByTime(5);\n  expect(Date.now() - start).toBe(5);\n});',
+    'import { test as base } from "@playwright/test";\nconst test = base.extend({});\ntest.beforeEach(async ({ page }) => {\n  await page.clock.install();\n});\ntest("t", async ({ page }) => {\n  const start = await page.evaluate(() => Date.now());\n  await page.clock.runFor(1000);\n  expect((await page.evaluate(() => Date.now())) - start).toBe(1000);\n});',
     // A clock read captured after the install is the fake clock.
     'it("x", () => {\n  vi.useFakeTimers();\n  const now = Date.now;\n  expect(now()).toBe(0);\n});',
     // A capture read off a helper's returned object or list is judged at the call that returned it.

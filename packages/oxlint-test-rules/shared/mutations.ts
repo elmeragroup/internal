@@ -65,14 +65,9 @@ function mutationAt(
       const method = memberName(callee);
       if (callee.type !== "MemberExpression" || method === undefined || !MUTATORS.has(method))
         return undefined;
-      if (method !== "push") return other(callee.object);
-      const spreads = node.arguments.some((argument) => argument.type === "SpreadElement");
-      return {
-        target: callee.object,
-        mutation: spreads
-          ? { kind: "other", site: node, values: [] }
-          : { kind: "push", site: node, values: node.arguments },
-      };
+      if (method !== "push" || node.arguments.some((argument) => argument.type === "SpreadElement"))
+        return other(callee.object);
+      return { target: callee.object, mutation: { kind: "push", site: node, values: node.arguments } };
     }
     default:
       return undefined;

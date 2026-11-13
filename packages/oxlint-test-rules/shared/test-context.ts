@@ -10,7 +10,8 @@ import { isolated } from "./traversal.ts";
  * Test context for the test-file rules: where a function is registered and how surely, which
  * setup hooks run before a body, which code a body reaches, and where a local function is called.
  * Test APIs are recognised through `calleeTargets`, so an aliased or namespace import (`it as
- * spec`, `vt.beforeEach`) is the same API.
+ * spec`, `vt.beforeEach`) is the same API, and so is an extended test (`base.extend({ … })`).
+ * Playwright's `test.beforeEach` and `test.beforeAll` are setup hooks like the bare ones.
  *
  * The execution model: a registration is `guaranteed` when every alternative of its callee is the
  * same API, and `possible` otherwise (`const hook = flag ? beforeEach : noop`). A call's position
@@ -192,7 +193,8 @@ function buildRegistry(context: Context, program: ESTree.Node): Registry {
     const roots = runnerRoots(context, node.callee);
     const isTest = roots.some((root) => root !== undefined && TEST_ROOTS.has(root));
     const apis = apisOf(context, node);
-    const hookApis = HOOK_APIS.filter((api) => apis.includes(api));
+    // Playwright registers its hooks as `test.beforeEach` and `test.beforeAll`.
+    const hookApis = HOOK_APIS.filter((api) => apis.includes(api) || apis.includes(`test.${api}`));
     const isEvaluate = EVALUATES.has(memberName(node.callee) ?? "");
     if (!isTest && hookApis.length === 0 && !isEvaluate) continue;
     const testCertainty: Certainty = allAgree(roots) !== undefined && isTest ? "guaranteed" : "possible";

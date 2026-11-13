@@ -74,6 +74,17 @@ function aliasChain(first: number, second: number): string {
 
 ruleTester.run("no-fixed-delay", noFixedDelay, {
   valid: [
+    // `vitest` is exported beside `vi` with the same API.
+    'import { vitest } from "vitest";\nit("a", () => {\n  vitest.useFakeTimers();\n  setTimeout(fire, 100);\n  vitest.advanceTimersByTime(100);\n});',
+    // A test registered through an extended `test` runs its own body and its suite's hooks.
+    'import { test as base, vi } from "vitest";\nconst test = base.extend({});\ntest("a", () => {\n  vi.useFakeTimers();\n  setTimeout(fire, 100);\n  vi.advanceTimersByTime(100);\n});',
+    'import { test as base, vi } from "vitest";\nconst test = base.extend({});\ntest.beforeEach(() => {\n  vi.useFakeTimers();\n});\ntest("a", () => {\n  setTimeout(fire, 100);\n  vi.advanceTimersByTime(100);\n});',
+    // A delay that coerces to zero waits nothing.
+    'await sleep("0");',
+    'await sleep("0ms");',
+    "setTimeout(fire, false);",
+    // A timer slot overwritten before the call holds no timer the evaluator can prove.
+    "const timers = [setTimeout];\ntimers[0] = noop;\ntimers[0](fire, 100);",
     // An alias captured after the install is the fake timer.
     'it("x", () => {\n  vi.useFakeTimers();\n  const later = setTimeout;\n  later(cb, 100);\n});',
     // Building a closure schedules nothing; the closure waits where it is called, here on a fake clock.
@@ -168,6 +179,15 @@ ruleTester.run("no-fixed-delay", noFixedDelay, {
     'function Later() {\n  useEffect(() => {\n    setTimeout(fire, 500);\n  }, []);\n  return null;\n}\nit("a", () => {\n  vi.useFakeTimers();\n  render(<Later />);\n});',
   ],
   invalid: [
+    // A delay that coerces to a positive number waits for real.
+    { code: 'setTimeout(fire, "100");', errors: [{ messageId: "delay" }] },
+    { code: 'await sleep("1 second");', errors: [{ messageId: "delay" }] },
+    { code: "setTimeout(fire, true);", errors: [{ messageId: "delay" }] },
+    // A dynamic import of node:timers is the real module.
+    {
+      code: 'const timers = await import("node:timers");\ntimers.setTimeout(fire, 100);',
+      errors: [{ messageId: "delay", line: 2 }],
+    },
     // Reviewer repro: a native timer captured at module level stays real after the install.
     {
       code: 'const now = Date.now;\nconst later = setTimeout;\nit("x", () => {\n  vi.useFakeTimers();\n  later(cb, 100);\n  expect(now()).toBe(0);\n});',

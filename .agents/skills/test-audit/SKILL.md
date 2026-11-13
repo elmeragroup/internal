@@ -21,8 +21,8 @@ lives. This skill decides whether a test earns its place.
 - The **owner boundary** is the public entry point of the module that owns a behavior: an export
   of `@elmeragroup/internal`, a package's `src/index.ts`, a script's CLI, a lint rule object, or a
   generated artifact. A contract's one primary test there is its **keeper**.
-- The **oracle** is the independently defined expectation a test reproduces: an upstream
-  `output.json`, a committed fixture or report, a documented contract.
+- The **oracle** is the independently defined expectation a test reproduces; the Tests section of
+  `AGENTS.md` lists what qualifies.
 - A **change detector** goes red under a behavior-preserving refactor.
 - A **test-only seam** is an export, parameter, option, global or code path whose only callers are
   tests, such as a `…ForTest` factory.
@@ -91,8 +91,7 @@ production code whose only callers are tests.
 - names that promise more than the input exercises.
 
 **Flakes.** The result depends on timing, load or order: a wall-clock budget, a fixed delay, a
-retry, a scan of a directory other test files share. Make it deterministic or delete it in the same
-change.
+retry, a scan of a directory other test files share.
 
 ## Retention bar
 

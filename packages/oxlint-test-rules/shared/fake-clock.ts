@@ -1,6 +1,6 @@
 import type { Context, ESTree } from "@oxlint/plugins";
 
-import { descendants, isFunction, isPromiseCallback } from "./ast-walk.ts";
+import { descendants, isFunction, isPromiseCallback, within } from "./ast-walk.ts";
 import { allAgree } from "./quantify.ts";
 import { calleeTargets, evaluate } from "./resolve.ts";
 import {
@@ -14,7 +14,7 @@ import {
 } from "./test-context.ts";
 import type { Certainty } from "./test-context.ts";
 import { Analysis, isolated } from "./traversal.ts";
-import { entryFor, GLOBAL_OBJECTS } from "./value.ts";
+import { entryFor, GLOBAL_OBJECTS, stringValues } from "./value.ts";
 import type { Alt, CalleeTarget } from "./value.ts";
 
 /**
@@ -38,32 +38,27 @@ import type { Alt, CalleeTarget } from "./value.ts";
  * `evaluate` callback at every `evaluate` call.
  *
  * The host (the test's own `Date`, timers and `performance`) and the page (code inside a page
- * `evaluate` callback) have separate clocks: `vi` changes the host's, `page.clock` the page's.
+ * `evaluate` callback) have separate clocks: `vi` (or its alias `vitest`) changes the host's,
+ * `page.clock` the page's. `vi.setSystemTime()` without fake timers installs a clock that fakes
+ * `Date` (Vitest 5.1), so it adds `Date` where nothing is faked and leaves an installed clock be.
  */
 
+/** The fake-timer names that schedule or read time, each the API it fakes. `clear*` fakes nothing. */
+const CLOCK_APIS = ["setTimeout", "setInterval", "setImmediate", "Date", "performance", "hrtime"] as const;
+
 /** A clock API a test can fake: one scheduling or reading API each. */
-export type ClockApi = "setTimeout" | "setInterval" | "setImmediate" | "Date" | "performance" | "hrtime";
+export type ClockApi = (typeof CLOCK_APIS)[number];
 
 /** Where a clock read or wait runs: the test process, or a page `evaluate` callback. */
 type ClockRealm = "host" | "page";
 
-/** The fake-timer names that schedule or read time, each the API it fakes. `clear*` fakes nothing. */
-const FAKEABLE: ReadonlySet<ClockApi> = new Set([
-  "setTimeout",
-  "setInterval",
-  "setImmediate",
-  "Date",
-  "performance",
-  "hrtime",
-]);
-
 /** Whether a `toFake` name is a clock API it fakes. */
 function isFakeable(name: string | undefined): name is ClockApi {
-  return [...FAKEABLE].some((api) => api === name);
+  return CLOCK_APIS.some((api) => api === name);
 }
 
 /** What `vi.useFakeTimers()` fakes with no `toFake`: Vitest's default, every API here. */
-const ALL_APIS: ReadonlySet<ClockApi> = FAKEABLE;
+const ALL_APIS: ReadonlySet<ClockApi> = new Set(CLOCK_APIS);
 
 /** What Playwright's `clock.install()` and `pauseAt()` take over in the page. */
 const PAGE_CLOCK_APIS: ReadonlySet<ClockApi> = new Set(["setTimeout", "setInterval", "Date", "performance"]);
@@ -89,7 +84,7 @@ export const FAKE_CLOCK_HELPERS_SCHEMA = {
       name: { type: "string" },
       fakes: {
         type: "array",
-        items: { enum: ["setTimeout", "setInterval", "setImmediate", "Date", "performance", "hrtime"] },
+        items: { enum: CLOCK_APIS },
       },
     },
     required: ["name", "fakes"],
@@ -97,14 +92,24 @@ export const FAKE_CLOCK_HELPERS_SCHEMA = {
   },
 } as const;
 
-/** One clock change: the realm it changes, the APIs it leaves faked, and the API that makes it. */
-type Change = { readonly realm: ClockRealm; readonly faked: ReadonlySet<ClockApi>; readonly api: string };
+/**
+ * One clock change: the realm it changes, the APIs it leaves faked, and the API that makes it.
+ * `adds` marks a change that only fakes `faked` where nothing is faked yet (`vi.setSystemTime`
+ * without fake timers installs a `Date`-only clock in Vitest 5.1) and leaves any installed clock be.
+ */
+type Change = {
+  readonly realm: ClockRealm;
+  readonly faked: ReadonlySet<ClockApi>;
+  readonly api: string;
+  readonly adds: boolean;
+};
 
 /** One clock event in one realm: its call, the APIs it surely leaves faked, and whether its callee is one API. */
 type ClockEvent = {
   readonly call: ESTree.CallExpression;
   readonly realm: ClockRealm;
   readonly faked: ReadonlySet<ClockApi>;
+  readonly adds: boolean;
   readonly sameApi: boolean;
 };
 
@@ -153,7 +158,7 @@ function fakedByToNotFake(context: Context, list: Alt): ReadonlySet<ClockApi> {
   for (const element of list.elements) {
     if (element === null) continue;
     const names = evaluate(context, element);
-    const strings = names.flatMap((name) => (name.kind === "string" ? [name.value] : []));
+    const strings = stringValues(names);
     if (strings.length !== names.length) return NONE;
     for (const name of strings) kept.add(name);
   }
@@ -210,16 +215,18 @@ function changeOf(
   helpers: ReadonlyArray<FakeClockHelper>
 ): Change | undefined {
   if (target === undefined) return undefined;
-  const api = target.path.join(".");
+  // `vitest` is exported beside `vi` with the same API.
+  const api = target.path.join(".").replace(/^vitest(?=\.)/u, "vi");
   const pageClock = target.path.at(-2) === "clock" ? target.path.at(-1) : undefined;
-  if (api === "vi.useFakeTimers") return { realm: "host", faked: fakedBy(context, call), api };
+  if (api === "vi.useFakeTimers") return { realm: "host", faked: fakedBy(context, call), api, adds: false };
+  if (api === "vi.setSystemTime") return { realm: "host", faked: new Set(["Date"]), api, adds: true };
   const helper = helpers.find((candidate) => candidate.name === api);
-  if (helper !== undefined) return { realm: "host", faked: new Set(helper.fakes), api };
-  if (api === "vi.useRealTimers") return { realm: "host", faked: new Set(), api };
+  if (helper !== undefined) return { realm: "host", faked: new Set(helper.fakes), api, adds: false };
+  if (api === "vi.useRealTimers") return { realm: "host", faked: new Set(), api, adds: false };
   if (pageClock === "install" || pageClock === "pauseAt")
-    return { realm: "page", faked: PAGE_CLOCK_APIS, api: `clock.${pageClock}` };
+    return { realm: "page", faked: PAGE_CLOCK_APIS, api: `clock.${pageClock}`, adds: false };
   if (pageClock === "setFixedTime")
-    return { realm: "page", faked: new Set(["Date"]), api: "clock.setFixedTime" };
+    return { realm: "page", faked: new Set(["Date"]), api: "clock.setFixedTime", adds: false };
   return undefined;
 }
 
@@ -238,20 +245,35 @@ function clockEventsOf(
   );
   const sameApi = allAgree(changes.map((change) => change?.api)) !== undefined;
   return (["host", "page"] as const).flatMap((realm) => {
-    const made = changes.flatMap((change) => (change?.realm === realm ? [change.faked] : []));
-    return made.length === 0 ? [] : [{ call, realm, faked: intersect(made), sameApi }];
+    const made = changes.flatMap((change) => (change?.realm === realm ? [change] : []));
+    return made.length === 0
+      ? []
+      : [
+          {
+            call,
+            realm,
+            faked: intersect(made.map((change) => change.faked)),
+            adds: made.every((change) => change.adds),
+            sameApi,
+          },
+        ];
   });
 }
 
 /** Fold events over a coverage: a guaranteed event replaces it, a possible one intersects it. */
 function fold(
   coverage: ReadonlySet<ClockApi>,
-  events: ReadonlyArray<{ readonly faked: ReadonlySet<ClockApi>; readonly certainty: Certainty }>
+  events: ReadonlyArray<{
+    readonly faked: ReadonlySet<ClockApi>;
+    readonly adds: boolean;
+    readonly certainty: Certainty;
+  }>
 ): ReadonlySet<ClockApi> {
-  return events.reduce<ReadonlySet<ClockApi>>(
-    (before, event) => (event.certainty === "guaranteed" ? event.faked : intersect([before, event.faked])),
-    coverage
-  );
+  return events.reduce<ReadonlySet<ClockApi>>((before, event) => {
+    // An adding event leaves an installed clock be, and only fakes its APIs where nothing was faked.
+    if (event.adds) return event.certainty === "guaranteed" && before.size === 0 ? event.faked : before;
+    return event.certainty === "guaranteed" ? event.faked : intersect([before, event.faked]);
+  }, coverage);
 }
 
 /** Every clock event in the file, found from its calls once per program and helper list. */
@@ -279,7 +301,12 @@ function eventsIn(
   realm: ClockRealm,
   before: number,
   registered: Certainty
-): Array<{ readonly faked: ReadonlySet<ClockApi>; readonly certainty: Certainty; readonly start: number }> {
+): Array<{
+  readonly faked: ReadonlySet<ClockApi>;
+  readonly adds: boolean;
+  readonly certainty: Certainty;
+  readonly start: number;
+}> {
   return eventsOf(context, helpers)
     .filter((event) => event.realm === realm && event.call.start < before)
     .flatMap((event) => {
@@ -287,7 +314,7 @@ function eventsIn(
       if (position === undefined) return [];
       const certainty: Certainty =
         event.sameApi && position === "guaranteed" && registered === "guaranteed" ? "guaranteed" : "possible";
-      return [{ faked: event.faked, certainty, start: event.call.start }];
+      return [{ faked: event.faked, adds: event.adds, certainty, start: event.call.start }];
     })
     .sort((left, right) => left.start - right.start);
 }
@@ -384,7 +411,7 @@ function judgedAt(
  * @param api - The clock API.
  * @returns The node that read the slot, or `undefined` when the alternative reads none.
  */
-export function captureSite(alternative: Alt, api: ClockApi): ESTree.Node | undefined {
+function captureSite(alternative: Alt, api: ClockApi): ESTree.Node | undefined {
   for (let value: Alt = alternative; ;) {
     if (value.kind === "global") return api !== "hrtime" && value.name === api ? value.at : undefined;
     if (value.kind !== "member") return undefined;
@@ -400,6 +427,24 @@ export function captureSite(alternative: Alt, api: ClockApi): ESTree.Node | unde
   }
 }
 
+/** Where a capture is judged: a node, and the local calls that carried the value there (`Alt.via`). */
+export type ClockCapture = { readonly at: ESTree.Node; readonly via: ReadonlyArray<ESTree.CallExpression> };
+
+/**
+ * Where a callee read the slot a fake clock replaces for an API (`captureSite`), when that is away
+ * from the call that uses it (`const later = setTimeout` at module scope), with the calls that
+ * carried the alias there; `undefined` when the call reads the slot itself or reads none.
+ *
+ * @param callee - A callee or constructor alternative that names the API.
+ * @param api - The clock API.
+ * @param call - The call or construction that uses the callee.
+ * @returns The earlier capture, or `undefined`.
+ */
+export function captureAway(callee: Alt, api: ClockApi, call: ESTree.Node): ClockCapture | undefined {
+  const site = captureSite(callee, api);
+  return site === undefined || within(site, call) ? undefined : { at: site, via: callee.via };
+}
+
 /**
  * Whether a capture's time is simulated: every run of the code around it fakes the API in the
  * capture's own clock, the page's inside a page `evaluate` callback and the test's elsewhere.
@@ -410,7 +455,7 @@ export function captureSite(alternative: Alt, api: ClockApi): ESTree.Node | unde
  * @param helpers - The repository's fake-clock helpers, beside Vitest's and Playwright's own APIs.
  * @param via - The local calls whose returns carried the captured value to where it is judged,
  *   outermost first (`Alt.via`): a capture in a helper is then judged at the call that produced
- *   it rather than at every call of the helper. Default none.
+ *   it rather than at every call of the helper.
  * @returns Whether a simulated clock covers it.
  */
 export function isSimulated(
@@ -418,7 +463,7 @@ export function isSimulated(
   capture: ESTree.Node,
   api: ClockApi,
   helpers: ReadonlyArray<FakeClockHelper>,
-  via: ReadonlyArray<ESTree.CallExpression> = []
+  via: ReadonlyArray<ESTree.CallExpression>
 ): boolean {
   const question: Question = { api, realm: runsInPage(context, capture) ? "page" : "host", helpers };
   return via.length === 0 ? coveredAt(context, question, capture) : judgedAt(context, question, capture, via);

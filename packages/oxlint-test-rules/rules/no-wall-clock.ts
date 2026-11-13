@@ -1,7 +1,6 @@
 import type { ESTree, Rule } from "@oxlint/plugins";
 
-import { within } from "../shared/ast-walk.ts";
-import { captureSite, FAKE_CLOCK_HELPERS_SCHEMA, isSimulated } from "../shared/fake-clock.ts";
+import { captureAway, FAKE_CLOCK_HELPERS_SCHEMA, isSimulated } from "../shared/fake-clock.ts";
 import type { ClockApi, FakeClockHelper } from "../shared/fake-clock.ts";
 import { allQualify, anyViolates } from "../shared/quantify.ts";
 import { evaluate } from "../shared/resolve.ts";
@@ -21,21 +20,25 @@ const CLOCK_READS = new Map<string, ClockApi>([
 /**
  * No timing assertions: a value that may be a wall-clock capture is neither subtracted nor
  * asserted, unless a simulated clock that fakes that API covers the capture, as `fake-clock.ts`
- * models one: `vi.useFakeTimers()` with its effective `toFake`, a configured fake-clock helper
- * (the `fakeClockHelpers` option, default none) or `vi.useRealTimers()` for the test's own clock,
- * and Playwright's `page.clock`
- * for captures inside a page `evaluate` callback. Time is captured by `Date.now()`,
+ * models one: `vi.useFakeTimers()` with its effective `toFake`, `vi.setSystemTime()` without fake
+ * timers (`Date` only), a configured fake-clock helper (the `fakeClockHelpers` option, default
+ * none) or `vi.useRealTimers()` for the test's own clock, and Playwright's `page.clock` for
+ * captures inside a page `evaluate` callback. Time is captured by `Date.now()`,
  * `performance.now()`, `process.hrtime()` and `new Date()`, and `date.getTime()` reads the time its
  * date captured at construction. A capture is judged where its callee read the global a fake clock
- * replaces, so `const now = Date.now` at module scope stays real in a faked test. A budget measured on the machine running the test flakes under
- * load and proves nothing a user sees. Reading the clock for a unique name or to seed a fake clock
- * stays allowed, and so does offsetting a capture by a number in every alternative
- * (`Date.now() - HOUR`), which builds a timestamp rather than measuring one.
+ * replaces, so `const now = Date.now` at module scope stays real in a faked test. A budget
+ * measured on the machine running the test flakes under load and proves nothing a user sees.
+ * Reading the clock for a unique name or to seed a fake clock stays allowed, and so does
+ * offsetting a capture by a duration in every alternative, which builds a timestamp rather than
+ * measuring one: a number, an imported constant (`Date.now() - HOUR`), scaling arithmetic
+ * (`days * DAY`), or the time of a date that is no clock capture (`born.getTime()`).
  *
  * Scope: follows what `resolve.ts` follows, for the capture and every callee, and judges coverage
- * as `fake-clock.ts` does, a capture a helper returns at the call that returned it. Beyond that: a clock change inside a nested function, or at module or
- * `describe` level outside a hook, does not count, and `page.clock` never covers the test's own
- * clock.
+ * as `fake-clock.ts` does, a capture a helper returns at the call that returned it. Beyond that: a
+ * clock change inside a nested function, or at module or `describe` level outside a hook, does not
+ * count, and `page.clock` never covers the test's own clock. A test registered through a local
+ * wrapper that forwards its body to `it`, and a clock read in a class method (`new C().m()`), are
+ * judged without their test, so that test's fake clock does not cover them.
  */
 export const noWallClock: Rule = {
   meta: {
@@ -71,7 +74,7 @@ export const noWallClock: Rule = {
 
     /**
      * Where a clock call or construction takes its time, judged where its callee read the slot a
-     * fake clock replaces (`captureSite`): at the call itself when the slot is read there, or at
+     * fake clock replaces (`captureAway`): at the call itself when the slot is read there, or at
      * an earlier alias (`const now = Date.now`), which keeps whatever the slot held when it ran.
      */
     const captureAt = (
@@ -79,12 +82,7 @@ export const noWallClock: Rule = {
       api: ClockApi,
       call: ESTree.Node,
       via: ReadonlyArray<ESTree.CallExpression>
-    ): Capture => {
-      const site = captureSite(callee, api);
-      return site === undefined || within(site, call)
-        ? { at: call, api, via }
-        : { at: site, api, via: callee.via };
-    };
+    ): Capture => ({ api, ...(captureAway(callee, api, call) ?? { at: call, via }) });
 
     /** Where an alternative that is `new Date()` with no argument captures the time. */
     const constructedNow = (alternative: Alt, via: ReadonlyArray<ESTree.CallExpression>): Capture[] => {
@@ -120,9 +118,35 @@ export const noWallClock: Rule = {
         ({ at, api, via }) => !isSimulated(context, at, api, fakeClockHelpers, via)
       );
 
-    /** Whether a value is a number in every alternative: an offset, not a second capture. */
+    /**
+     * Whether a value is a duration in every alternative: a number, a constant held by name (an
+     * import), or arithmetic that scales one (`days * DAY`). An offset builds a timestamp; it is not
+     * a second capture.
+     */
     const isOffset = (values: ReadonlyArray<Alt>): boolean =>
-      allQualify(values, (alternative) => alternative.kind === "number");
+      allQualify(
+        values,
+        (alternative) =>
+          alternative.kind === "number" ||
+          alternative.kind === "import" ||
+          isScaled(alternative) ||
+          isStampOfOtherDate(alternative)
+      );
+
+    /** Whether an alternative is arithmetic that scales a duration (`days * DAY`). */
+    const isScaled = (alternative: Alt): boolean =>
+      alternative.kind === "opaque" &&
+      alternative.node.type === "BinaryExpression" &&
+      ["*", "/", "%"].includes(alternative.node.operator);
+
+    /** Whether an alternative is `date.getTime()` of a date that is no clock capture: a fixture's stamp. */
+    const isStampOfOtherDate = (alternative: Alt): boolean =>
+      alternative.kind === "opaque" &&
+      alternative.node.type === "CallExpression" &&
+      capturesOf(alternative).length === 0 &&
+      evaluate(context, alternative.node.callee).some(
+        (callee) => callee.kind === "member" && (callee.key === "getTime" || callee.key === "valueOf")
+      );
 
     return {
       BinaryExpression(node) {

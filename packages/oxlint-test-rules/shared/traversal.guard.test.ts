@@ -5,6 +5,8 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
+import plugin from "../index.ts";
+
 /*
  * Unit under test: every recursive analysis the rules run, through the published plugin entry.
  * Oracle: `traversal.ts`'s contract: every analysis that follows values is bounded, so a value that
@@ -103,6 +105,10 @@ function helperFixture(): string {
 }
 
 describe("every recursive analysis is bounded", () => {
+  it("reads values in every rule the plugin publishes", () => {
+    expect(Object.keys(HOLES).sort()).toEqual(Object.keys(plugin.rules).sort());
+  });
+
   it("finishes every rule on self-referencing and doubled values without a plugin error", () => {
     const root = mkdtempSync(join(tmpdir(), "traversal-guard-"));
     try {
@@ -115,13 +121,12 @@ describe("every recursive analysis is bounded", () => {
           rules,
         })
       );
-      const files = Object.entries(BUILDERS).flatMap(([builder, build]) =>
-        Object.entries(HOLES).map(([rule, holes]) => {
-          const file = `${rule}-${builder.replaceAll(" ", "-")}.test.tsx`;
-          writeFileSync(join(root, file), builtFixture(build, holes));
-          return file;
-        })
-      );
+      for (const [builder, build] of Object.entries(BUILDERS))
+        for (const [rule, holes] of Object.entries(HOLES))
+          writeFileSync(
+            join(root, `${rule}-${builder.replaceAll(" ", "-")}.test.tsx`),
+            builtFixture(build, holes)
+          );
       writeFileSync(join(root, "helpers.test.tsx"), helperFixture());
       for (const [rule, holes] of Object.entries(HOLES))
         writeFileSync(join(root, `${rule}-member-chain.test.tsx`), memberChainFixture(holes));
@@ -131,14 +136,14 @@ describe("every recursive analysis is bounded", () => {
         encoding: "utf8",
         timeout: 120_000,
       });
-      expect(run.status === 0 || run.status === 1).toBe(true);
+      // 0 is a clean run and 1 a run with lint errors; null is a signal or the hang guard's timeout.
+      expect([0, 1]).toContain(run.status);
       // Each diagnostic is one JSON object; a plugin error is one whose message says so.
       const crashes = [...run.stdout.matchAll(/"message": "(Error running JS plugin[^"]*)"/gu)].map((match) =>
         (match[1] ?? "").split("\\n").slice(0, 4).join(" | ")
       );
       expect(run.stdout).toContain('"diagnostics"');
       expect(crashes).toEqual([]);
-      expect(files.length + 1).toBe(Object.keys(BUILDERS).length * Object.keys(HOLES).length + 1);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

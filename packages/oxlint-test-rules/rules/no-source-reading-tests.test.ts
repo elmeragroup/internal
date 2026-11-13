@@ -10,8 +10,18 @@ function doubledPath(depth: number): string {
   ].join("\n");
 }
 
+/** A walk of `dir` whose filter keeps what `filter` keeps, then `steps` on the list, then a read of each file. */
+function walkFiltered(filter: string, steps = ""): string {
+  return `for (const f of readdirSync(dir).filter((f) => ${filter})${steps}) readFileSync(f);`;
+}
+
 ruleTester.run("no-source-reading-tests", noSourceReadingTests, {
   valid: [
+    // A filter that keeps data files keeps no code.
+    walkFiltered('extname(f) === ".json"'),
+    walkFiltered('[".json", ".md"].includes(extname(f))'),
+    walkFiltered("f.match(/\\.json$/)"),
+    walkFiltered('f.endsWith(".log") || f.endsWith(".json")'),
     // A pattern that matches every file name keeps nothing provable.
     "for (const f of readdirSync(dir).filter((f) => /.*/.test(f))) readFileSync(f);",
     // Hang: a path past the traversal's budget is unknown.
@@ -77,6 +87,36 @@ ruleTester.run("no-source-reading-tests", noSourceReadingTests, {
     'it("lists the modules", () => {\n  expect(readdirSync(src).filter((name) => name.endsWith(".ts"))).toContain("button.ts");\n});\nfunction readLog(file) {\n  return readFileSync(file, "utf8");\n}\nconst logPath = join(tmp, "server.log");\nit("logs", () => {\n  expect(readLog(logPath)).toContain("ready");\n});',
   ],
   invalid: [
+    // Every filter shape that keeps a code extension keeps code.
+    { code: walkFiltered("f.match(/\\.tsx?$/)"), errors: [{ messageId: "source" }] },
+    { code: walkFiltered('extname(f) === ".ts"'), errors: [{ messageId: "source" }] },
+    { code: walkFiltered('[".ts", ".tsx"].includes(extname(f))'), errors: [{ messageId: "source" }] },
+    { code: walkFiltered('f.endsWith(".log") || f.endsWith(".ts")'), errors: [{ messageId: "source" }] },
+    { code: walkFiltered('f.toLowerCase().endsWith(".ts")'), errors: [{ messageId: "source" }] },
+    { code: walkFiltered('`${f}`.endsWith(".ts")'), errors: [{ messageId: "source" }] },
+    // Reordering and slicing a list keeps what it holds.
+    {
+      code: walkFiltered('f.endsWith(".ts")', ".sort().slice(0, 3).reverse()"),
+      errors: [{ messageId: "source" }],
+    },
+    // A list mapped to full paths, or concatenated with another, keeps its code files.
+    {
+      code: 'const files = readdirSync(dir)\n  .filter((f) => f.endsWith(".ts"))\n  .map((name) => join(dir, name));\nfor (const f of files) readFileSync(f);',
+      errors: [{ messageId: "source" }],
+    },
+    {
+      code: 'const logs = readdirSync(dir).filter((f) => f.endsWith(".log"));\nconst code = readdirSync(dir).filter((f) => f.endsWith(".ts"));\nfor (const f of logs.concat(code)) readFileSync(f);',
+      errors: [{ messageId: "source" }],
+    },
+    // A guard inside the loop, by `&&` or a conditional, selects code like a filter.
+    {
+      code: 'for (const f of readdirSync(dir)) f.endsWith(".ts") && readFileSync(f);',
+      errors: [{ messageId: "source" }],
+    },
+    {
+      code: 'for (const f of readdirSync(dir)) f.endsWith(".ts") ? readFileSync(f) : undefined;',
+      errors: [{ messageId: "source" }],
+    },
     // Reviewer repro: a Dirent walk's `.name` is the walked file name, with its guard.
     {
       code: 'for (const entry of readdirSync(src, { withFileTypes: true })) {\n  if (entry.name.endsWith(".ts")) readFileSync(join(src, entry.name));\n}',

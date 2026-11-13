@@ -10,7 +10,7 @@ type LiteralCandidate = { readonly type: string; readonly value?: unknown };
  * @param node - Any AST node, or `null` for an absent one.
  * @returns The literal's string value, or `undefined`.
  */
-export function stringLiteral(node: LiteralCandidate | null): string | undefined {
+function stringLiteral(node: LiteralCandidate | null): string | undefined {
   if (node?.type !== "Literal") return undefined;
   // oxlint-disable-next-line anti-slop/no-runtime-typeof -- ESTree tags every literal kind `Literal`; the value's type is the only tag a string literal has
   return typeof node.value === "string" ? node.value : undefined;

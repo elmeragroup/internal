@@ -58,6 +58,7 @@ import type { Alt, CalleeTarget, Entry } from "./value.ts";
  * 5. A call to a local function (a declaration, or a function bound by step 2) to every value its
  *    body returns: an arrow's expression body, or each `return` in a block body. Each value
  *    records the call in `via`, so a consumer can judge it at the invocation that produced it.
+ *    A call to `.extend(…)` on `it` or `test` (`const test = base.extend({ … })`) is that test API.
  * 6. A call to a static `evaluate`, `evaluateHandle`, `$eval` or `$$eval` member with a function
  *    argument to every value that callback returns.
  * 7. An import to its module and imported name, and a dynamic `import()` of a string to that
@@ -84,21 +85,24 @@ import type { Alt, CalleeTarget, Entry } from "./value.ts";
  * analysis walks: its memo, cycle cuts and budget. A cycle cut here is `unknown`, so a
  * self-referencing binding stops, and, for a call back into a function whose returns are being
  * read, `opaque` (the call itself); a walk past its budget is `unknown`. Values live in
- * `value.ts`, whose `derive` is the one way provenance (`narrowed`, `named`, `via`) is marked;
- * the literal mutations of step 2 live in `mutations.ts`. A rule that classifies values
- * recursively (a measurement, a class read, a path) does so as its own `Analysis` on the same
- * traversal, so it shares the evaluator's budget. A parameter evaluates to itself (`parameter`), a
- * `for…of` or `for…in` binding to its iterable (`loop`), a call the evaluator does not follow to
- * itself (`opaque`), and anything else the list does not name to `opaque`. An alternative reached
- * through a property read (steps 3 and 4) is marked `narrowed` and keeps its container's `via`;
- * one reached through a name (a binding in steps 2 and 3, a property of a named value, a return in
- * steps 5 and 6, or a step-10 result with a named operand) is marked `named`.
+ * `value.ts`, whose `derive` is the one way provenance (`named`, `via`) is marked; the literal
+ * mutations of step 2 live in `mutations.ts`. A rule that classifies values recursively (a
+ * measurement, a class read, a path) does so as its own `Analysis` on the same traversal, so it
+ * shares the evaluator's budget. A parameter evaluates to itself (`parameter`), a `for…of` or
+ * `for…in` binding to its iterable (`loop`), a call the evaluator does not follow to itself
+ * (`opaque`), and anything else the list does not name to `opaque`. An alternative reached through
+ * a property read (steps 3 and 4) keeps its container's `via`; one reached through a name (a
+ * binding in steps 2 and 3, a property of a named value, a return in steps 5 and 6, or a step-10
+ * result with a named operand) is marked `named`.
  *
  * `unknown` is never evidence: no rule grants an exemption on it, and no rule reports on it.
  */
 
 /** The callee names that run a callback in the page and hand back what it returns. */
 export const EVALUATES: ReadonlySet<string> = new Set(["evaluate", "evaluateHandle", "$eval", "$$eval"]);
+
+/** The test APIs whose `.extend(fixtures)` is the same API with fixtures (Vitest's and Playwright's). */
+const EXTENDABLE_TEST_APIS: ReadonlySet<string> = new Set(["it", "test"]);
 
 /** The string methods step 10 assembles from a string receiver. */
 const STRING_METHODS = new Map<string, (text: string) => string>([
@@ -198,11 +202,6 @@ function importedName(specifier: ESTree.Node): string | undefined {
 /** Alternatives read through a name. */
 function named(values: ReadonlyArray<Alt>): Alt[] {
   return values.map((value) => derive(value, { _tag: "name" }));
-}
-
-/** The key a JSX member tag reads: `Later` for `<fixtures.Later />`. */
-function jsxMemberKey(tag: ESTree.JSXMemberExpression): string {
-  return tag.property.name;
 }
 
 /**
@@ -327,6 +326,9 @@ function evaluator(
     }
     if (callee.kind !== "member") return opaque(call);
     const receiver = callee.object;
+    // `base.extend(fixtures)` on a test API is that API, so a test or hook it registers is one.
+    if (callee.key === "extend" && EXTENDABLE_TEST_APIS.has(targetOf(receiver)?.path.at(0) ?? ""))
+      return [receiver];
     if (EVALUATES.has(callee.key)) {
       const callbacks = combine(
         call.arguments.map((argument) => evaluateNode(argument)),
@@ -526,7 +528,7 @@ function evaluator(
       case "JSXIdentifier":
         return bindingOf(expression);
       case "JSXMemberExpression":
-        return projectionOf(expression.object, jsxMemberKey(expression), expression);
+        return projectionOf(expression.object, expression.property.name, expression);
       case "MemberExpression": {
         const key = memberName(expression);
         return key === undefined ? opaque(expression) : projectionOf(expression.object, key, expression);
@@ -637,18 +639,4 @@ export function calleeApis(context: Context, callee: ESTree.Node): Array<string 
  */
 export function isApi(context: Context, callee: ESTree.Node, api: string): boolean {
   return allAgree(calleeApis(context, callee)) === api;
-}
-
-/**
- * The dotted names a callee's alternatives have, module left off, one per alternative that names a
- * function: `["vi.useFakeTimers"]`.
- *
- * @param context - The rule context.
- * @param callee - A call's callee.
- * @returns The names.
- */
-export function calleeNames(context: Context, callee: ESTree.Node): string[] {
-  return calleeTargets(context, callee).flatMap((target) =>
-    target === undefined ? [] : [target.path.join(".")]
-  );
 }

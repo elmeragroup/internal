@@ -62,10 +62,11 @@ the check too. Use the formatter for layout and import ordering.
 
 Fix the underlying issue before adding a lint exception. Every disable carries a `--` reason that
 names the contract it guards (`elmera/require-disable-reason`), and lint reports unused disables as
-errors. In `api-extractor`, a disable is a next-line disable naming one rule, which lint enforces, and
-no override may relax a rule for its files and no directive may silence that guard (a blanket
-disable, or one naming it), which `test/extractor-lint-policy.test.mjs` enforces. Use
-a `SAFETY:` comment where the assertion rule requires it.
+errors. Use a `SAFETY:` comment where the assertion rule requires it.
+
+`api-extractor` takes next-line disables only, each naming one rule, which lint enforces. No override
+may relax a rule for its files, and no disable may name `elmera/require-disable-reason` or no rule at
+all, which `test/extractor-lint-policy.test.mjs` enforces.
 
 ## Tests
 

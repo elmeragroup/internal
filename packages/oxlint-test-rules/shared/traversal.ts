@@ -130,11 +130,24 @@ function charge(walk: Walk, entry: Entry<unknown>): void {
   walk.steps += entry.cost;
   if (walk.steps > WORK_BUDGET.steps || walk.frames.length + entry.depth > WORK_BUDGET.depth)
     walk.exhausted = true;
-  const frame = walk.frames.at(-1);
-  if (frame === undefined) return;
-  for (const cut of entry.cuts) frame.cuts.add(cut);
-  frame.cost += entry.cost;
-  frame.depth = Math.max(frame.depth, entry.depth + 1);
+  absorb(walk.frames.at(-1), entry);
+}
+
+/** Fold a finished or reused step's cuts, cost and depth into the frame it ran under. */
+function absorb(
+  parent: Frame | undefined,
+  child: { readonly cuts: ReadonlySet<number>; readonly cost: number; readonly depth: number }
+): void {
+  if (parent === undefined) return;
+  for (const cut of child.cuts) parent.cuts.add(cut);
+  parent.cost += child.cost;
+  parent.depth = Math.max(parent.depth, child.depth + 1);
+}
+
+/** Whether every cut a kept result depends on is still live in the walk. */
+function allLive(cuts: ReadonlySet<number>, live: ReadonlySet<number>): boolean {
+  for (const cut of cuts) if (!live.has(cut)) return false;
+  return true;
 }
 
 /**
@@ -244,7 +257,7 @@ export class Analysis<T> {
     }
     if (walk.exhausted) return this.unresolved;
     const known = memo?.get(key);
-    if (known !== undefined && [...known.cuts].every((cut) => walk.live.has(cut))) {
+    if (known !== undefined && allLive(known.cuts, walk.live)) {
       charge(walk, known);
       return isExhausted(walk) ? this.unresolved : known.value;
     }
@@ -270,12 +283,7 @@ export class Analysis<T> {
       walk.frames.pop();
       active.delete(key);
       walk.live.delete(frame.activation);
-      const parent = walk.frames.at(-1);
-      if (parent !== undefined) {
-        for (const cut of frame.cuts) parent.cuts.add(cut);
-        parent.cost += frame.cost;
-        parent.depth = Math.max(parent.depth, frame.depth + 1);
-      }
+      absorb(walk.frames.at(-1), frame);
     }
   }
 }

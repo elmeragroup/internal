@@ -7,7 +7,7 @@ import { calleeTargets, evaluate, mutationsOf, returnedValues } from "./resolve.
 import { staticText } from "./static-text.ts";
 import { callSitesOf } from "./test-context.ts";
 import { Analysis, isolated, pairKey } from "./traversal.ts";
-import { plain, product } from "./value.ts";
+import { plain, product, stringValues } from "./value.ts";
 import type { Alt } from "./value.ts";
 
 /**
@@ -115,6 +115,23 @@ type Identity = string | ESTree.Node;
 
 /** A spelling of nothing the rule can name. */
 const NOTHING: PathSpelling = { fragments: [], walked: [], temporary: false };
+
+/** The constructor a `new URL(path, base)` spells a path through. */
+const URL_CONSTRUCTOR = new Set(["URL"]);
+
+/** The call that reads a path's extension. */
+const EXTNAME = new Set(["extname"]);
+
+/**
+ * What a spelling's own text names: other under a temporary directory, else code or other by its
+ * last fragment with an extension; `undefined` when it names no file, so its walked lists decide.
+ */
+function namedSelection({ fragments, temporary }: PathSpelling): "code" | "other" | undefined {
+  if (temporary) return "other";
+  const named = [...fragments].reverse().find((fragment) => EXTENSION.test(fragment));
+  if (named === undefined) return undefined;
+  return CODE_FILE.test(named) ? "code" : "other";
+}
 
 /** Each opaque path expression's spellings. */
 const SPELLINGS = new Analysis<ReadonlyArray<PathSpelling>>([NOTHING]);
@@ -309,7 +326,7 @@ export function sourcePaths(context: Context) {
         const callee = expression.callee;
         const [first, second] = expression.arguments;
         if (callsOneOf(callee, TEMP_DIRECTORIES)) return [{ ...NOTHING, temporary: true }];
-        if (callsOneOf(callee, new Set(["URL"]))) return urlSpellings(first, second);
+        if (callsOneOf(callee, URL_CONSTRUCTOR)) return urlSpellings(first, second);
         if (callsOneOf(callee, CONVERTERS))
           return first === undefined ? [NOTHING] : partSpellings([first]).flat();
         if (callsOneOf(callee, RESOLVERS)) return merge(expression.arguments, resolvedTemporary);
@@ -351,7 +368,7 @@ export function sourcePaths(context: Context) {
   /** The strings a value is in every alternative, or `undefined` when one is not a string. */
   const stringsOf = (node: ESTree.Node): string[] | undefined => {
     const values = evaluate(context, node);
-    const strings = values.flatMap((value) => (value.kind === "string" ? [value.value] : []));
+    const strings = stringValues(values);
     return strings.length === values.length ? strings : undefined;
   };
 
@@ -467,7 +484,7 @@ export function sourcePaths(context: Context) {
   /** The argument of an `extname(…)` call, or `undefined` for anything else. */
   const extnameOf = (node: ESTree.Node): ESTree.Node | undefined => {
     const expression = unwrap(node);
-    return expression.type === "CallExpression" && callsOneOf(expression.callee, new Set(["extname"]))
+    return expression.type === "CallExpression" && callsOneOf(expression.callee, EXTNAME)
       ? expression.arguments[0]
       : undefined;
   };
@@ -584,9 +601,8 @@ export function sourcePaths(context: Context) {
     joined(
       evaluate(context, node).flatMap((alternative) =>
         spell(alternative).map((spelling): Selection | undefined => {
-          if (spelling.temporary) return "other";
-          const named = [...spelling.fragments].reverse().find((fragment) => EXTENSION.test(fragment));
-          if (named !== undefined) return CODE_FILE.test(named) ? "code" : "other";
+          const named = namedSelection(spelling);
+          if (named !== undefined) return named;
           const [walked] = spelling.walked;
           return walked === undefined ? undefined : selectionOfWalked(walked, at);
         })
@@ -743,11 +759,10 @@ export function sourcePaths(context: Context) {
     });
 
   /** Whether one spelling names a code module where it is read: by its last named file, or by the list it walks. */
-  const spellsCode = ({ fragments, walked, temporary }: PathSpelling, at: ESTree.Node): boolean => {
-    if (temporary) return false;
-    const named = [...fragments].reverse().find((fragment) => EXTENSION.test(fragment));
-    if (named !== undefined) return CODE_FILE.test(named);
-    return walked.some((value) => {
+  const spellsCode = (spelling: PathSpelling, at: ESTree.Node): boolean => {
+    const named = namedSelection(spelling);
+    if (named !== undefined) return named === "code";
+    return spelling.walked.some((value) => {
       if (selectionOfWalked(value, at) === "code") return true;
       // A reader helper's parameter is judged at each call site, against what that site passes.
       if (value.kind !== "parameter" || elementCallOf(value.fn) !== undefined) return false;
