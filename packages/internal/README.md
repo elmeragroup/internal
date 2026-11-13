@@ -49,12 +49,31 @@ Configure the plugins explicitly in Oxlint:
 {
   "jsPlugins": [
     { "name": "elmera", "specifier": "@elmeragroup/internal/oxlint" },
-    { "name": "anti-slop", "specifier": "@elmeragroup/internal/oxlint/anti-slop" }
+    { "name": "anti-slop", "specifier": "@elmeragroup/internal/oxlint/anti-slop" },
+    { "name": "tests", "specifier": "@elmeragroup/internal/oxlint/tests" }
   ],
   "rules": {
     "elmera/no-tailwind-dark-variant": "error",
+    "elmera/require-disable-reason": "error",
     "anti-slop/no-reflect-get": "error"
-  }
+  },
+  "overrides": [
+    {
+      "files": ["**/*.test.{ts,tsx,mts,mjs}"],
+      "rules": {
+        "tests/no-class-assertions": "error",
+        "tests/no-fixed-delay": "error",
+        "tests/no-geometry-assertions": "error",
+        "tests/no-source-reading-tests": "error",
+        "tests/no-test-retry": "error",
+        "tests/no-wall-clock": "error"
+      }
+    },
+    {
+      "files": ["**/vitest.config.*", "**/playwright.config.*"],
+      "rules": { "tests/no-test-retry": "error" }
+    }
+  ]
 }
 ```
 
@@ -62,7 +81,27 @@ Configure the plugins explicitly in Oxlint:
 
 `enforce-variant-standard` requires a structural connection between a `tv()` recipe with axes and the component's props: `VariantProps` must be imported from `tailwind-variants` and applied to `typeof <recipe>` in an exported props type or a function parameter annotation.
 
-Both entries export a default plugin. They do not load TypeScript or Effect.
+`require-disable-reason` requires `--` and a reason of at least eight non-space characters on every
+`oxlint-disable` and `eslint-disable` comment. Its options can narrow a path further:
+`{ "directives": ["disable-next-line"], "rules": "one" }` accepts only next-line disables that name
+exactly one rule.
+
+`@elmeragroup/internal/oxlint/tests` holds test-shape rules: the shapes that make a test flake or pin
+the implementation. Each rule follows values through bindings, imports, members, spreads and local
+helpers, and reports a shape only when it can show it, so a value it cannot resolve is never a
+violation. The [rule package README](https://github.com/elmeragroup/internal/tree/main/packages/oxlint-test-rules)
+lists what each rule reports, what it allows and its options.
+
+| Rule                      | Reports                                                                           |
+| ------------------------- | --------------------------------------------------------------------------------- |
+| `no-test-retry`           | `retry`, `repeats` or `retries` on a test, suite, `vi.setConfig` or a test config |
+| `no-wall-clock`           | an elapsed real-clock time that is subtracted or asserted                         |
+| `no-fixed-delay`          | a non-zero timer, `sleep`, `delay` or `page.waitForTimeout` outside a fake clock  |
+| `no-source-reading-tests` | reading a code module's text, or a `?raw` import of one                           |
+| `no-class-assertions`     | an assertion on a class the test did not supply                                   |
+| `no-geometry-assertions`  | a measured layout length compared with a pixel number                             |
+
+All three entries export a default plugin. They do not load TypeScript or Effect.
 
 ## Release
 

@@ -10,6 +10,10 @@
     {
       "name": "anti-slop",
       "specifier": "@elmeragroup/oxlint-plugin-anti-slop"
+    },
+    {
+      "name": "tests",
+      "specifier": "@elmeragroup/oxlint-test-rules"
     }
   ],
   "categories": {
@@ -17,6 +21,7 @@
   },
   "rules": {
     "turbo/no-undeclared-env-vars": "error",
+    "elmera/require-disable-reason": "error",
     "no-unused-vars": [
       "error",
       {
@@ -178,6 +183,55 @@
         "anti-slop/no-chained-type-assertions": "off",
         "anti-slop/no-unknown-parameters": "off",
         "anti-slop/no-unsafe-dictionary-type": "off"
+      }
+    },
+    {
+      "files": ["packages/api-extractor/**"],
+      "rules": {
+        "elmera/require-disable-reason": [
+          "error",
+          {
+            "directives": ["disable-next-line"],
+            "rules": "one"
+          }
+        ]
+      }
+    },
+    {
+      "files": ["packages/api-extractor/src/**"],
+      "rules": {
+        "no-restricted-properties": [
+          "error",
+          {
+            "object": "Object",
+            "property": "freeze",
+            "message": "The fact cache's deep freeze stops at an already frozen record, so a freeze in src/** must leave nothing mutable beneath it. Disable this on the line with a reason that says why the frozen value has no mutable child."
+          }
+        ]
+      }
+    },
+    {
+      "files": ["**/*.test.{ts,tsx,mts,mjs,js}"],
+      "rules": {
+        "tests/no-class-assertions": "error",
+        "tests/no-fixed-delay": "error",
+        "tests/no-geometry-assertions": "error",
+        "tests/no-source-reading-tests": "error",
+        "tests/no-test-retry": "error",
+        "tests/no-wall-clock": "error"
+      }
+    },
+    {
+      "files": ["**/test/**/*.{ts,tsx,mts,mjs,js}"],
+      "rules": {
+        "tests/no-fixed-delay": "error",
+        "tests/no-wall-clock": "error"
+      }
+    },
+    {
+      "files": ["**/vitest.config.*", "**/vitest.*.config.*", "**/playwright.config.*"],
+      "rules": {
+        "tests/no-test-retry": "error"
       }
     }
   ]

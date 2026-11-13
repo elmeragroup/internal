@@ -21,6 +21,7 @@
     "@elmeragroup/api-extractor": "workspace:*",
     "@elmeragroup/oxlint-plugin": "workspace:*",
     "@elmeragroup/oxlint-plugin-anti-slop": "workspace:*",
+    "@elmeragroup/oxlint-test-rules": "workspace:*",
     "@elmeragroup/release": "workspace:*",
     "tsdown": "catalog:"
   },
@@ -49,6 +50,10 @@
     "./oxlint/anti-slop": {
       "types": "./dist/oxlint/anti-slop.d.mts",
       "import": "./dist/oxlint/anti-slop.mjs"
+    },
+    "./oxlint/tests": {
+      "types": "./dist/oxlint/tests.d.mts",
+      "import": "./dist/oxlint/tests.mjs"
     },
     "./release": {
       "types": "./dist/release.d.mts",

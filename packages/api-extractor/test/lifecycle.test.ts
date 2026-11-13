@@ -3,7 +3,7 @@ import type { ChildProcess } from "node:child_process";
 import { syncBuiltinESMExports } from "node:module";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { afterAll, describe, expect, it, vi } from "vitest";
+import { afterAll, describe, expect, it, onTestFinished, vi } from "vitest";
 
 const nativeChildren: ChildProcess[] = [];
 const originalSpawn = childProcess.spawn;
@@ -65,6 +65,11 @@ function nativeChildPid(child: ChildProcess): number {
   return child.pid;
 }
 
+/**
+ * Resolves once Node has reaped the child. Node emits `exit` after it collects the child's status,
+ * so its PID no longer names a live process. A child that never exits hangs here until Vitest's
+ * test timeout fails the test.
+ */
 function waitForChildExit(child: ChildProcess): Promise<void> {
   return new Promise((resolveExit, rejectExit) => {
     if (child.exitCode !== null || child.signalCode !== null) {
@@ -82,18 +87,6 @@ function waitForChildExit(child: ChildProcess): Promise<void> {
     child.once("exit", onExit);
     child.once("error", onError);
   });
-}
-
-async function waitForProcessExit(child: ChildProcess): Promise<void> {
-  const pid = nativeChildPid(child);
-  await waitForChildExit(child);
-  const deadline = Date.now() + 5_000;
-  while (isProcessAlive(pid)) {
-    if (Date.now() >= deadline) {
-      throw new Error(`The TypeScript native compiler process ${pid} is still alive`);
-    }
-    await new Promise((resolveDelay) => setTimeout(resolveDelay, 10));
-  }
 }
 
 type ChildAcquisition = { readonly status: number | null; readonly stdout: string; readonly stderr: string };
@@ -135,6 +128,11 @@ async function acquireProjectInChild(projectTsconfigPath: string): Promise<Child
     cwd: resolve(import.meta.dirname, ".."),
     stdio: ["ignore", "pipe", "pipe"],
   });
+  // A child that never releases its compiler hangs the test until Vitest's timeout fails it; this
+  // keeps that failure from leaving the child behind.
+  onTestFinished(() => {
+    if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+  });
   child.stdout.setEncoding("utf8");
   child.stderr.setEncoding("utf8");
   let stdout = "";
@@ -147,26 +145,14 @@ async function acquireProjectInChild(projectTsconfigPath: string): Promise<Child
   });
 
   const status = await new Promise<number | null>((resolveStatus, rejectStatus) => {
-    const timeout = setTimeout(() => {
-      child.kill("SIGKILL");
-      rejectStatus(
-        new Error(`Live project acquisition did not release its process within five seconds: ${stderr}`)
-      );
-    }, 5_000);
-    child.once("error", (error) => {
-      clearTimeout(timeout);
-      rejectStatus(error);
-    });
-    child.once("exit", (code) => {
-      clearTimeout(timeout);
-      resolveStatus(code);
-    });
+    child.once("error", rejectStatus);
+    child.once("exit", resolveStatus);
   });
   return { status, stdout, stderr };
 }
 
 describe("ProjectExtractor native compiler lifecycle", () => {
-  it("exits within five seconds after live project acquisition rejects an invalid configuration", async () => {
+  it("exits after live project acquisition rejects an invalid configuration", async () => {
     const { status, stdout, stderr } = await acquireProjectInChild(invalidTsconfigPath);
 
     expect(status, stderr).toBe(0);
@@ -235,7 +221,7 @@ describe("ProjectExtractor native compiler lifecycle", () => {
     );
 
     expect(result.module.name).toBe("input");
-    await waitForProcessExit(child);
+    await waitForChildExit(child);
     expect(isProcessAlive(nativeChildPid(child))).toBe(false);
   });
 
@@ -253,7 +239,7 @@ describe("ProjectExtractor native compiler lifecycle", () => {
     );
 
     expect(exit._tag).toBe("Failure");
-    await waitForProcessExit(child);
+    await waitForChildExit(child);
     expect(isProcessAlive(nativeChildPid(child))).toBe(false);
   });
 
@@ -298,7 +284,7 @@ describe("ProjectExtractor native compiler lifecycle", () => {
     expect(repeated).toEqual([resolved[0], resolved[0]]);
     expect(extracted.module.exports.map((entry) => entry.name)).toEqual(["greet"]);
     expect(sourceModes).toEqual([true, true, true, undefined]);
-    await waitForProcessExit(child);
+    await waitForChildExit(child);
     expect(isProcessAlive(nativeChildPid(child))).toBe(false);
   });
 
@@ -318,7 +304,7 @@ describe("ProjectExtractor native compiler lifecycle", () => {
     );
 
     expect(exit._tag).toBe("Failure");
-    await waitForProcessExit(child);
+    await waitForChildExit(child);
     expect(isProcessAlive(nativeChildPid(child))).toBe(false);
   });
 });

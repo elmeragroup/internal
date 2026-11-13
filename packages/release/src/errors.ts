@@ -8,7 +8,6 @@ const failureFields = {
 /** Expected failure of a public release operation; `cause` retains the original thrown value. */
 export class ReleaseError extends Schema.TaggedError<ReleaseError>()("ReleaseError", failureFields) {}
 
-// oxlint-disable-next-line anti-slop/no-unknown-parameters -- thrown values are narrowed at this seam.
 function failed(cause: unknown): ReleaseError {
   return cause instanceof Error
     ? new ReleaseError({ message: cause.message, cause })

@@ -73,6 +73,7 @@ const expectedExports = [
   "./api-extractor",
   "./oxlint",
   "./oxlint/anti-slop",
+  "./oxlint/tests",
   "./release",
 ];
 const exports = manifest.exports ?? {};
