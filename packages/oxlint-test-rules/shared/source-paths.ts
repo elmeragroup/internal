@@ -144,11 +144,10 @@ function namedSelection({ fragments, temporary }: PathSpelling): "code" | "other
 /** Each opaque path expression's spellings. */
 const SPELLINGS = new Analysis<ReadonlyArray<PathSpelling>>([NOTHING]);
 
-/**
- * What each list expression keeps, every alternative joined; `undefined` for no list. Keyed by the
- * expression, since one array literal's alternatives (one per spread combination) hold different
- * elements.
- */
+/** The list methods that reorder a list in place. */
+const PERMUTING = new Set(["sort", "reverse"]);
+
+/** What each list expression keeps, every alternative joined; `undefined` for no list. */
 const LISTS = new Analysis<Selection | undefined>(undefined);
 
 /** What each test on a file name keeps, per element it tests. */
@@ -688,20 +687,29 @@ export function sourcePaths(context: Context) {
       )
     );
 
-  /** What a list literal and what is pushed into it keep. */
-  const literalSelection = (
-    node: ESTree.Node,
-    written: ReadonlyArray<ESTree.Node | null>
-  ): Selection | undefined => {
+  /** Whether a change in place only reorders a list (`sort`, `reverse`), keeping what it holds. */
+  const permutes = (site: ESTree.Node): boolean =>
+    site.type === "CallExpression" && PERMUTING.has(memberName(unwrap(site.callee)) ?? "");
+
+  /**
+   * What a list literal and what is pushed into it keep. A spread, written in the literal
+   * (`[...xs]`) or pushed (`push(...xs)`), appends every name the spread list holds. A sort or
+   * reverse in place keeps them; any other change in place leaves the list unprovable.
+   */
+  const literalSelection = (node: ESTree.ArrayExpression): Selection | undefined => {
     const pushes: Array<Extract<Mutation, { readonly kind: "push" }>> = [];
     for (const mutation of mutationsOf(context, node)) {
-      if (mutation.kind === "other") return undefined;
-      pushes.push(mutation);
+      if (mutation.kind === "push") pushes.push(mutation);
+      else if (!permutes(mutation.site)) return undefined;
     }
     let selection: Selection = "other";
-    // A spread push appends every name the spread list holds; a spread of this list itself (a
-    // recursive walker's `out.push(...walk(sub))`) adds nothing it does not already hold.
-    for (const list of pushes.flatMap((push) => push.spreads)) {
+    const spreads = [
+      ...node.elements.flatMap((element) => (element?.type === "SpreadElement" ? [element.argument] : [])),
+      ...pushes.flatMap((push) => push.spreads),
+    ];
+    // A spread of this list itself (a recursive walker's `out.push(...walk(sub))`) adds nothing it
+    // does not already hold.
+    for (const list of spreads) {
       const values = evaluate(context, list);
       if (values.length > 0 && values.every((value) => value.kind === "array" && value.node === node))
         continue;
@@ -710,7 +718,9 @@ export function sourcePaths(context: Context) {
       selection = either(selection, kept);
     }
     const elements = [
-      ...written.flatMap((element) => (element === null ? [] : [{ node: element, at: element }])),
+      ...node.elements.flatMap((element) =>
+        element === null || element.type === "SpreadElement" ? [] : [{ node: element, at: element }]
+      ),
       ...pushes.flatMap((push) => push.values.map((value) => ({ node: value, at: push.site }))),
     ];
     for (const element of elements) {
@@ -759,21 +769,28 @@ export function sourcePaths(context: Context) {
   /**
    * What a list expression keeps, `code` when any alternative keeps code, or `undefined` for a
    * value that is no list the rule can follow: a listing, an array step on one, or an array
-   * literal and what is pushed into it.
+   * literal with what it spreads and what is pushed into it.
    */
   const selectionOfList = (node: ESTree.Node): Selection | undefined => {
     const expression = unwrap(node);
     return LISTS.run(
       context,
       expression,
-      () =>
-        joined(
+      () => {
+        // Each combination of a literal's spreads is one alternative; the literal is judged once.
+        const literals = new Map<ESTree.Node, Selection | undefined>();
+        return joined(
           evaluate(context, expression).map((alternative) => {
-            if (alternative.kind === "array") return literalSelection(alternative.node, alternative.elements);
+            if (alternative.kind === "array") {
+              if (!literals.has(alternative.node))
+                literals.set(alternative.node, literalSelection(alternative.node));
+              return literals.get(alternative.node);
+            }
             if (alternative.kind !== "opaque" || alternative.node.type !== "CallExpression") return undefined;
             return callSelection(alternative.node);
           })
-        ),
+        );
+      },
       () => undefined
     );
   };

@@ -10,16 +10,32 @@ function doubledPath(depth: number): string {
   ].join("\n");
 }
 
-/** A list spread-pushed from the one before it twice, down a chain, starting from a code listing. */
-function doubledPushes(depth: number): string {
+/** A helper listing the names that end with the suffix it is handed. */
+const LIST_HELPER = "function list(ext) {\n  return readdirSync(d).filter((n) => n.endsWith(ext));\n}\n";
+
+/**
+ * A list holding the one before it twice, spread in a literal (`written`) or pushed, down a chain,
+ * starting from a code listing.
+ */
+function doubledSpreads(depth: number, spread: "pushed" | "written"): string {
+  const step = (list: string, previous: string): string =>
+    spread === "written"
+      ? `const ${list} = [...${previous}, ...${previous}];`
+      : `const ${list} = [];\n${list}.push(...${previous}, ...${previous});`;
   return [
     'const v0 = readdirSync(dir).filter((f) => f.endsWith(".ts"));',
-    ...Array.from(
-      { length: depth },
-      (_, index) => `const v${index + 1} = [];\nv${index + 1}.push(...v${index}, ...v${index});`
-    ),
+    ...Array.from({ length: depth }, (_, index) => step(`v${index + 1}`, `v${index}`)),
     `for (const f of v${depth}) readFileSync(f);`,
   ].join("\n");
+}
+
+/** `list` spread into `tsFiles` for `first` and `second`, then `read` of what it holds. */
+function spreadHelper(
+  first: string,
+  second: string,
+  read = "for (const f of tsFiles()) readFileSync(f);"
+): string {
+  return `${LIST_HELPER}function tsFiles() {\n  return [...list("${first}"), ...list("${second}")];\n}\n${read}`;
 }
 
 /** A recursive walker that keeps names with `extension` and spreads in what each subdirectory's walk keeps. */
@@ -40,9 +56,9 @@ function walkFiltered(filter: string, steps = ""): string {
 ruleTester.run("no-source-reading-tests", noSourceReadingTests, {
   valid: [
     // A helper's suffix parameter passed a data extension keeps no code.
-    'function list(ext) {\n  return readdirSync(d).filter((n) => n.endsWith(ext));\n}\nfor (const f of list(".json")) readFileSync(f);',
+    LIST_HELPER + 'for (const f of list(".json")) readFileSync(f);',
     // Call sites that pass different kinds share one listing, which proves nothing.
-    'function list(ext) {\n  return readdirSync(d).filter((n) => n.endsWith(ext));\n}\nlist(".ts");\nfor (const f of list(".json")) readFileSync(f);',
+    LIST_HELPER + 'list(".ts");\nfor (const f of list(".json")) readFileSync(f);',
     // A filter that keeps data files keeps no code.
     walkFiltered('extname(f) === ".json"'),
     walkFiltered('[".json", ".md"].includes(extname(f))'),
@@ -125,9 +141,19 @@ ruleTester.run("no-source-reading-tests", noSourceReadingTests, {
     collectingWalker(".json"),
     // Hang: a list spread into itself, and a doubled spread-push chain past the budget, prove nothing.
     "const all = [];\nall.push(...all);\nfor (const f of all) readFileSync(f);",
-    doubledPushes(25),
+    doubledSpreads(25, "pushed"),
     "const all = [];\nall.push(...things);\nfor (const f of all) readFileSync(f);",
     'const all = [];\nall.push(...readdirSync(dir).filter((f) => f.endsWith(".ts")), ...things);\nfor (const f of all) readFileSync(f);',
+    // A list literal's spreads follow the same rule as a spread push: an unknown one blocks.
+    'for (const f of [...readdirSync(dir).filter((f) => f.endsWith(".ts")), ...things]) readFileSync(f);',
+    // Hang: list literals spread into each other resolve to nothing.
+    'const a = [...b, "x.ts"];\nconst b = [...a];\nfor (const f of a) readFileSync(f);',
+    // Sorting or reversing a data listing keeps data; any other change in place keeps nothing provable.
+    'for (const f of [...readdirSync(dir).filter((f) => f.endsWith(".json"))].sort()) readFileSync(f);',
+    'const all = [...readdirSync(dir).filter((f) => f.endsWith(".ts"))];\nall[0] = "notes.md";\nfor (const f of all) readFileSync(f);',
+    // A helper handed only data or declaration extensions lists no code, spread or not.
+    spreadHelper(".json", ".md"),
+    spreadHelper(".d.ts", ".d.ts"),
     // A pattern anchored at the end keeps what its trailing extension names: a data file here.
     walkFiltered("/fixture\\.json$/.test(f)"),
     walkFiltered('/^report\\.(json|md)$/.test(f) && f.endsWith(".ts")'),
@@ -148,7 +174,7 @@ ruleTester.run("no-source-reading-tests", noSourceReadingTests, {
   invalid: [
     // A helper's suffix parameter keeps what its one call site passes.
     {
-      code: 'function list(ext) {\n  return readdirSync(d).filter((n) => n.endsWith(ext));\n}\nfor (const f of list(".ts")) readFileSync(f);',
+      code: LIST_HELPER + 'for (const f of list(".ts")) readFileSync(f);',
       errors: [{ messageId: "source" }],
     },
     // A pattern with a stem keeps the code its trailing extension names.
@@ -167,7 +193,32 @@ ruleTester.run("no-source-reading-tests", noSourceReadingTests, {
     { code: recursiveWalker(".ts"), errors: [{ messageId: "source" }] },
     { code: collectingWalker(".ts"), errors: [{ messageId: "source" }] },
     // A doubled spread-push chain within the budget keeps its listing's code.
-    { code: doubledPushes(3), errors: [{ messageId: "source" }] },
+    { code: doubledSpreads(3, "pushed"), errors: [{ messageId: "source" }] },
+    // A list literal keeps what its spreads hold: a code listing, directly or through a helper.
+    { code: doubledSpreads(3, "written"), errors: [{ messageId: "source" }] },
+    // Budget: each spread combination is one alternative (32 here); the literal is judged once, not per alternative.
+    {
+      code: 'const A = readdirSync(dir).filter((f) => f.endsWith(".ts"));\nconst B = readdirSync(dir).filter((f) => f.endsWith(".json"));\nfor (const f of [...(c0 ? A : B), ...(c1 ? A : B), ...(c2 ? A : B), ...(c3 ? A : B), ...(c4 ? A : B)]) readFileSync(f);',
+      errors: [{ messageId: "source" }],
+    },
+    // Sorting or reversing a list, in place or not, keeps what it holds.
+    {
+      code: 'for (const f of [...readdirSync(dir).filter((f) => f.endsWith(".ts"))].sort()) readFileSync(f);',
+      errors: [{ messageId: "source" }],
+    },
+    {
+      code: 'const all = [...readdirSync(dir).filter((f) => f.endsWith(".ts"))];\nall.reverse();\nfor (const f of all) readFileSync(f);',
+      errors: [{ messageId: "source" }],
+    },
+    {
+      code: 'for (const f of [...readdirSync(dir).filter((f) => f.endsWith(".ts")), "notes.md"]) readFileSync(f);',
+      errors: [{ messageId: "source" }],
+    },
+    { code: spreadHelper(".ts", ".tsx"), errors: [{ messageId: "source" }] },
+    {
+      code: spreadHelper(".ts", ".tsx", "tsFiles().map((f) => readFileSync(f));"),
+      errors: [{ messageId: "source" }],
+    },
     {
       code: 'const all = [];\nall.push(...readdirSync(dir).filter((f) => f.endsWith(".ts")));\nfor (const f of all) readFileSync(f);',
       errors: [{ messageId: "source" }],

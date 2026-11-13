@@ -30,19 +30,21 @@ const RAW_CODE_IMPORT = /(?<!\.d)\.[cm]?[jt]sx?\?raw$/u;
  * around the read or around the `push` that fills a list. A negated or unrecognised selector keeps
  * nothing the rule can prove, so `!name.endsWith(".ts")` is no evidence. A helper's suffix
  * parameter (`function list(ext) { … name.endsWith(ext) … }`) keeps what its call sites pass when
- * every site keeps the same, so `list(".ts")` keeps code unless another site passes `".json"`. A `$`-anchored pattern
- * that matches no sample file name keeps what the extensions it ends with name
- * (`/button\.tsx?$/` keeps code), and `.d.ts` endings keep other files. `sort`, `slice` and
+ * every site keeps the same, so `list(".ts")` keeps code unless another site passes `".json"`. A
+ * `$`-anchored pattern that matches no sample file name keeps what the extensions it ends with
+ * name (`/button\.tsx?$/` keeps code), and `.d.ts` endings keep other files. `sort`, `slice` and
  * `reverse` keep the list's selection; `map` and `flatMap` keep it when the callback returns the
- * name or a path built from it (`flatMap` also `[name]`); `concat` joins the selections; and
- * `push(...list)` adds the spread list's selection, skipping a spread of the list itself (a
- * recursive walker's `out.push(...walk(sub))`). Reading JSON (a read the resolved `JSON.parse`
- * takes), CSS, Markdown and declaration files stays allowed, and so does reading data the test
- * wrote: a path the same file writes (`writeFileSync`, `writeFile`, `appendFile`, `outputFile`),
- * read as the same value, through a reader or writer helper at each call site that passes it; or
- * a path surely under a temporary directory (`mkdtempSync`, `tmpdir()`): `join` keeps it unless a
- * later segment climbs out with `..`, and `resolve` keeps it only when every later segment is a
- * known relative one. `new URL(spec, base)` names the spec's file in the base's directory.
+ * name or a path built from it (`flatMap` also `[name]`); `concat` joins the selections; and a
+ * spread, written in a list literal (`[...list]`) or pushed (`push(...list)`), adds the spread
+ * list's selection, skipping a spread of the list itself (a recursive walker's
+ * `out.push(...walk(sub))`). A spread the rule cannot follow leaves the whole list unprovable.
+ * Reading JSON (a read the resolved `JSON.parse` takes), CSS, Markdown and declaration files stays
+ * allowed, and so does reading data the test wrote: a path the same file writes (`writeFileSync`,
+ * `writeFile`, `appendFile`, `outputFile`), read as the same value, through a reader or writer
+ * helper at each call site that passes it; or a path surely under a temporary directory
+ * (`mkdtempSync`, `tmpdir()`): `join` keeps it unless a later segment climbs out with `..`, and
+ * `resolve` keeps it only when every later segment is a known relative one. `new URL(spec, base)`
+ * names the spec's file in the base's directory.
  *
  * Scope: follows what `resolve.ts` follows, for the reader (named, aliased, namespace or
  * destructured import), the path, the list and its pushes, and finds a helper's call sites as

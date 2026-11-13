@@ -39,7 +39,7 @@ export type AltBody =
   | { readonly kind: "object"; readonly node: ESTree.Node; readonly entries: ReadonlyArray<Entry> }
   | {
       readonly kind: "array";
-      readonly node: ESTree.Node;
+      readonly node: ESTree.ArrayExpression;
       readonly elements: ReadonlyArray<ESTree.Node | null>;
       readonly complete: boolean;
     }
