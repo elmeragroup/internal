@@ -1,7 +1,6 @@
 import { defineConfig } from "tsdown";
 
-// A config function keeps importing this module free of filesystem reads; tsdown calls it to build.
-export default defineConfig(() => ({
+export default defineConfig({
   entry: {
     index: "src/index.ts",
     "api-artifacts/model": "src/api-artifacts-model.ts",
@@ -24,4 +23,4 @@ export default defineConfig(() => ({
     neverBundle: ["effect", "tsrs", "@oxlint/plugins", "undici"],
     onlyImport: ["effect", "tsrs", "@oxlint/plugins", "undici"],
   },
-}));
+});
