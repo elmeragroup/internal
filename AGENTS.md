@@ -10,6 +10,8 @@ This pnpm workspace contains shared engineering packages for the Elmera Group. R
 - `packages/api-extractor` extracts a semantic API model from TypeScript projects.
 - `packages/release` is the private publication domain: identity, configuration, versioning, policy, and Effect operations.
 - `packages/oxlint-plugin` and `packages/oxlint-anti-slop` contain private lint rules.
+- `packages/oxlint-test-rules` contains the private test-shape lint rules, published as
+  `@elmeragroup/internal/oxlint/tests`.
 - `tooling/typescript` contains shared TypeScript configuration.
 - `scripts` contains workspace build, packaging, and release tooling. Root `test` contains repository
   policy tests and the packed-consumer test.
@@ -58,9 +60,44 @@ Follow `.oxlintrc.json`, `.oxfmtrc.json`, and the shared TypeScript configuratio
 separate type imports, and kebab-case filenames. Lint runs with `--deny-warnings`, so warnings fail
 the check too. Use the formatter for layout and import ordering.
 
-Fix the underlying issue before adding a lint exception. In `api-extractor`, file-wide disables and
-path-wide overrides are prohibited. A necessary next-line disable must name one rule and include a
-`--` reason. Use a `SAFETY:` comment where the assertion rule requires it. Remove obsolete exceptions.
+Fix the underlying issue before adding a lint exception. Every disable carries a `--` reason that
+names the contract it guards (`elmera/require-disable-reason`), and lint reports unused disables as
+errors. Use a `SAFETY:` comment where the assertion rule requires it.
+
+`api-extractor` takes next-line disables only, each naming one rule, which lint enforces. No override
+may relax a rule for its files, and no disable may name `elmera/require-disable-reason` or no rule at
+all, which `test/extractor-lint-policy.test.mjs` enforces.
+
+## Tests
+
+Every new or changed test passes the authoring gate in
+[the test-audit skill](.agents/skills/test-audit/SKILL.md#authoring-gate), and its answers go in the
+PR's Test value section. A fix gets a test only when one passes the gate.
+
+Assert behavior against an independently defined oracle: a committed fixture, an upstream
+`output.json`, a documented contract, or a value the test states for a reason it gives. A test that
+computes its expectation with the code under test, or asserts what its own mock returns, is a
+tautology. A cross-check between two representations that must agree names both: the unit under
+test and the oracle its output must reproduce.
+
+A test that flakes is made deterministic or deleted in the same change, never rerun or retried.
+Wait on a condition (an event, a promise, `vi.waitFor`) or drive a fake clock; a timeout is only a
+hang guard. Test files run in parallel, so a test owns its temporary directories and environment.
+
+Each kind of test lives with its owner:
+
+- Package behavior: `packages/<name>/test/*.test.ts`, run by that package's `vitest run`.
+- Lint rules: `rules/<rule>.test.{js,ts}` beside each rule, as RuleTester valid and invalid cases.
+- Extractor evidence: the fixture, conformance and timing checks in `packages/api-extractor`, driven
+  by its scripts; committed reports and baselines are drift gates.
+- Repository policy (workflows, release configuration, the lint config): root `test/*.test.{mjs,ts}`,
+  run by `pnpm test:repo-policy`.
+- Consumer behavior of the published archive: `test/packed-consumer/*.mjs`, run by
+  `pnpm test:packed-consumer` after `pnpm packages:pack`.
+
+Mechanical test-shape contracts are lint rules in `packages/oxlint-test-rules`, which `.oxlintrc.json`
+turns on for test files and helpers under `test/`. State a new mechanical contract as a rule there,
+or in `packages/oxlint-plugin` when it binds source rather than tests, with RuleTester cases.
 
 ## Extractor boundaries and evidence
 

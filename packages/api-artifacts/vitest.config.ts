@@ -1,4 +1,6 @@
 import { defineConfig } from "vitest/config";
+
 export default defineConfig({
-  test: { include: ["test/**/*.test.ts"], testTimeout: 30000, fileParallelism: false },
+  // The timeout is a hang guard for suites that spawn the compiler, git or npm; no test is timed.
+  test: { include: ["test/**/*.test.ts"], testTimeout: 30_000 },
 });

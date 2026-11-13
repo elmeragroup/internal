@@ -43,6 +43,7 @@ export class HandleRegistry {
     this.nextId += 1;
     this.values.set(id, { kind, value });
     // SAFETY: the registry creates the branded handle and retains the matching value.
+    // oxlint-disable-next-line no-restricted-properties -- a handle holds only primitives and the session symbol, so it is frozen all the way down.
     return Object.freeze({ kind, id, session: this.session }) as BackendHandle<Tag>;
   }
 

@@ -58,7 +58,8 @@ Complete a full review pass before opening a PR, or before marking a draft ready
 Use a reviewer other than the code's author: another person, or an agent with a fresh context. When
 an agent wrote the change, the person who directed it can review it. The reviewer checks the
 complete proposed diff and relevant surrounding code against the agreed scope, this guide and
-[AGENTS.md](AGENTS.md).
+[AGENTS.md](AGENTS.md), and each Test value answer against its test, as the
+[test-audit skill](.agents/skills/test-audit/SKILL.md) reviews.
 
 Review the generated Version Packages PR (`changeset-release/main`) before merging it. The code owner
 who merges it records that review in a PR comment.
@@ -67,10 +68,17 @@ who merges it records that review in a PR comment.
 
 ## Show that it works
 
-Behavior changes include tests. Run the [checks](AGENTS.md#setup-and-checks) the change touches,
-then explain in the PR how you established the problem and checked the change: the commands you
-ran, their results and anything you could not check. When regenerated evidence or reports change,
-explain each semantic change.
+Run the [checks](AGENTS.md#setup-and-checks) the change touches, then explain in the PR how you
+established the problem and checked the change: the commands you ran, their results and anything you
+could not check. When regenerated evidence or reports change, explain each semantic change.
+
+<a id="test-value"></a>
+
+### Test value
+
+The [authoring gate](.agents/skills/test-audit/SKILL.md#authoring-gate) decides whether a change gets
+a test. Every added or changed test answers each gate question in the PR's Test value section. A
+behavior change without a new test names the gate's reason instead.
 
 <a id="release-impact"></a>
 
