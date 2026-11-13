@@ -2,11 +2,12 @@ import type { ESTree, Rule } from "@oxlint/plugins";
 
 import { captureAway, FAKE_CLOCK_HELPERS_SCHEMA, isSimulated } from "../shared/fake-clock.ts";
 import type { ClockApi, FakeClockHelper } from "../shared/fake-clock.ts";
-import { allQualify, anyViolates } from "../shared/quantify.ts";
-import { evaluate } from "../shared/resolve.ts";
+import { allAgree, allQualify, anyViolates } from "../shared/quantify.ts";
+import { calleeApis, evaluate } from "../shared/resolve.ts";
 import { ruleOptions } from "../shared/rule-options.ts";
 import { assertionOf } from "../shared/test-context.ts";
-import { targetOf } from "../shared/value.ts";
+import { Analysis } from "../shared/traversal.ts";
+import { derive, targetOf } from "../shared/value.ts";
 import type { Alt } from "../shared/value.ts";
 
 /** The calls that read the wall clock, by their resolved name, with the clock API each reads. */
@@ -16,6 +17,23 @@ const CLOCK_READS = new Map<string, ClockApi>([
   ["process.hrtime", "hrtime"],
   ["process.hrtime.bigint", "hrtime"],
 ]);
+
+/** The arithmetic that scales a value (`days * DAY`, `now / 1000`). */
+const SCALING = new Set(["*", "/", "%"]);
+
+/** The calls that round or convert a value and keep what it measures. */
+const ROUNDING = new Set(["Math.round", "Math.floor", "Math.ceil", "Math.trunc", "Number"]);
+
+/**
+ * The values each scaling or rounding expression is built from, through nested scaling and
+ * rounding, as one analysis on the bounded traversal: an expression reached again while it is
+ * read, or past the budget, is built from nothing known. Each value carries its provenance
+ * (`named`, `via`) as reached from the expression; the caller applies the provenance of the
+ * alternative that reached the expression, since that differs per alternative. The empty result
+ * on a cycle or budget cut is deliberate: an operand that cannot be read neither blocks an offset
+ * nor reports.
+ */
+const SCALED_FROM = new Analysis<ReadonlyArray<Alt>>([]);
 
 /**
  * No timing assertions: a value that may be a wall-clock capture is neither subtracted nor
@@ -30,11 +48,18 @@ const CLOCK_READS = new Map<string, ClockApi>([
  * measured on the machine running the test flakes under load and proves nothing a user sees.
  * Reading the clock for a unique name or to seed a fake clock stays allowed, and so does
  * offsetting a capture by a duration in every alternative, which builds a timestamp rather than
- * measuring one: a number, an imported constant (`Date.now() - HOUR`), scaling arithmetic
- * (`days * DAY`), or the time of a date that is no clock capture (`born.getTime()`).
+ * measuring one: a number, an imported constant (`Date.now() - HOUR`), arithmetic that scales or
+ * rounds one (`days * DAY`, `Math.round(days * DAY)`), or the time of a date that is no clock
+ * capture (`born.getTime()`). A capture stays one through scaling and rounding
+ * (`performance.now() / 1000`), so an offset holds none, and a scaled capture is asserted or
+ * subtracted like the capture itself. A subtraction whose sides both hold one and the same reading
+ * (`now - (now % DAY)`) builds a timestamp from it and stays allowed; two calls of the clock, or
+ * of one helper, are two readings.
  *
  * Scope: follows what `resolve.ts` follows, for the capture and every callee, and judges coverage
- * as `fake-clock.ts` does, a capture a helper returns at the call that returned it. Beyond that: a
+ * as `fake-clock.ts` does, a capture a helper returns at the call that returned it. Scaling and
+ * rounding are followed only through `*`, `/`, `%` and `Math.round`, `Math.floor`, `Math.ceil`,
+ * `Math.trunc` and `Number`. Beyond that: a
  * clock change inside a nested function, or at module or `describe` level outside a hook, does not
  * count, and `page.clock` never covers the test's own clock. A test registered through a local
  * wrapper that forwards its body to `it`, and a clock read in a class method (`new C().m()`), are
@@ -65,11 +90,16 @@ export const noWallClock: Rule = {
     /**
      * A clock capture: where the time is taken (which decides its coverage), the API it reads, and
      * the local calls that carried it out, so a helper's capture is judged at the call that made it.
+     * `call` is the call or construction that reads the clock and `reading` the local calls that
+     * carried that read out: together they name one reading, since `at` may be an alias that many
+     * reads share.
      */
     type Capture = {
       readonly at: ESTree.Node;
       readonly api: ClockApi;
       readonly via: ReadonlyArray<ESTree.CallExpression>;
+      readonly call: ESTree.Node;
+      readonly reading: ReadonlyArray<ESTree.CallExpression>;
     };
 
     /**
@@ -82,7 +112,7 @@ export const noWallClock: Rule = {
       api: ClockApi,
       call: ESTree.Node,
       via: ReadonlyArray<ESTree.CallExpression>
-    ): Capture => ({ api, ...(captureAway(callee, api, call) ?? { at: call, via }) });
+    ): Capture => ({ api, call, reading: via, ...(captureAway(callee, api, call) ?? { at: call, via }) });
 
     /** Where an alternative that is `new Date()` with no argument captures the time. */
     const constructedNow = (alternative: Alt, via: ReadonlyArray<ESTree.CallExpression>): Capture[] => {
@@ -95,11 +125,11 @@ export const noWallClock: Rule = {
     };
 
     /**
-     * Where one alternative captures the time: a clock call (`Date.now()`, `performance.now()`,
+     * Where one alternative is itself a capture: a clock call (`Date.now()`, `performance.now()`,
      * `process.hrtime()`) or `new Date()`, each where its callee read the clock (`captureAt`), and
      * `date.getTime()` or `date.valueOf()` where its date was constructed.
      */
-    const capturesOf = (alternative: Alt): Capture[] => {
+    const directCapturesOf = (alternative: Alt): Capture[] => {
       const constructed = constructedNow(alternative, alternative.via);
       if (constructed.length > 0) return constructed;
       if (alternative.kind !== "opaque" || alternative.node.type !== "CallExpression") return [];
@@ -112,6 +142,49 @@ export const noWallClock: Rule = {
       });
     };
 
+    /** The expression of an alternative that scales a value (`days * DAY`) or rounds one (`Math.round(x)`). */
+    const scalingOf = (alternative: Alt): ESTree.Node | undefined => {
+      if (alternative.kind !== "opaque") return undefined;
+      const { node } = alternative;
+      if (node.type === "BinaryExpression") return SCALING.has(node.operator) ? node : undefined;
+      return node.type === "CallExpression" && ROUNDING.has(allAgree(calleeApis(context, node.callee)) ?? "")
+        ? node
+        : undefined;
+    };
+
+    /** The values an alternative is built from past scaling and rounding, as reached from it. */
+    const basesOf = (alternative: Alt): ReadonlyArray<Alt> => {
+      const scaling = scalingOf(alternative);
+      if (scaling === undefined) return [alternative];
+      return scaledFrom(scaling).map((base) => derive(base, { _tag: "projection", container: alternative }));
+    };
+
+    /**
+     * The values a scaling or rounding expression is built from, past nested scaling and rounding,
+     * each as reached from the expression: one step of `SCALED_FROM` per expression.
+     */
+    const scaledFrom = (node: ESTree.Node): ReadonlyArray<Alt> =>
+      SCALED_FROM.run(
+        context,
+        node,
+        () => {
+          const operands =
+            node.type === "BinaryExpression"
+              ? [node.left, node.right]
+              : node.type === "CallExpression"
+                ? node.arguments
+                : [];
+          return operands.flatMap((operand) => evaluate(context, operand).flatMap(basesOf));
+        },
+        () => []
+      );
+
+    /**
+     * Where one alternative captures the time, through scaling and rounding: a capture divided down
+     * to seconds or rounded is still a capture.
+     */
+    const capturesOf = (alternative: Alt): Capture[] => basesOf(alternative).flatMap(directCapturesOf);
+
     /** Whether one alternative captures the time where no simulated clock covers it. */
     const onWallClock = (alternative: Alt): boolean =>
       capturesOf(alternative).some(
@@ -120,30 +193,48 @@ export const noWallClock: Rule = {
 
     /**
      * Whether a value is a duration in every alternative: a number, a constant held by name (an
-     * import), or arithmetic that scales one (`days * DAY`). An offset builds a timestamp; it is not
-     * a second capture.
+     * import), arithmetic that scales or rounds one (`days * DAY`, `Math.round(days * DAY)`), or
+     * the time of a date that is no clock capture (`born.getTime()`), and in each case holds no
+     * capture, even through scaling. An offset builds a timestamp; it is not a second capture.
      */
     const isOffset = (values: ReadonlyArray<Alt>): boolean =>
       allQualify(
         values,
         (alternative) =>
-          alternative.kind === "number" ||
-          alternative.kind === "import" ||
-          isScaled(alternative) ||
-          isStampOfOtherDate(alternative)
+          (alternative.kind === "number" ||
+            alternative.kind === "import" ||
+            scalingOf(alternative) !== undefined ||
+            isStamp(alternative)) &&
+          capturesOf(alternative).length === 0
       );
 
-    /** Whether an alternative is arithmetic that scales a duration (`days * DAY`). */
-    const isScaled = (alternative: Alt): boolean =>
-      alternative.kind === "opaque" &&
-      alternative.node.type === "BinaryExpression" &&
-      ["*", "/", "%"].includes(alternative.node.operator);
+    /** Whether two captures are one reading: the same clock read, carried out by the same calls. */
+    const sameReading = (first: Capture, second: Capture): boolean =>
+      first.call === second.call &&
+      first.reading.length === second.reading.length &&
+      first.reading.every((call, index) => call === second.reading[index]);
 
-    /** Whether an alternative is `date.getTime()` of a date that is no clock capture: a fixture's stamp. */
-    const isStampOfOtherDate = (alternative: Alt): boolean =>
+    /**
+     * Whether both sides of a subtraction hold one and the same reading in every alternative
+     * (`now - (now % DAY)`): a timestamp built from that reading, which measures nothing.
+     */
+    const isOneReading = (left: ReadonlyArray<Alt>, right: ReadonlyArray<Alt>): boolean => {
+      const sides = [left, right].map((values) => values.map(capturesOf));
+      const [first] = sides.flat(2);
+      return (
+        first !== undefined &&
+        sides.every((side) =>
+          side.every(
+            (captures) => captures.length > 0 && captures.every((capture) => sameReading(capture, first))
+          )
+        )
+      );
+    };
+
+    /** Whether an alternative is `date.getTime()` or `date.valueOf()`: a date's stamp. */
+    const isStamp = (alternative: Alt): boolean =>
       alternative.kind === "opaque" &&
       alternative.node.type === "CallExpression" &&
-      capturesOf(alternative).length === 0 &&
       evaluate(context, alternative.node.callee).some(
         (callee) => callee.kind === "member" && (callee.key === "getTime" || callee.key === "valueOf")
       );
@@ -154,7 +245,7 @@ export const noWallClock: Rule = {
         const left = evaluate(context, node.left);
         const right = evaluate(context, node.right);
         // A capture offset by a number (`Date.now() - HOUR`) seeds a timestamp; it measures nothing.
-        if (isOffset(left) || isOffset(right)) return;
+        if (isOffset(left) || isOffset(right) || isOneReading(left, right)) return;
         if (anyViolates([...left, ...right], onWallClock)) context.report({ node, messageId: "budget" });
       },
       CallExpression(node) {

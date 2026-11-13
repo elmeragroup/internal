@@ -72,6 +72,18 @@ ruleTester.run("no-wall-clock", noWallClock, {
     "const hourAgo = new Date(Date.now() - 3_600_000);",
     "const HOUR = 3_600_000;\nconst stamp = Date.now() - HOUR;",
     "const ts = Date.now();\nlog(ts - 1000);",
+    // A rounded duration holds no capture, so it offsets as a scaled one does.
+    'const born = new Date("2000-01-01");\nlog(Math.floor(Date.now() / 1000) - Math.floor(born.getTime() / 1000));',
+    "log(Date.now() - Math.round(days * 86_400_000));",
+    "log(Date.now() - Math.floor(hours * 3_600_000));",
+    // Rounding one reading down to its window builds a timestamp from that reading; it measures nothing.
+    "const now = Date.now();\nconst startOfDay = now - (now % 86_400_000);\nlog(startOfDay);",
+    "const now = Date.now();\nconst bucketStart = now - (now % 60_000);\nexpect(bucketOf(now)).toBe(bucketStart);",
+    // A scaled capture under a simulated clock, asserted directly or through a helper called after the install.
+    'it("a", () => {\n  vi.useFakeTimers();\n  expect(performance.now() / 1000).toBe(0);\n});',
+    'const nowSec = () => performance.now() / 1000;\nit("x", () => {\n  log(nowSec());\n  vi.useFakeTimers();\n  const a = nowSec();\n  vi.advanceTimersByTime(1000);\n  expect(nowSec() - a).toBe(1);\n});',
+    // A `toFake` list keeps its written entries across a spread push.
+    'it("a", () => {\n  const toFake = ["Date"];\n  toFake.push(...more);\n  vi.useFakeTimers({ toFake });\n  const s = Date.now();\n  log(Date.now() - s);\n});',
   ],
   invalid: [
     // Reviewer repro: a native clock read captured at module level stays real after the install.
@@ -255,5 +267,32 @@ ruleTester.run("no-wall-clock", noWallClock, {
       code: "const start = Date.now();\nwork();\nlog(Date.now() - start);",
       errors: [{ messageId: "budget" }],
     },
+    // Scaling a capture to seconds keeps it a capture, so it is no offset.
+    {
+      code: "const start = performance.now();\nwork();\nlog(performance.now() / 1000 - start / 1000);",
+      errors: [{ messageId: "budget" }],
+    },
+    {
+      code: "work();\nlog(performance.now() / 1000 - t0);",
+      errors: [{ messageId: "budget" }],
+    },
+    {
+      code: "work();\nlog(Math.round(performance.now() / 1000) - startSec);",
+      errors: [{ messageId: "budget" }],
+    },
+    {
+      code: "const t0 = Number(process.hrtime.bigint()) / 1e9;\nwork();\nlog(Number(process.hrtime.bigint()) / 1e9 - t0);",
+      errors: [{ messageId: "budget" }],
+    },
+    // Two readings stay two, through one alias of the clock or one helper called twice.
+    { code: "log(Date.now() - (Date.now() % HOUR));", errors: [{ messageId: "budget" }] },
+    { code: "const clock = Date.now;\nlog(clock() - (clock() % HOUR));", errors: [{ messageId: "budget" }] },
+    {
+      code: "const now = () => Date.now();\nlog(now() - (now() % HOUR));",
+      errors: [{ messageId: "budget" }],
+    },
+    // A scaled or rounded capture asserted is still a capture asserted.
+    { code: "expect(performance.now() / 1000).toBeLessThan(5);", errors: [{ messageId: "budget" }] },
+    { code: "expect(Math.round(Date.now() / 1000)).toBe(x);", errors: [{ messageId: "budget" }] },
   ],
 });

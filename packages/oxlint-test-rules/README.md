@@ -2,8 +2,9 @@
 
 Private implementation of `@elmeragroup/internal/oxlint/tests`: lint rules for the shapes a test may
 not take because they flake or pin the implementation. The root `.oxlintrc.json` registers the
-plugin as `tests` and turns the rules on for `**/*.test.*` files, helpers under `test/` directories
-and test-runner configs.
+plugin as `tests` and turns the rules on for test files
+(`**/*.{test,spec}{,-d}.{ts,tsx,mts,cts,js,jsx,mjs,cjs}`), helpers under `test/` directories and
+test-runner configs.
 
 The rules came from `elmeragroup/fuse` (`tooling/oxlint-plugin-fuse`, PR #605), with Fuse's own paths
 and helpers turned into options.

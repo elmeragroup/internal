@@ -37,6 +37,11 @@ const BUILDERS = {
   logical: (p: string) => `${p} || ${p}`,
   "class list": (p: string) => `[...${p}.classList, ...${p}]`,
   measure: (p: string) => `${p}.offsetWidth + ${p}.offsetWidth`,
+  scale: (p: string) => `${p} / ${p}`,
+  round: (p: string) => `Math.round(${p} * ${p})`,
+  "push spread": (p: string) =>
+    `(() => {\n  const out = [];\n  out.push(...${p}, ...${p});\n  return out;\n})()`,
+  "flat map": (p: string) => `[...${p}, ...${p}].flatMap((e) => [e])`,
 };
 
 /** Each rule and the places it reads a value, `V` standing for the value. */

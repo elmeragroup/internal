@@ -41,9 +41,9 @@ import type { Alt, CalleeTarget, Entry } from "./value.ts";
  *    changes in place (an assigned, updated or deleted member, or a mutating method such as
  *    `push`), through its own binding or any value this list resolves to it (an alias, a
  *    property, a local function's return), stays that literal, but every member read off it is
- *    `unknown`; a literal only pushed to keeps its written elements and leaves its end `unknown`.
- *    A change through a value the list does not resolve to the literal, such as a parameter, is
- *    not followed (`mutationsOf`).
+ *    `unknown`; a literal only pushed to (spread arguments included) keeps its written elements and
+ *    leaves its end `unknown`. A change through a value the list does not resolve to the literal,
+ *    such as a parameter, is not followed (`mutationsOf`).
  * 3. A key destructured from an object pattern (`const { a: b } = value`, `const { "a": b } =
  *    value`) to that member of each alternative of the value, as step 4 reads it; with a default
  *    (`const { a = 0 } = value`), to the default where the member is `undefined`, and to both

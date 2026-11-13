@@ -59,7 +59,7 @@ Configure the plugins explicitly in Oxlint:
   },
   "overrides": [
     {
-      "files": ["**/*.test.{ts,tsx,mts,mjs}"],
+      "files": ["**/*.{test,spec}{,-d}.{ts,tsx,mts,cts,js,jsx,mjs,cjs}"],
       "rules": {
         "tests/no-class-assertions": "error",
         "tests/no-fixed-delay": "error",

@@ -61,6 +61,13 @@ ruleTester.run("no-geometry-assertions", noGeometryAssertions, {
     // A scroll offset is a position the test drives, not a layout length.
     "list.scrollTop = 300;\nexpect(list.scrollTop).toBe(300);",
     "row.scrollLeft = 120;\nexpect(row.scrollLeft).toBe(120);",
+    // A non-finite number is no pixel length: a measurement checked against NaN or Infinity is a sanity check.
+    "expect(panel.offsetWidth).not.toBe(NaN);",
+    "expect(panel.offsetWidth).toBe(Infinity);",
+    "expect(panel.offsetWidth).toBeGreaterThan(-Infinity);",
+    "expect(panel.getBoundingClientRect()).toMatchObject({ width: Infinity });",
+    // A pixel string too long for a finite number (`Number` reads it as `Infinity`) is no length.
+    `expect(getComputedStyle(panel).width).toBe("${"9".repeat(320)}px");`,
   ],
   invalid: [
     // A doubled measurement within the budget is still a length.

@@ -10,6 +10,28 @@ function doubledPath(depth: number): string {
   ].join("\n");
 }
 
+/** A list spread-pushed from the one before it twice, down a chain, starting from a code listing. */
+function doubledPushes(depth: number): string {
+  return [
+    'const v0 = readdirSync(dir).filter((f) => f.endsWith(".ts"));',
+    ...Array.from(
+      { length: depth },
+      (_, index) => `const v${index + 1} = [];\nv${index + 1}.push(...v${index}, ...v${index});`
+    ),
+    `for (const f of v${depth}) readFileSync(f);`,
+  ].join("\n");
+}
+
+/** A recursive walker that keeps names with `extension` and spreads in what each subdirectory's walk keeps. */
+function recursiveWalker(extension: string): string {
+  return `function walk(d) {\n  const out = [];\n  for (const name of readdirSync(d)) {\n    if (name.endsWith("${extension}")) out.push(name);\n    else out.push(...walk(join(d, name)));\n  }\n  return out;\n}\nfor (const f of walk(root)) readFileSync(f);`;
+}
+
+/** A helper walker that pushes the joined path of each name with `extension`. */
+function collectingWalker(extension: string): string {
+  return `function collect(dir) {\n  const files = [];\n  for (const name of readdirSync(dir)) {\n    if (name.endsWith("${extension}")) files.push(join(dir, name));\n  }\n  return files;\n}\nfor (const f of collect(root)) readFileSync(f);`;
+}
+
 /** A walk of `dir` whose filter keeps what `filter` keeps, then `steps` on the list, then a read of each file. */
 function walkFiltered(filter: string, steps = ""): string {
   return `for (const f of readdirSync(dir).filter((f) => ${filter})${steps}) readFileSync(f);`;
@@ -85,8 +107,62 @@ ruleTester.run("no-source-reading-tests", noSourceReadingTests, {
     'const pkg = JSON.parse(readFileSync(join(root, "src/manifest.ts"), "utf8"));',
     // An unrelated listing of code files does not make a helper's log read a source read.
     'it("lists the modules", () => {\n  expect(readdirSync(src).filter((name) => name.endsWith(".ts"))).toContain("button.ts");\n});\nfunction readLog(file) {\n  return readFileSync(file, "utf8");\n}\nconst logPath = join(tmp, "server.log");\nit("logs", () => {\n  expect(readLog(logPath)).toContain("ready");\n});',
+    // A flatMap that hands back each name, or a spread push of a data listing, keeps what the listing keeps.
+    walkFiltered('f.endsWith(".json")', ".flatMap((f) => [f])"),
+    'const all = [];\nall.push(...readdirSync(dir).filter((f) => f.endsWith(".json")));\nfor (const f of all) readFileSync(f);',
+    // A flatMap that returns more than the name, or a spread of a value that is no list the rule follows, proves nothing.
+    walkFiltered('f.endsWith(".ts")', ".flatMap((f) => [f, other])"),
+    walkFiltered('f.endsWith(".ts")', ".flatMap((f) => lookup(f))"),
+    walkFiltered('f.endsWith(".ts")', ".flatMap((f) => [...f])"),
+    // A map to one-name arrays is a list of arrays, not of names.
+    walkFiltered('f.endsWith(".ts")', ".map((f) => [f])"),
+    // A walker that keeps data files, through its own recursion or a helper that joins each name.
+    recursiveWalker(".json"),
+    collectingWalker(".json"),
+    // Hang: a list spread into itself, and a doubled spread-push chain past the budget, prove nothing.
+    "const all = [];\nall.push(...all);\nfor (const f of all) readFileSync(f);",
+    doubledPushes(25),
+    "const all = [];\nall.push(...things);\nfor (const f of all) readFileSync(f);",
+    'const all = [];\nall.push(...readdirSync(dir).filter((f) => f.endsWith(".ts")), ...things);\nfor (const f of all) readFileSync(f);',
+    // A pattern anchored at the end keeps what its trailing extension names: a data file here.
+    walkFiltered("/fixture\\.json$/.test(f)"),
+    walkFiltered('/^report\\.(json|md)$/.test(f) && f.endsWith(".ts")'),
+    // A declaration file is no code module.
+    walkFiltered("/^types\\.d\\.ts$/.test(f)"),
+    walkFiltered("/(?:\\.d)\\.ts$/.test(f)"),
+    walkFiltered('f.endsWith(".ts") && /\\.d\\.ts$/.test(f)'),
+    walkFiltered("/\\.tsx?$/.test(f) && /\\.d\\.ts$/.test(f)"),
+    walkFiltered('f.endsWith(".ts")', ".filter((f) => /\\.d\\.ts$/.test(f))"),
+    walkFiltered('f.endsWith(".ts") && /^types\\.d\\.ts$/.test(f)'),
+    // Hang: a stem nested past the reader's depth is unreadable.
+    walkFiltered(`/button${"(?:".repeat(10_000)}\\.ts${")".repeat(10_000)}$/.test(f)`),
+    // A pattern not anchored at the end, or anchored per line, keeps nothing provable.
+    walkFiltered("/button\\.tsx?/.test(f)"),
+    walkFiltered("/button\\.tsx?$/m.test(f)"),
+    walkFiltered("/button\\.tsx?$|readme/.test(f)"),
   ],
   invalid: [
+    // A pattern with a stem keeps the code its trailing extension names.
+    { code: walkFiltered("/button\\.tsx?$/.test(f)"), errors: [{ messageId: "source" }] },
+    { code: walkFiltered("f.match(/^index\\.(ts|tsx)$/)"), errors: [{ messageId: "source" }] },
+    { code: walkFiltered("/^view-[a-z]+\\.m?js$/.test(f)"), errors: [{ messageId: "source" }] },
+    { code: walkFiltered("/BUTTON\\.TSX?$/i.test(f)"), errors: [{ messageId: "source" }] },
+    // A prefix before a wildcard does not hide the code extension the pattern ends with.
+    { code: walkFiltered("/^src\\/.*\\.tsx?$/.test(f)"), errors: [{ messageId: "source" }] },
+    { code: walkFiltered("/(?:^|\\/)__tests__\\/.*\\.[jt]sx?$/.test(f)"), errors: [{ messageId: "source" }] },
+    // A flatMap that hands back each name, or a spread push of a code listing, keeps code.
+    { code: walkFiltered('f.endsWith(".ts")', ".flatMap((f) => [f])"), errors: [{ messageId: "source" }] },
+    // Control: a flatMap that returns the name itself, which keeps the name as a map does.
+    { code: walkFiltered('f.endsWith(".ts")', ".flatMap((f) => f)"), errors: [{ messageId: "source" }] },
+    // A walker that keeps code files, through its own recursion or a helper that joins each name.
+    { code: recursiveWalker(".ts"), errors: [{ messageId: "source" }] },
+    { code: collectingWalker(".ts"), errors: [{ messageId: "source" }] },
+    // A doubled spread-push chain within the budget keeps its listing's code.
+    { code: doubledPushes(3), errors: [{ messageId: "source" }] },
+    {
+      code: 'const all = [];\nall.push(...readdirSync(dir).filter((f) => f.endsWith(".ts")));\nfor (const f of all) readFileSync(f);',
+      errors: [{ messageId: "source" }],
+    },
     // Every filter shape that keeps a code extension keeps code.
     { code: walkFiltered("f.match(/\\.tsx?$/)"), errors: [{ messageId: "source" }] },
     { code: walkFiltered('extname(f) === ".ts"'), errors: [{ messageId: "source" }] },

@@ -28,9 +28,13 @@ const RAW_CODE_IMPORT = /(?<!\.d)\.[cm]?[jt]sx?\?raw$/u;
  * `extname(name) === ".ts"`, `[".ts"].includes(extname(name))` or `EXTENSIONS.some((e) =>
  * name.endsWith(e))`, combined with `&&` (both must keep code) and `||` (either may), and an `if`
  * around the read or around the `push` that fills a list. A negated or unrecognised selector keeps
- * nothing the rule can prove, so `!name.endsWith(".ts")` is no evidence; `sort`, `slice` and
- * `reverse` keep the list's selection, `map` keeps it when the callback returns the name or a path
- * built from it, and `concat` joins the selections. Reading JSON (a read the resolved `JSON.parse`
+ * nothing the rule can prove, so `!name.endsWith(".ts")` is no evidence. A `$`-anchored pattern
+ * that matches no sample file name keeps what the extensions it ends with name
+ * (`/button\.tsx?$/` keeps code), and `.d.ts` endings keep other files. `sort`, `slice` and
+ * `reverse` keep the list's selection; `map` and `flatMap` keep it when the callback returns the
+ * name or a path built from it (`flatMap` also `[name]`); `concat` joins the selections; and
+ * `push(...list)` adds the spread list's selection, skipping a spread of the list itself (a
+ * recursive walker's `out.push(...walk(sub))`). Reading JSON (a read the resolved `JSON.parse`
  * takes), CSS, Markdown and declaration files stays allowed, and so does reading data the test
  * wrote: a path the same file writes (`writeFileSync`, `writeFile`, `appendFile`, `outputFile`),
  * read as the same value, through a reader or writer helper at each call site that passes it; or

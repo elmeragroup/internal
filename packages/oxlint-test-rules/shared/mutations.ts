@@ -28,15 +28,21 @@ const MUTATORS = new Set([
   "add",
 ]);
 
-/** A place the code changes an object or array in place, and the kind of change. */
-export type Mutation = {
-  /** `push` appends its arguments; `other` changes what the value holds in a way not followed. */
-  readonly kind: "push" | "other";
-  /** The assignment, update, `delete` or call that makes the change. */
-  readonly site: ESTree.Node;
-  /** The values a `push` appends, in order; none for another change. */
-  readonly values: ReadonlyArray<ESTree.Node>;
-};
+/**
+ * A place the code changes an object or array in place, at `site` (the assignment, update,
+ * `delete` or call that makes the change): a `push`, which appends its arguments, or an `other`
+ * change to what the value holds, which is not followed.
+ */
+export type Mutation =
+  | { readonly kind: "other"; readonly site: ESTree.Node }
+  | {
+      readonly kind: "push";
+      readonly site: ESTree.Node;
+      /** The values it appends as written arguments, in order. */
+      readonly values: ReadonlyArray<ESTree.Node>;
+      /** The lists it spreads into its arguments (`push(...xs)`), each appending what it holds. */
+      readonly spreads: ReadonlyArray<ESTree.Node>;
+    };
 
 /** Each file's mutations, by the literal they change. */
 const INDEXES = new WeakMap<ESTree.Node, ReadonlyMap<ESTree.Node, ReadonlyArray<Mutation>>>();
@@ -50,9 +56,7 @@ function mutationAt(
     return expression.type === "MemberExpression" ? expression.object : undefined;
   };
   const other = (target: ESTree.Node | undefined) =>
-    target === undefined
-      ? undefined
-      : { target, mutation: { kind: "other" as const, site: node, values: [] } };
+    target === undefined ? undefined : { target, mutation: { kind: "other" as const, site: node } };
   switch (node.type) {
     case "AssignmentExpression":
       return other(memberTarget(node.left));
@@ -65,9 +69,13 @@ function mutationAt(
       const method = memberName(callee);
       if (callee.type !== "MemberExpression" || method === undefined || !MUTATORS.has(method))
         return undefined;
-      if (method !== "push" || node.arguments.some((argument) => argument.type === "SpreadElement"))
-        return other(callee.object);
-      return { target: callee.object, mutation: { kind: "push", site: node, values: node.arguments } };
+      if (method !== "push") return other(callee.object);
+      const values: ESTree.Node[] = [];
+      const spreads: ESTree.Node[] = [];
+      for (const argument of node.arguments)
+        if (argument.type === "SpreadElement") spreads.push(argument.argument);
+        else values.push(argument);
+      return { target: callee.object, mutation: { kind: "push", site: node, values, spreads } };
     }
     default:
       return undefined;

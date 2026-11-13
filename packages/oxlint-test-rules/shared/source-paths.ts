@@ -2,6 +2,8 @@ import type { Context, ESTree } from "@oxlint/plugins";
 
 import { memberName } from "./ast-names.ts";
 import { descendants, unwrap } from "./ast-walk.ts";
+import type { Mutation } from "./mutations.ts";
+import { endingsOf } from "./pattern-endings.ts";
 import { anyViolates } from "./quantify.ts";
 import { calleeTargets, evaluate, mutationsOf, returnedValues } from "./resolve.ts";
 import { staticText } from "./static-text.ts";
@@ -90,6 +92,12 @@ const CODE_SAMPLES = ["a.ts", "a.tsx", "a.mts", "a.cts", "a.js", "a.jsx", "a.mjs
 
 /** File names a pattern that keeps only code files does not match. */
 const OTHER_SAMPLES = ["a.json", "a.log", "a.md", "a.css", "a.d.ts.map", "a.txt"];
+
+/** A code extension at the end of a name, in any case and declaration files included. */
+const CODE_EXTENSION = /\.[cm]?[jt]sx?$/iu;
+
+/** A declaration file's extension at the end of a name, in any case: no code module. */
+const DECLARATION_EXTENSION = /\.d\.[cm]?ts$/iu;
 
 /** A URL with a scheme, which a base URL does not change. */
 const ABSOLUTE_URL = /^[a-z][a-z0-9+.-]*:/iu;
@@ -186,6 +194,22 @@ function joined(selections: ReadonlyArray<Selection | undefined>): Selection | u
     selection = either(selection, one);
   }
   return selection;
+}
+
+/**
+ * What a pattern keeps by the endings its source requires (`pattern-endings.ts`): other when every
+ * ending is a declaration file's extension (`.d.ts`, as `endsWith(".d.ts")` is) or an extension
+ * that is no code extension; code when every ending is a code extension, a declaration one
+ * included, and not every one is a declaration; nothing provable otherwise, or when the endings
+ * cannot be read.
+ */
+function selectionOfEndings(regex: RegExp): Selection {
+  const endings = endingsOf(regex.source, regex.flags);
+  if (endings === undefined || endings.length === 0) return "any";
+  const isDeclaration = (ending: string) => DECLARATION_EXTENSION.test(ending);
+  const isOther = (ending: string) => EXTENSION.test(ending) && !CODE_EXTENSION.test(ending);
+  if (endings.every((ending) => isDeclaration(ending) || isOther(ending))) return "other";
+  return endings.every((ending) => CODE_EXTENSION.test(ending)) ? "code" : "any";
 }
 
 /** Whether a fragment climbs out of the directory before it: a `..` segment. */
@@ -460,9 +484,11 @@ export function sourcePaths(context: Context) {
   };
 
   /**
-   * What a regular expression keeps when it tests a file name, by what it matches: code when it
-   * matches a code file name and no other kind, other when it matches only other kinds, and
-   * nothing provable otherwise (`/.*\/`, a pattern that does not compile).
+   * What a regular expression keeps when it tests a file name, by the sample names it matches:
+   * code when it matches a code file name and no other kind, other when it matches only other
+   * kinds, and nothing provable when it matches both (`/.*\/`) or does not compile. It falls back
+   * to `selectionOfEndings` when no sample name matches, such as for a pattern with a stem
+   * (`/button\.tsx?$/`).
    */
   const selectionOfPattern = (node: ESTree.Node): Selection =>
     joined(
@@ -476,8 +502,9 @@ export function sourcePaths(context: Context) {
         }
         const code = CODE_SAMPLES.some((name) => regex.test(name));
         const other = OTHER_SAMPLES.some((name) => regex.test(name));
-        if (code && !other) return "code";
-        return other && !code ? "other" : "any";
+        if (code && other) return "any";
+        if (code) return "code";
+        return other ? "other" : selectionOfEndings(regex);
       })
     ) ?? "any";
 
@@ -587,15 +614,29 @@ export function sourcePaths(context: Context) {
     return selection;
   };
 
-  /** Whether a mapping callback returns the name it is handed, or a projection that keeps it. */
-  const keepsName = (fn: ESTree.Node): boolean => {
-    const returned = returnedValues(context, fn);
-    return returned.length > 0 && returned.every((value) => isSubject(value, elementOf(fn)));
+  /**
+   * Whether a mapping callback returns the name it is handed, or a projection that keeps it; when
+   * the step `flattens` (`flatMap`), each element of an array literal it returns is judged instead
+   * (`(f) => [f]`), and a hole or a spread in one keeps nothing provable.
+   */
+  const keepsName = (fn: ESTree.Node, flattens: boolean): boolean => {
+    const returned = returnedValues(context, fn).flatMap((value): Array<ESTree.Node | null> => {
+      const expression = unwrap(value);
+      return flattens && expression.type === "ArrayExpression" ? expression.elements : [value];
+    });
+    return (
+      returned.length > 0 &&
+      returned.every(
+        (value) => value !== null && value.type !== "SpreadElement" && isSubject(value, elementOf(fn))
+      )
+    );
   };
 
   /**
    * What one element written or pushed into a list keeps, judged where it is written: a path is
-   * code or other by its spelling, a walked value by the list it comes from and its guards.
+   * code or other by its spelling, else by the values it walks (`join(dir, name)`), as
+   * `spellsCode` judges a read: code when any walked value keeps code, other only when every one
+   * provably keeps other.
    */
   const selectionOfElement = (node: ESTree.Node, at: ESTree.Node): Selection | undefined =>
     joined(
@@ -603,8 +644,9 @@ export function sourcePaths(context: Context) {
         spell(alternative).map((spelling): Selection | undefined => {
           const named = namedSelection(spelling);
           if (named !== undefined) return named;
-          const [walked] = spelling.walked;
-          return walked === undefined ? undefined : selectionOfWalked(walked, at);
+          const walked = spelling.walked.map((value) => selectionOfWalked(value, at));
+          if (walked.includes("code")) return "code";
+          return walked.length > 0 && walked.every((kept) => kept === "other") ? "other" : undefined;
         })
       )
     );
@@ -614,15 +656,26 @@ export function sourcePaths(context: Context) {
     node: ESTree.Node,
     written: ReadonlyArray<ESTree.Node | null>
   ): Selection | undefined => {
-    const mutations = mutationsOf(context, node);
-    if (mutations.some((mutation) => mutation.kind === "other")) return undefined;
+    const pushes: Array<Extract<Mutation, { readonly kind: "push" }>> = [];
+    for (const mutation of mutationsOf(context, node)) {
+      if (mutation.kind === "other") return undefined;
+      pushes.push(mutation);
+    }
+    let selection: Selection = "other";
+    // A spread push appends every name the spread list holds; a spread of this list itself (a
+    // recursive walker's `out.push(...walk(sub))`) adds nothing it does not already hold.
+    for (const list of pushes.flatMap((push) => push.spreads)) {
+      const values = evaluate(context, list);
+      if (values.length > 0 && values.every((value) => value.kind === "array" && value.node === node))
+        continue;
+      const kept = selectionOfList(list);
+      if (kept === undefined) return undefined;
+      selection = either(selection, kept);
+    }
     const elements = [
       ...written.flatMap((element) => (element === null ? [] : [{ node: element, at: element }])),
-      ...mutations.flatMap((mutation) =>
-        mutation.values.map((value) => ({ node: value, at: mutation.site }))
-      ),
+      ...pushes.flatMap((push) => push.values.map((value) => ({ node: value, at: push.site }))),
     ];
-    let selection: Selection = "other";
     for (const element of elements) {
       const kept = selectionOfElement(element.node, element.at);
       if (kept === undefined) return undefined;
@@ -657,7 +710,9 @@ export function sourcePaths(context: Context) {
     }
     if (MAPPING_STEPS.has(method) && first !== undefined) {
       const callbacks = evaluate(context, first);
-      return callbacks.every((callback) => callback.kind === "function" && keepsName(callback.fn))
+      return callbacks.every(
+        (callback) => callback.kind === "function" && keepsName(callback.fn, method === "flatMap")
+      )
         ? receiver
         : undefined;
     }

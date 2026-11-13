@@ -179,6 +179,11 @@ ruleTester.run("no-fixed-delay", noFixedDelay, {
     'function Later() {\n  useEffect(() => {\n    setTimeout(fire, 500);\n  }, []);\n  return null;\n}\nit("a", () => {\n  vi.useFakeTimers();\n  render(<Later />);\n});',
   ],
   invalid: [
+    // A spread push keeps the list's written elements: the first delay is still known.
+    {
+      code: "const delays = [100];\ndelays.push(...more);\nsetTimeout(fire, delays[0]);",
+      errors: [{ messageId: "delay" }],
+    },
     // A delay that coerces to a positive number waits for real.
     { code: 'setTimeout(fire, "100");', errors: [{ messageId: "delay" }] },
     { code: 'await sleep("1 second");', errors: [{ messageId: "delay" }] },

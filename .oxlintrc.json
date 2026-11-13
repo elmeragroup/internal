@@ -211,7 +211,7 @@
       }
     },
     {
-      "files": ["**/*.test.{ts,tsx,mts,mjs,js}"],
+      "files": ["**/*.{test,spec}{,-d}.{ts,tsx,mts,cts,js,jsx,mjs,cjs}"],
       "rules": {
         "tests/no-class-assertions": "error",
         "tests/no-fixed-delay": "error",

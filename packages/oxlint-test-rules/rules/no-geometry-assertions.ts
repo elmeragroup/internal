@@ -188,7 +188,7 @@ export const noGeometryAssertions: Rule = {
     };
 
     /**
-     * Whether one expected alternative pins a pixel: a non-zero number or pixel string the test
+     * Whether one expected alternative pins a pixel: a finite non-zero number or pixel string the test
      * writes inline, or a box object with such a length. A value reached through a name (a named
      * constant, a property of one, a helper's return) states what the number is, so it pins nothing.
      */
@@ -196,10 +196,12 @@ export const noGeometryAssertions: Rule = {
       if (alternative.named) return false;
       switch (alternative.kind) {
         case "number":
-          return alternative.value !== 0;
+          // `NaN` and `±Infinity` are no length.
+          return Number.isFinite(alternative.value) && alternative.value !== 0;
         case "string": {
-          const match = PIXEL_STRING.exec(alternative.value);
-          return match?.[1] !== undefined && Number(match[1]) !== 0;
+          const pixels = Number(PIXEL_STRING.exec(alternative.value)?.[1]);
+          // A run of digits too long for a number reads as `Infinity`: no length.
+          return Number.isFinite(pixels) && pixels !== 0;
         }
         case "object":
           return [...BOX_LENGTHS].some((key) => {
