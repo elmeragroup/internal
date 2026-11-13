@@ -15,7 +15,7 @@ catalog:
   react: 19.3.0
   esbuild: 0.28.2
   tsdown: 0.23.1
-  tsrs: 0.21.0-ts7.1.0-beta
+  tsrs: 0.25.0-ts7.1.0-beta
   turbo: 2.11.7
   undici: 8.11.2
   vitest: 5.0.4
@@ -31,11 +31,12 @@ allowBuilds:
 minimumReleaseAge: 4320
 
 minimumReleaseAgeExclude:
-  - tsrs@0.21.0-ts7.1.0-beta
-  - "@tsrs/darwin-arm64@0.21.0-ts7.1.0-beta"
-  - "@tsrs/darwin-x64@0.21.0-ts7.1.0-beta"
-  - "@tsrs/linux-arm64-gnu@0.21.0-ts7.1.0-beta"
-  - "@tsrs/linux-arm64-musl@0.21.0-ts7.1.0-beta"
-  - "@tsrs/linux-x64-gnu@0.21.0-ts7.1.0-beta"
-  - "@tsrs/linux-x64-musl@0.21.0-ts7.1.0-beta"
-  - "@tsrs/win32-x64@0.21.0-ts7.1.0-beta"
+  - tsrs@0.25.0-ts7.1.0-beta
+  - "@tsrs/darwin-arm64@0.25.0-ts7.1.0-beta"
+  - "@tsrs/darwin-x64@0.25.0-ts7.1.0-beta"
+  - "@tsrs/linux-arm64-gnu@0.25.0-ts7.1.0-beta"
+  - "@tsrs/linux-arm64-musl@0.25.0-ts7.1.0-beta"
+  - "@tsrs/linux-x64-gnu@0.25.0-ts7.1.0-beta"
+  - "@tsrs/linux-x64-musl@0.25.0-ts7.1.0-beta"
+  - "@tsrs/win32-x64@0.25.0-ts7.1.0-beta"
+  - "@tsrs/win32-arm64@0.25.0-ts7.1.0-beta"
