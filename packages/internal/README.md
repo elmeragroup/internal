@@ -29,8 +29,8 @@ when a maintainer merges the version PR. After the first stable release, install
 
 Requires Node >=24.13.0 <25 on macOS arm64/x64 or Linux x64/arm64 (glibc or musl). The bundled
 compiler, [tsrs](https://github.com/oxc-project/tsrs), follows TypeScript 7.1; where its native binary
-is not installed, generation fails with a `BackendError` naming the missing binary. tsrs also ships a
-Windows x64 binary, but Windows is not supported: extraction path identity is not Windows-aware yet.
+is not installed, generation fails with a `BackendError` naming the missing binary. tsrs also ships
+Windows x64 and arm64 binaries, but Windows is not supported: extraction path identity is not Windows-aware yet.
 Generate during the build, then import the JSON from rendering code.
 
 The generator defaults to `includeExternalTypes: ["@base-ui/react"]` and `allowedWarningCodes: ["unsupported-type-fallback"]`. Override either option as needed. Accepted warnings are returned in `diagnostics`.
