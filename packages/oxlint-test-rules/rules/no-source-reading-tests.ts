@@ -28,7 +28,9 @@ const RAW_CODE_IMPORT = /(?<!\.d)\.[cm]?[jt]sx?\?raw$/u;
  * `extname(name) === ".ts"`, `[".ts"].includes(extname(name))` or `EXTENSIONS.some((e) =>
  * name.endsWith(e))`, combined with `&&` (both must keep code) and `||` (either may), and an `if`
  * around the read or around the `push` that fills a list. A negated or unrecognised selector keeps
- * nothing the rule can prove, so `!name.endsWith(".ts")` is no evidence. A `$`-anchored pattern
+ * nothing the rule can prove, so `!name.endsWith(".ts")` is no evidence. A helper's suffix
+ * parameter (`function list(ext) { … name.endsWith(ext) … }`) keeps what its call sites pass when
+ * every site keeps the same, so `list(".ts")` keeps code unless another site passes `".json"`. A `$`-anchored pattern
  * that matches no sample file name keeps what the extensions it ends with name
  * (`/button\.tsx?$/` keeps code), and `.d.ts` endings keep other files. `sort`, `slice` and
  * `reverse` keep the list's selection; `map` and `flatMap` keep it when the callback returns the

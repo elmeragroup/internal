@@ -36,13 +36,46 @@ const ROUNDING = new Set(["Math.round", "Math.floor", "Math.ceil", "Math.trunc",
 const SCALED_FROM = new Analysis<ReadonlyArray<Alt>>([]);
 
 /**
+ * A clock capture: where the time is taken (which decides its coverage), the API it reads, and
+ * the local calls that carried it out, so a helper's capture is judged at the call that made it.
+ * `call` is the call or construction that reads the clock and `reading` the local calls that
+ * carried that read out: together they name one reading, since `at` may be an alias that many
+ * reads share.
+ */
+type Capture = {
+  readonly at: ESTree.Node;
+  readonly api: ClockApi;
+  readonly via: ReadonlyArray<ESTree.CallExpression>;
+  readonly call: ESTree.Node;
+  readonly reading: ReadonlyArray<ESTree.CallExpression>;
+};
+
+/** The arithmetic that shifts a timestamp (`Date.now() - DAY`, `performance.timeOrigin + performance.now()`). */
+const SHIFTING = new Set(["+", "-"]);
+
+/**
+ * The values each timestamp a `Date` is built from (`new Date(stamp)`) is made of, through nested
+ * shifting, on the same terms as `SCALED_FROM`: provenance applied by the caller, nothing known on
+ * a cycle or budget cut.
+ */
+const SHIFTED_FROM = new Analysis<ReadonlyArray<Alt>>([]);
+
+/**
+ * The captures each `new Date(stamp)` holds, as reached from the construction, on the same terms:
+ * the caller applies the calls that reached it, and a cycle or budget cut holds no capture, so a
+ * date built from a date built from a reading recurses through the bounded traversal.
+ */
+const STAMP_CAPTURES = new Analysis<ReadonlyArray<Capture>>([]);
+
+/**
  * No timing assertions: a value that may be a wall-clock capture is neither subtracted nor
  * asserted, unless a simulated clock that fakes that API covers the capture, as `fake-clock.ts`
  * models one: `vi.useFakeTimers()` with its effective `toFake`, `vi.setSystemTime()` without fake
  * timers (`Date` only), a configured fake-clock helper (the `fakeClockHelpers` option, default
  * none) or `vi.useRealTimers()` for the test's own clock, and Playwright's `page.clock` for
  * captures inside a page `evaluate` callback. Time is captured by `Date.now()`,
- * `performance.now()`, `process.hrtime()` and `new Date()`, and `date.getTime()` reads the time its
+ * `performance.now()`, `process.hrtime()`, `new Date()` and a `new Date(stamp)` whose timestamp
+ * holds a capture through `+` and `-` (`new Date(Date.now())`), and `date.getTime()` reads the time its
  * date captured at construction. A capture is judged where its callee read the global a fake clock
  * replaces, so `const now = Date.now` at module scope stays real in a faked test. A budget
  * measured on the machine running the test flakes under load and proves nothing a user sees.
@@ -88,21 +121,6 @@ export const noWallClock: Rule = {
     );
 
     /**
-     * A clock capture: where the time is taken (which decides its coverage), the API it reads, and
-     * the local calls that carried it out, so a helper's capture is judged at the call that made it.
-     * `call` is the call or construction that reads the clock and `reading` the local calls that
-     * carried that read out: together they name one reading, since `at` may be an alias that many
-     * reads share.
-     */
-    type Capture = {
-      readonly at: ESTree.Node;
-      readonly api: ClockApi;
-      readonly via: ReadonlyArray<ESTree.CallExpression>;
-      readonly call: ESTree.Node;
-      readonly reading: ReadonlyArray<ESTree.CallExpression>;
-    };
-
-    /**
      * Where a clock call or construction takes its time, judged where its callee read the slot a
      * fake clock replaces (`captureAway`): at the call itself when the slot is read there, or at
      * an earlier alias (`const now = Date.now`), which keeps whatever the slot held when it ran.
@@ -114,14 +132,45 @@ export const noWallClock: Rule = {
       via: ReadonlyArray<ESTree.CallExpression>
     ): Capture => ({ api, call, reading: via, ...(captureAway(callee, api, call) ?? { at: call, via }) });
 
-    /** Where an alternative that is `new Date()` with no argument captures the time. */
+    /**
+     * Where an alternative that constructs a `Date` captures the time: `new Date()` where its
+     * callee read the clock, and `new Date(stamp)` wherever its one timestamp does, through
+     * shifting (`new Date(performance.timeOrigin + performance.now())`).
+     */
     const constructedNow = (alternative: Alt, via: ReadonlyArray<ESTree.CallExpression>): Capture[] => {
       if (alternative.kind !== "opaque" || alternative.node.type !== "NewExpression") return [];
       const construction = alternative.node;
-      if (construction.arguments.length > 0) return [];
-      return evaluate(context, construction.callee).flatMap((callee): Capture[] =>
-        targetOf(callee)?.path.join(".") === "Date" ? [captureAt(callee, "Date", construction, via)] : []
+      const dates = evaluate(context, construction.callee).filter(
+        (callee) => targetOf(callee)?.path.join(".") === "Date"
       );
+      if (construction.arguments.length === 0)
+        return dates.map((callee) => captureAt(callee, "Date", construction, via));
+      const [stamp, ...rest] = construction.arguments;
+      if (dates.length === 0 || stamp === undefined || stamp.type === "SpreadElement" || rest.length > 0)
+        return [];
+      return STAMP_CAPTURES.run(
+        context,
+        construction,
+        () => evaluate(context, stamp).flatMap((value) => partsOf(value).flatMap(capturesOf)),
+        () => []
+      ).map((capture) => ({
+        ...capture,
+        via: [...via, ...capture.via],
+        reading: [...via, ...capture.reading],
+      }));
+    };
+
+    /** The values a timestamp is made of past shifting (`+`, `-`), as reached from it. */
+    const partsOf = (alternative: Alt): ReadonlyArray<Alt> => {
+      if (alternative.kind !== "opaque") return [alternative];
+      const { node } = alternative;
+      if (node.type !== "BinaryExpression" || !SHIFTING.has(node.operator)) return [alternative];
+      return SHIFTED_FROM.run(
+        context,
+        node,
+        () => [node.left, node.right].flatMap((operand) => evaluate(context, operand).flatMap(partsOf)),
+        () => []
+      ).map((part) => derive(part, { _tag: "projection", container: alternative }));
     };
 
     /**

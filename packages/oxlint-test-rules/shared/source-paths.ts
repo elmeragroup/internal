@@ -154,6 +154,12 @@ const LISTS = new Analysis<Selection | undefined>(undefined);
 /** What each test on a file name keeps, per element it tests. */
 const TESTS = new Analysis<Selection>("any");
 
+/**
+ * What each `endsWith` argument keeps, by the suffixes it may be. A helper's parameter
+ * (`list(".ts")`) is judged at every call site and keeps something provable only when all agree.
+ */
+const SUFFIXES = new Analysis<Selection>("any");
+
 /** Whether each expression is the element a selector tests, or a projection that keeps its name. */
 const SUBJECTS = new Analysis<boolean>(false);
 
@@ -484,6 +490,39 @@ export function sourcePaths(context: Context) {
   };
 
   /**
+   * What an `endsWith` argument keeps: what its suffixes name, or, for a helper's own parameter
+   * (`function list(ext) { … n.endsWith(ext) … }`), what every call site passes when every site
+   * keeps the same. Sites that disagree (`list(".ts")` and `list(".json")`) prove nothing, since one
+   * listing serves both. One step of `SUFFIXES` per argument.
+   */
+  const selectionOfSuffix = (node: ESTree.Node): Selection =>
+    SUFFIXES.run(
+      context,
+      node,
+      () => {
+        const suffixes = suffixesOf(node);
+        if (suffixes !== undefined) return selectionOfNames(suffixes);
+        const values = evaluate(context, node);
+        const [parameter] = values;
+        if (
+          values.length !== 1 ||
+          parameter?.kind !== "parameter" ||
+          elementCallOf(parameter.fn) !== undefined
+        )
+          return "any";
+        const sites = callSitesOf(context, parameter.fn).map((site): Selection => {
+          const passed = site.arguments.slice(0, parameter.index + 1);
+          const argument = site.arguments[parameter.index];
+          if (argument === undefined || passed.some((one) => one.type === "SpreadElement")) return "any";
+          return selectionOfSuffix(argument);
+        });
+        const [agreed] = sites;
+        return agreed !== undefined && sites.every((one) => one === agreed) ? agreed : "any";
+      },
+      () => "any"
+    );
+
+  /**
    * What a regular expression keeps when it tests a file name, by the sample names it matches:
    * code when it matches a code file name and no other kind, other when it matches only other
    * kinds, and nothing provable when it matches both (`/.*\/`) or does not compile. It falls back
@@ -576,10 +615,8 @@ export function sourcePaths(context: Context) {
         const method = memberName(callee);
         const [first] = expression.arguments;
         if (callee.type !== "MemberExpression" || method === undefined) return "any";
-        if (method === "endsWith" && first !== undefined && isSubject(callee.object, element)) {
-          const suffixes = suffixesOf(first);
-          return suffixes === undefined ? "any" : selectionOfNames(suffixes);
-        }
+        if (method === "endsWith" && first !== undefined && isSubject(callee.object, element))
+          return selectionOfSuffix(first);
         if (method === "test" && first !== undefined && isSubject(first, element))
           return selectionOfPattern(callee.object);
         if (method === "match" && first !== undefined && isSubject(callee.object, element))

@@ -82,10 +82,29 @@ ruleTester.run("no-wall-clock", noWallClock, {
     // A scaled capture under a simulated clock, asserted directly or through a helper called after the install.
     'it("a", () => {\n  vi.useFakeTimers();\n  expect(performance.now() / 1000).toBe(0);\n});',
     'const nowSec = () => performance.now() / 1000;\nit("x", () => {\n  log(nowSec());\n  vi.useFakeTimers();\n  const a = nowSec();\n  vi.advanceTimersByTime(1000);\n  expect(nowSec() - a).toBe(1);\n});',
+    // A date built from a fixed stamp is a fixture, and its time an offset.
+    "const SEED_MS = 946_684_800_000;\nconst born = new Date(SEED_MS);\nlog(Date.now() - born.getTime());",
+    // A date built from a reading, measured against that same reading, measures nothing.
+    "const now = Date.now();\nconst copy = new Date(now);\nlog(copy.getTime() - now);",
+    // A date built from a reading under a fake clock is simulated.
+    'it("a", () => {\n  vi.useFakeTimers();\n  const start = new Date(Date.now());\n  vi.advanceTimersByTime(1000);\n  expect(Date.now() - start.getTime()).toBe(1000);\n});',
     // A `toFake` list keeps its written entries across a spread push.
     'it("a", () => {\n  const toFake = ["Date"];\n  toFake.push(...more);\n  vi.useFakeTimers({ toFake });\n  const s = Date.now();\n  log(Date.now() - s);\n});',
   ],
   invalid: [
+    // A date built from a clock reading captures the time as `new Date()` does.
+    {
+      code: "const start = new Date(Date.now());\nwork();\nexpect(Date.now() - start.getTime()).toBeLessThan(100);",
+      errors: [{ messageId: "budget", line: 3 }],
+    },
+    {
+      code: "const start = new Date(Date.now());\nwork();\nexpect(Date.now() - start.valueOf()).toBeLessThan(100);",
+      errors: [{ messageId: "budget", line: 3 }],
+    },
+    {
+      code: "const start = new Date(performance.timeOrigin + performance.now());\nwork();\nexpect(Date.now() - start.getTime()).toBeLessThan(100);",
+      errors: [{ messageId: "budget", line: 3 }],
+    },
     // Reviewer repro: a native clock read captured at module level stays real after the install.
     {
       code: 'const now = Date.now;\nconst later = setTimeout;\nit("x", () => {\n  vi.useFakeTimers();\n  later(cb, 100);\n  expect(now()).toBe(0);\n});',

@@ -42,6 +42,7 @@ const BUILDERS = {
   "push spread": (p: string) =>
     `(() => {\n  const out = [];\n  out.push(...${p}, ...${p});\n  return out;\n})()`,
   "flat map": (p: string) => `[...${p}, ...${p}].flatMap((e) => [e])`,
+  "date stamp": (p: string) => `new Date(${p} + ${p}).getTime()`,
 };
 
 /** Each rule and the places it reads a value, `V` standing for the value. */

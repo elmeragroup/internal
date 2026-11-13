@@ -39,6 +39,10 @@ function walkFiltered(filter: string, steps = ""): string {
 
 ruleTester.run("no-source-reading-tests", noSourceReadingTests, {
   valid: [
+    // A helper's suffix parameter passed a data extension keeps no code.
+    'function list(ext) {\n  return readdirSync(d).filter((n) => n.endsWith(ext));\n}\nfor (const f of list(".json")) readFileSync(f);',
+    // Call sites that pass different kinds share one listing, which proves nothing.
+    'function list(ext) {\n  return readdirSync(d).filter((n) => n.endsWith(ext));\n}\nlist(".ts");\nfor (const f of list(".json")) readFileSync(f);',
     // A filter that keeps data files keeps no code.
     walkFiltered('extname(f) === ".json"'),
     walkFiltered('[".json", ".md"].includes(extname(f))'),
@@ -142,6 +146,11 @@ ruleTester.run("no-source-reading-tests", noSourceReadingTests, {
     walkFiltered("/button\\.tsx?$|readme/.test(f)"),
   ],
   invalid: [
+    // A helper's suffix parameter keeps what its one call site passes.
+    {
+      code: 'function list(ext) {\n  return readdirSync(d).filter((n) => n.endsWith(ext));\n}\nfor (const f of list(".ts")) readFileSync(f);',
+      errors: [{ messageId: "source" }],
+    },
     // A pattern with a stem keeps the code its trailing extension names.
     { code: walkFiltered("/button\\.tsx?$/.test(f)"), errors: [{ messageId: "source" }] },
     { code: walkFiltered("f.match(/^index\\.(ts|tsx)$/)"), errors: [{ messageId: "source" }] },
