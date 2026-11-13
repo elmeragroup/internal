@@ -136,11 +136,11 @@ describe("every recursive analysis is bounded", () => {
       writeFileSync(join(root, "helpers.test.tsx"), helperFixture());
       for (const [rule, holes] of Object.entries(HOLES))
         writeFileSync(join(root, `${rule}-member-chain.test.tsx`), memberChainFixture(holes));
-      // A hang guard only: a bounded run finishes far inside it.
+      // A hang guard only, inside the test timeout: a bounded run finishes far inside it.
       const run = spawnSync(oxlint, ["-c", ".oxlintrc.json", "--format", "json", "."], {
         cwd: root,
         encoding: "utf8",
-        timeout: 120_000,
+        timeout: 25_000,
       });
       // 0 is a clean run and 1 a run with lint errors; null is a signal or the hang guard's timeout.
       expect([0, 1]).toContain(run.status);
