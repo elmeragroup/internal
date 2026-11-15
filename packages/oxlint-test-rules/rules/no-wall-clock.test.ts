@@ -95,6 +95,8 @@ ruleTester.run("no-wall-clock", noWallClock, {
     'it("a", () => {\n  let now;\n  now = Date.now();\n  log(now - (now % 86400000));\n});',
     'it("a", () => {\n  let now;\n  now = Date.now();\n  let duration;\n  duration = 1000;\n  const cutoff = now - duration;\n  log(cutoff);\n});',
     'it("a", () => {\n  let install;\n  install = vi.useFakeTimers;\n  install();\n  const s = Date.now();\n  log(Date.now() - s);\n});',
+    // A `let` a hoisted function reads holds nothing known: the function may run before the write.
+    "let now;\ncheck();\nnow = Date.now();\nfunction check() {\n  expect(now).toBeUndefined();\n}",
   ],
   invalid: [
     // A date built from a clock reading captures the time as `new Date()` does.

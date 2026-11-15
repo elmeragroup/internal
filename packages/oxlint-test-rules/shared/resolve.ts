@@ -38,17 +38,25 @@ import type { Alt, CalleeTarget, Entry } from "./value.ts";
  * 1. Wrappers: parentheses, `await`, optional chains, `!` and TypeScript `as`/`satisfies`.
  * 2. A `const`, or a `let`/`var` that is never reassigned, to its initializer, through any chain of such
  *    aliases. A `let` written after its declaration resolves the same way, to its written value alone, when
- *    all five hold: it has no initializer and is no loop's own binding; it has exactly one write, a plain
- *    `=`; the write is in the declaration's own function, not a nested function, closure or hook callback;
- *    the write ends before every read in source order; and the write dominates every read, being a whole
- *    `x = v;` statement whose every enclosing node, up to the block that declares the `let`, is a block, or
- *    the block of a `try` with no `finally` whose `catch`, if any, ends in `continue`, `break`, `return` or
- *    `throw` and holds no read. Any other reassigned binding is `unknown`. An object or array literal the
- *    code changes in place (an assigned, updated or deleted member, or a mutating method such as `push`),
- *    through its own binding or any value this list resolves to it (an alias, a property, a local function's
- *    return), stays that literal, but every member read off it is `unknown`; a literal only pushed to (spread
- *    arguments included) keeps its written elements and leaves its end `unknown`. A change through a value
- *    the list does not resolve to the literal, such as a parameter, is not followed (`mutationsOf`).
+ *    all of these hold (`heldExpression`; reach reads a superset, `possiblyHeldExpression`):
+ *    - it has no initializer, and is no loop's own binding;
+ *    - it has exactly one write, a plain `=`;
+ *    - it is declared directly in a program, block or static block, not in a `switch` case, whose other
+ *      cases read it in its temporal dead zone;
+ *    - every read is in the declaration's own function, not in a nested function, generator or hook
+ *      callback, which may run before the write, and ends after the write in source order;
+ *    - the write dominates every read: it is a whole `x = v;` statement whose every enclosing node, up to
+ *      the block that declares the `let`, is a block, or the block of a `try` with no `finally` whose
+ *      `catch`, if any, ends in `continue`, `break`, `return` or `throw` and holds no read.
+ *
+ *    Any other reassigned binding is `unknown`.
+ *
+ *    An object or array literal the code changes in place (an assigned, updated or deleted member, or a
+ *    mutating method such as `push`), through its own binding or any value this list resolves to it (an
+ *    alias, a property, a local function's return), stays that literal, but every member read off it is
+ *    `unknown`; a literal only pushed to (spread arguments included) keeps its written elements and leaves
+ *    its end `unknown`. A change through a value the list does not resolve to the literal, such as a
+ *    parameter, is not followed (`mutationsOf`).
  * 3. A key destructured from an object pattern (`const { a: b } = value`, `const { "a": b } =
  *    value`) to that member of each alternative of the value, as step 4 reads it; with a default
  *    (`const { a = 0 } = value`), to the default where the member is `undefined`, and to both
@@ -155,35 +163,101 @@ export function isReassigned(variable: Variable): boolean {
 }
 
 /**
- * The value a `let` declared without an initializer takes from its one write (step 2): a plain `=`
- * assignment in the declaration's own function, nested functions and hook callbacks aside, that
- * ends before every read in source order and dominates every read (`dominates`), so every read sees
- * exactly the written value.
+ * The expression a variable holds (step 2), as the evaluator reads it: its declarator's initializer
+ * when nothing writes it after its declaration, or the one written expression of a `let` that
+ * `singleWrite` accepts, every read in the declaration's own function and after the write.
+ *
+ * @param variable - The variable.
+ * @returns The expression, or `undefined` for a variable with no single declarator, no initializer
+ *   and no accepted write, or any other reassigned binding.
+ */
+export function heldExpression(variable: Variable): ESTree.Node | undefined {
+  const declarator = declaratorOf(variable);
+  if (declarator === undefined) return undefined;
+  if (isReassigned(variable)) return singleWrite(variable, declarator);
+  return declarator.init ?? undefined;
+}
+
+/**
+ * The expression a variable may hold, as code that only collects evidence for an exemption reads
+ * it (`test-context.ts`'s reach): what `heldExpression` returns, or else the write of a `let` that
+ * meets step 2's structure (`dominatingWrite`), wherever its reads sit. A read in another function
+ * may run before that write, so the evaluator does not resolve it, but the write is still code the
+ * read may see. The invariant is a superset: every expression `heldExpression` returns, this returns
+ * too, never less. Evidence only exempts, so following more can never report.
+ *
+ * @param variable - The variable.
+ * @returns The expression, or `undefined` for a variable with no single declarator, no initializer
+ *   and no dominating write, or any other reassigned binding.
+ */
+export function possiblyHeldExpression(variable: Variable): ESTree.Node | undefined {
+  const declarator = declaratorOf(variable);
+  if (declarator === undefined) return undefined;
+  if (isReassigned(variable)) return dominatingWrite(variable, declarator)?.right;
+  return declarator.init ?? undefined;
+}
+
+/** A variable's one declarator, or `undefined` for any other definition or more than one. */
+function declaratorOf(variable: Variable): ESTree.VariableDeclarator | undefined {
+  const [def, ...others] = variable.defs;
+  if (def?.type !== "Variable" || others.length > 0) return undefined;
+  return def.node.type === "VariableDeclarator" ? def.node : undefined;
+}
+
+/** The nodes whose direct body may declare a `let` that step 2 follows. */
+const DECLARING_BLOCKS: ReadonlySet<string> = new Set(["Program", "BlockStatement", "StaticBlock"]);
+
+/**
+ * The one write of a `let` declared without an initializer that meets step 2's structure: a plain
+ * `=` assignment, a whole `x = v;` statement that dominates the rest of the declaring block
+ * (`dominates`). The `let` sits directly in a program, block or static block, since a `switch`
+ * case's binding is visible, in its temporal dead zone, to the other cases. Where the reads sit is
+ * `singleWrite`'s concern.
+ *
+ * @param variable - The variable.
+ * @param declarator - Its declarator.
+ * @returns The assignment, or `undefined` when the binding is no such `let`.
+ */
+function dominatingWrite(
+  variable: Variable,
+  declarator: ESTree.VariableDeclarator
+): ESTree.AssignmentExpression | undefined {
+  const declaration = declarator.parent;
+  if (declarator.init !== null || declaration.type !== "VariableDeclaration" || declaration.kind !== "let")
+    return undefined;
+  // A loop's own binding (`for (let i; …)`, `for (let x of …)`) is written once per iteration and sits in
+  // its loop, a `switch` case's binding in its case: neither holder is a block.
+  const holder = declaration.parent;
+  if (!DECLARING_BLOCKS.has(holder.type)) return undefined;
+  const [write, ...others] = variable.references.filter((reference) => reference.isWrite());
+  if (write === undefined || others.length > 0) return undefined;
+  const assignment = write.identifier.parent;
+  if (assignment.type !== "AssignmentExpression" || assignment.operator !== "=") return undefined;
+  const statement = assignment.parent;
+  if (statement.type !== "ExpressionStatement") return undefined;
+  const reads = variable.references
+    .filter((reference) => reference.isRead())
+    .map(({ identifier }) => identifier);
+  return dominates(statement, holder, reads) ? assignment : undefined;
+}
+
+/**
+ * The value a `let` takes from its one write (step 2), as the evaluator reads it: a
+ * `dominatingWrite` that ends before every read in source order, every read in the declaration's
+ * own function, so every read sees exactly the written value. A function or generator body may be
+ * called, or hoisted and called, before the write runs.
  *
  * @param variable - The variable.
  * @param declarator - Its declarator.
  * @returns The written expression, or `undefined` when the binding is no such `let`.
  */
 function singleWrite(variable: Variable, declarator: ESTree.VariableDeclarator): ESTree.Node | undefined {
-  const declaration = declarator.parent;
-  if (declarator.init !== null || declaration.type !== "VariableDeclaration" || declaration.kind !== "let")
-    return undefined;
-  // A loop's own binding (`for (let i; …)`, `for (let x of …)`) is written once per iteration.
-  const owner = declaration.parent;
-  if (owner.type === "ForStatement" || owner.type === "ForOfStatement" || owner.type === "ForInStatement")
-    return undefined;
-  const [write, ...others] = variable.references.filter((reference) => reference.isWrite());
-  if (write === undefined || others.length > 0) return undefined;
-  const assignment = write.identifier.parent;
-  if (assignment.type !== "AssignmentExpression" || assignment.operator !== "=") return undefined;
-  if (write.from.variableScope !== variable.scope.variableScope) return undefined;
-  const reads = variable.references
-    .filter((reference) => reference.isRead())
-    .map(({ identifier }) => identifier);
-  if (reads.some((read) => read.start < assignment.end)) return undefined;
-  const statement = assignment.parent;
-  if (statement.type !== "ExpressionStatement") return undefined;
-  return dominates(statement, declaration.parent, reads) ? assignment.right : undefined;
+  const assignment = dominatingWrite(variable, declarator);
+  if (assignment === undefined) return undefined;
+  const reads = variable.references.filter((reference) => reference.isRead());
+  if (reads.some((read) => read.from.variableScope !== variable.scope.variableScope)) return undefined;
+  if (reads.some(({ identifier }) => identifier.start < assignment.end)) return undefined;
+  return assignment.right;
 }
 
 /**
@@ -569,17 +643,14 @@ function evaluator(
     }
     const declarator = def.node;
     if (declarator.type !== "VariableDeclarator") return [UNKNOWN];
-    if (isReassigned(variable)) {
-      const written = singleWrite(variable, declarator);
-      return written === undefined ? [UNKNOWN] : named(evaluateNode(written));
-    }
-    if (declarator.init === null) {
+    const held = heldExpression(variable);
+    if (held === undefined) {
       const loop = declarator.parent.parent;
-      return loop?.type === "ForOfStatement" || loop?.type === "ForInStatement"
+      return !isReassigned(variable) && (loop?.type === "ForOfStatement" || loop?.type === "ForInStatement")
         ? [plain({ kind: "loop", iterable: loop.right })]
         : [UNKNOWN];
     }
-    if (declarator.id.type === "Identifier") return named(evaluateNode(declarator.init));
+    if (declarator.id.type === "Identifier") return named(evaluateNode(held));
     if (declarator.id.type !== "ObjectPattern") return [UNKNOWN];
     for (const property of declarator.id.properties) {
       if (property.type !== "Property") continue;
@@ -588,7 +659,7 @@ function evaluator(
       if (target !== def.name) continue;
       const key = propertyKeyName(property);
       if (key === undefined) return [UNKNOWN];
-      return destructuredOf(declarator.init, key, withFallback?.right, property);
+      return destructuredOf(held, key, withFallback?.right, property);
     }
     return [UNKNOWN];
   };

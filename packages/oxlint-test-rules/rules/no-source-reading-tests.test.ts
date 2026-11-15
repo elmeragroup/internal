@@ -193,7 +193,10 @@ ruleTester.run("no-source-reading-tests", noSourceReadingTests, {
     ),
     demoListing("  try {\n    entries = readdirSync(demosDir);\n  } finally {\n    log(demosDir);\n  }"),
     demoListing('  switch (mode) {\n    case "list":\n      entries = readdirSync(demosDir);\n  }'),
-    'let file;\nif (flag) file = () => "out.ts";\nwriteFileSync(file(), "a");\nreadFileSync(file());',
+    // A file the test writes through a callable written once into a `let` is its own output.
+    'let file;\nfile = () => "out.ts";\nwriteFileSync(file(), "a");\nreadFileSync(file());',
+    // A `let` a hoisted function reads holds nothing known: the function may run before the write.
+    'let file;\nload();\nfile = "src/button.ts";\nfunction load() {\n  readFileSync(file);\n}',
     // A `let` written once, before every read, holds the written value alone: a temporary
     // directory, and `JSON.parse`, which consumes the read.
     'let dir;\ndir = mkdtempSync(join(tmpdir(), "x-"));\nreadFileSync(`${dir}/out.js`);',

@@ -100,6 +100,12 @@ ruleTester.run("no-class-assertions", noClassAssertions, {
     'it("a", () => {\n  root.className = "existing";\n  apply(root);\n  expect(root).toHaveClass("existing");\n});',
     // A class list and expected list each written once into a `let` hold the written values alone.
     'render(<Button className="marker" />);\nlet actual;\nactual = [...button.classList];\nlet markers;\nmarkers = ["marker"];\nexpect(actual).toEqual([...markers]);',
+    // A props object or fixture function written once into a `let` supplies its class where it is read.
+    'let props;\nprops = { className: "marker" };\nconst view = <Button {...props} />;\nit("supplied", () => {\n  let marker;\n  marker = "marker";\n  render(view);\n  expect(button).toHaveClass(marker);\n});',
+    'let renderMarked;\nrenderMarked = () => render(<Button className="marker" />);\nconst fixtures = { renderMarked };\nit("supplied", () => {\n  fixtures.renderMarked();\n  expect(button).toHaveClass("marker");\n});',
+    // Read inside the test too: reach follows the write wherever it is read, as it only exempts.
+    'let props;\nprops = { className: "marker" };\nit("supplied", () => {\n  let marker;\n  marker = "marker";\n  render(<Button {...props} />);\n  expect(button).toHaveClass(marker);\n});',
+    'let renderMarked;\nrenderMarked = () => render(<Button className="marker" />);\nit("supplied", () => {\n  renderMarked();\n  expect(button).toHaveClass("marker");\n});',
   ],
   invalid: [
     // A prefix written once into a `let` supplies `fixture-block`, not `block`.

@@ -178,7 +178,13 @@ ruleTester.run("no-fixed-delay", noFixedDelay, {
     // A component the test renders under fake timers runs its timers on the fake clock.
     'function Later() {\n  useEffect(() => {\n    setTimeout(fire, 500);\n  }, []);\n  return null;\n}\nit("a", () => {\n  vi.useFakeTimers();\n  render(<Later />);\n});',
     // A `let` written under a branch holds nothing known, so its member is no delay.
-    "let options;\nif (flag) options = { ms: 0 };\nsetTimeout(tick, options.ms);",
+    "let options;\nif (flag) options = { ms: 100 };\nsetTimeout(tick, options.ms);",
+    // So does one a hoisted function or generator reads, which may run before the write.
+    "let ms;\nschedule();\nms = 100;\nfunction schedule() {\n  setTimeout(tick, ms);\n}",
+    "let ms;\nticks().next();\nms = 100;\nfunction* ticks() {\n  yield setTimeout(tick, ms);\n}",
+    // And one declared in a `switch` case, which another case reads in its temporal dead zone.
+    'switch (mode) {\n  case "set":\n    let ms;\n    ms = 100;\n    break;\n  default:\n    setTimeout(tick, ms);\n}',
+    'switch (mode) {\n  case "set":\n    let ms;\n    ms = 100;\n  case "use":\n    setTimeout(tick, ms);\n}',
     // A `let` written once, before every read, holds the written value alone: the global
     // `setTimeout`, and a local function returning 0.
     "let later;\nlater = setTimeout;\nlet zero;\nzero = () => 0;\nlater(tick, zero());",

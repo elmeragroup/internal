@@ -218,22 +218,23 @@ function isInPollingLoop(context: Context, node: ESTree.Node): boolean {
  * No fixed delays: no global `setTimeout`, timer imported from `node:timers`, promise timer from
  * `node:timers/promises`, `sleep`, `delay`, `wait`, `page.waitForTimeout` or live `Effect.sleep`
  * waits a delay that is not zero. A fixed delay guesses how long the machine takes, so it flakes
- * under load and slows every run. A wait wrapped in a local helper is the wait its callers ask
- * for: a delay that is the helper's parameter, passed on unchanged through any chain of helpers, is
+ * under load and slows every run. A wait wrapped in a local helper is the wait its callers ask for:
+ * a delay that is the helper's parameter, passed on unchanged through any chain of helpers, is
  * judged and reported at each call that sets it (its argument, or else the parameter's default),
  * never at the timer, so a disable names the one wait it allows. A delay a helper writes itself is
  * reported at the timer that writes it. A delay reports only on evidence of a non-zero wait: a
  * positive number, a duration string, or a value held by name only (an imported constant,
  * `Duration.millis(200)`). Allowed: a delay of 0, `undefined` (a timer with no delay), `null`, a
  * negative or `NaN` number (one turn), a parameter no call sets, or a value the evaluator cannot
- * know (a binding written twice or under a branch); a wait inside a polling loop, whose test or
- * early exit checks state rather than a stepped counter; `Effect.sleep` on the test clock; and a
- * global `setTimeout` or `sleep`-style helper that a simulated clock faking `setTimeout` covers, as
- * `fake-clock.ts` models one, at the call that sets the delay: in the test, in a setup hook after
- * the hook's own install, or in a helper or component that only covered tests call or render,
- * however the call reaches it (an alias, an object property, a destructured binding). A timer read
- * through an alias is judged where the alias read the global (`const later = setTimeout` at module
- * scope stays real). A callee that may be a timer waits when any alternative does.
+ * know (a `let` written more than once, or written where some read may run first); a wait inside a
+ * polling loop, whose test or early exit checks state rather than a stepped counter; `Effect.sleep`
+ * on the test clock; and a global `setTimeout` or `sleep`-style helper that a simulated clock
+ * faking `setTimeout` covers, as `fake-clock.ts` models one, at the call that sets the delay: in
+ * the test, in a setup hook after the hook's own install, or in a helper or component that only
+ * covered tests call or render, however the call reaches it (an alias, an object property, a
+ * destructured binding). A timer read through an alias is judged where the alias read the global
+ * (`const later = setTimeout` at module scope stays real). A callee that may be a timer waits when
+ * any alternative does.
  *
  * Options: `waitHelpers` names the helpers that wait on the global timers (default `sleep` and
  * `delay`), `realWaitHelpers` the helpers that wait for real under any fake timers (default none;

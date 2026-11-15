@@ -3,7 +3,15 @@ import type { Context, ESTree } from "@oxlint/plugins";
 import { memberName } from "./ast-names.ts";
 import { descendants, isFunction, unwrap, within } from "./ast-walk.ts";
 import { allAgree } from "./quantify.ts";
-import { calleeApis, calleeTargets, evaluate, EVALUATES, returnedValues, variableOf } from "./resolve.ts";
+import {
+  calleeApis,
+  calleeTargets,
+  evaluate,
+  EVALUATES,
+  possiblyHeldExpression,
+  returnedValues,
+  variableOf,
+} from "./resolve.ts";
 import { isolated } from "./traversal.ts";
 
 /**
@@ -371,7 +379,9 @@ export function evidenceSets(context: Context, node: ESTree.Node): ESTree.Node[]
 
 /**
  * The code reachable from roots: the roots themselves, plus the declaration of every local binding
- * they read (JSX component tags included), followed transitively.
+ * they read (JSX component tags included) and the expression it may hold
+ * (`possiblyHeldExpression`, a `let`'s one dominating write included, wherever it is read),
+ * followed transitively.
  *
  * @param context - The rule context.
  * @param roots - Test callbacks, hook callbacks, or any nodes.
@@ -384,12 +394,17 @@ export function reachOf(context: Context, roots: ReadonlyArray<ESTree.Node>): ES
     if (region === undefined) break;
     for (const node of descendants(context, region, "into-functions")) {
       if (node.type !== "Identifier" && node.type !== "JSXIdentifier") continue;
-      // Every definition a binding has: one for a `const`, one per declaration otherwise.
-      for (const def of variableOf(context, node)?.defs ?? []) {
-        if (def.type !== "Variable" && def.type !== "FunctionName") continue;
-        const declaration = def.node;
-        if (regions.some((seen) => within(declaration, seen))) continue;
-        regions.push(declaration);
+      const variable = variableOf(context, node);
+      if (variable === undefined) continue;
+      // Every definition a binding has (one for a `const`, one per declaration otherwise), then the
+      // expression it holds, which a `let`'s one accepted write puts outside its declaration.
+      const declarations = variable.defs
+        .filter((def) => def.type === "Variable" || def.type === "FunctionName")
+        .map((def) => def.node);
+      const held = possiblyHeldExpression(variable);
+      for (const reached of held === undefined ? declarations : [...declarations, held]) {
+        if (regions.some((seen) => within(reached, seen))) continue;
+        regions.push(reached);
       }
     }
   }
