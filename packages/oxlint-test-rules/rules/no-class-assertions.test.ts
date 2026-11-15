@@ -53,6 +53,8 @@ ruleTester.run("no-class-assertions", noClassAssertions, {
     'render(<Button className="marker-1" />);\nexpect(button).toHaveClass(`marker-${1}`);',
     // The matcher's options object names no class.
     'render(<Button className="marker" />);\nexpect(button).toHaveClass("marker", { exact: true });',
+    // Options written once into a `let`, which may still be `undefined` where read, name no class.
+    'render(<Button className="marker" />);\nlet options;\noptions = { exact: true };\nexpect(button).toHaveClass("marker", options);',
     // A pattern that matches a supplied class.
     'render(<Button className="marker-x" />);\nexpect(button).toHaveClass(/marker-/);',
     // `concat` assembles statically.

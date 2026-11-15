@@ -226,7 +226,7 @@ function isInPollingLoop(context: Context, node: ESTree.Node): boolean {
  * positive number, a duration string, or a value held by name only (an imported constant,
  * `Duration.millis(200)`). Allowed: a delay of 0, `undefined` (a timer with no delay), `null`, a
  * negative or `NaN` number (one turn), a parameter no call sets, or a value the evaluator cannot
- * know (a reassigned binding); a wait inside a polling loop, whose test or early exit checks state
+ * know (a binding written more than once); a wait inside a polling loop, whose test or early exit checks state
  * rather than a stepped counter; `Effect.sleep` on the test clock; and a global `setTimeout` or
  * `sleep`-style helper that a simulated clock faking `setTimeout` covers, as `fake-clock.ts` models
  * one, at the call that sets the delay: in the test, in a setup hook after the hook's own install,

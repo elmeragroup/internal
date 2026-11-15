@@ -375,6 +375,8 @@ export function sourcePaths(context: Context) {
    * conversion, or a `new URL` the evaluator kept is spelled from its parts.
    */
   const spell = (alternative: Alt): ReadonlyArray<PathSpelling> => {
+    // A path built from or read at `undefined` throws before it names a file.
+    if (alternative.kind === "undefined") return [];
     if (alternative.kind === "string") return [{ ...NOTHING, fragments: [alternative.value] }];
     if (alternative.kind === "parameter" || alternative.kind === "loop")
       return [{ ...NOTHING, walked: [alternative] }];
@@ -890,7 +892,8 @@ export function sourcePaths(context: Context) {
   /**
    * What a list expression keeps, `code` when any alternative keeps code, or `undefined` for a
    * value that is no list the rule can follow: a listing, an array step on one, or an array
-   * literal with what it spreads and what is pushed into it. Each alternative is judged under the
+   * literal with what it spreads and what is pushed into it; a `null` or `undefined` alternative
+   * adds no name, since walking or stepping it throws. Each alternative is judged under the
    * binding calls with the calls it was returned through (`via`) inside them. One step of `LISTS`
    * per list and binding.
    */
@@ -904,15 +907,18 @@ export function sourcePaths(context: Context) {
         // per binding.
         const literals = new Map<StepKey, Selection | undefined>();
         return joined(
-          evaluate(context, expression).map((alternative) => {
+          evaluate(context, expression).flatMap((alternative): Array<Selection | undefined> => {
+            // Walking, spreading or stepping `null` or `undefined` throws, so it adds no name.
+            if (alternative.kind === "null" || alternative.kind === "undefined") return [];
             const bound = contextOf(context, alternative, calls);
             if (alternative.kind === "array") {
               const key = pairKey(alternative.node, bound.key);
               if (!literals.has(key)) literals.set(key, literalSelection(alternative.node, bound));
-              return literals.get(key);
+              return [literals.get(key)];
             }
-            if (alternative.kind !== "opaque" || alternative.node.type !== "CallExpression") return undefined;
-            return callSelection(alternative.node, bound);
+            if (alternative.kind !== "opaque" || alternative.node.type !== "CallExpression")
+              return [undefined];
+            return [callSelection(alternative.node, bound)];
           })
         );
       },
@@ -989,6 +995,8 @@ export function sourcePaths(context: Context) {
    */
   const isWrittenByTest = (node: ESTree.Node): boolean =>
     evaluate(context, node).every((value) => {
+      // Reading `undefined` throws, so it reads no file the test did not write.
+      if (value.kind === "undefined") return true;
       if (value.kind === "string") return writtenPaths().has(`string:${value.value}`);
       return value.kind === "opaque" && writtenPaths().has(value.node);
     });

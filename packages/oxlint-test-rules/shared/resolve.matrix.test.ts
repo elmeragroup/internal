@@ -29,6 +29,7 @@ type Step =
   | "0 direct"
   | "1 wrapper"
   | "2 alias"
+  | "2 single write"
   | "3 destructured"
   | "4 member"
   | "5 local call"
@@ -107,6 +108,7 @@ const ENTRIES: ReadonlyArray<Entry> = [
       "0 direct": { writings: [["", "setTimeout"]] },
       "1 wrapper": { writings: [["", "(setTimeout as typeof setTimeout)"]] },
       "2 alias": { writings: [["const later = setTimeout;", "later"]] },
+      "2 single write": { writings: [["let later;\nlater = setTimeout;", "later"]] },
       "3 destructured": { writings: [['const { "later": later } = { later: setTimeout };', "later"]] },
       "4 member": {
         writings: [
@@ -141,6 +143,7 @@ const ENTRIES: ReadonlyArray<Entry> = [
       "0 direct": { writings: [["", "spinner.classList"]] },
       "1 wrapper": { writings: [["", "(spinner.classList as DOMTokenList)"]] },
       "2 alias": { writings: [["const list = spinner.classList;", "list"]] },
+      "2 single write": { writings: [["let list;\nlist = spinner.classList;", "list"]] },
       "3 destructured": { writings: [["const { classList } = spinner;", "classList"]] },
       "4 member": {
         writings: [
@@ -165,6 +168,7 @@ const ENTRIES: ReadonlyArray<Entry> = [
       "0 direct": { writings: [["", '"src/button.tsx"']] },
       "1 wrapper": { writings: [["", '("src/button.tsx" as string)']] },
       "2 alias": { writings: [['const file = "src/button.tsx";', "file"]] },
+      "2 single write": { writings: [['let file;\nfile = "src/button.tsx";', "file"]] },
       "3 destructured": { writings: [['const { "file": file } = { file: "src/button.tsx" };', "file"]] },
       "4 member": {
         writings: [
@@ -195,6 +199,7 @@ const ENTRIES: ReadonlyArray<Entry> = [
       "0 direct": { writings: [["", "{ retry: 2 }"]] },
       "1 wrapper": { writings: [["", "({ retry: 2 } as Options)"]] },
       "2 alias": { writings: [["const flaky = { retry: 2 };", "flaky"]] },
+      "2 single write": { writings: [["let flaky;\nflaky = { retry: 2 };", "flaky"]] },
       "3 destructured": { writings: [["const { flaky } = { flaky: { retry: 2 } };", "flaky"]] },
       "4 member": {
         writings: [
@@ -229,6 +234,7 @@ const ENTRIES: ReadonlyArray<Entry> = [
       "0 direct": { writings: [["", "0"]] },
       "1 wrapper": { writings: [["", "(0 as number)"]] },
       "2 alias": { writings: [["const NONE = 0;", "NONE"]] },
+      "2 single write": { writings: [["let NONE;\nNONE = 0;", "NONE"]] },
       "3 destructured": { writings: [["const { none } = { none: 0 };", "none"]] },
       "4 member": {
         writings: [
@@ -258,6 +264,7 @@ const ENTRIES: ReadonlyArray<Entry> = [
           ['const id = "x";', "`marker-${id}`"],
         ],
       },
+      "2 single write": { writings: [['let marker;\nmarker = "marker-x";', "marker"]] },
       "3 destructured": { writings: [['const { "marker": marker } = { marker: "marker-x" };', "marker"]] },
       "4 member": {
         writings: [
@@ -292,6 +299,7 @@ const ENTRIES: ReadonlyArray<Entry> = [
       "0 direct": { writings: [["", "panel.offsetWidth"]] },
       "1 wrapper": { writings: [["", "(panel.offsetWidth as number)"]] },
       "2 alias": { writings: [["const width = panel.offsetWidth;", "width"]] },
+      "2 single write": { writings: [["let width;\nwidth = panel.offsetWidth;", "width"]] },
       "3 destructured": { writings: [["const { offsetWidth } = panel;", "offsetWidth"]] },
       "4 member": {
         writings: [
@@ -318,6 +326,11 @@ const ENTRIES: ReadonlyArray<Entry> = [
       },
       "2 alias": {
         writings: [['const files = readdirSync(src).filter((name) => name.endsWith(".tsx"));', "files"]],
+      },
+      "2 single write": {
+        writings: [
+          ['let files;\nfiles = readdirSync(src).filter((name) => name.endsWith(".tsx"));', "files"],
+        ],
       },
       "3 destructured": {
         writings: [
@@ -359,6 +372,7 @@ const ENTRIES: ReadonlyArray<Entry> = [
       "0 direct": { writings: [["", "new Date()"]] },
       "1 wrapper": { writings: [["", "(new Date() as Date)"]] },
       "2 alias": { writings: [["const now = new Date();", "now"]] },
+      "2 single write": { writings: [["let now;\nnow = new Date();", "now"]] },
       "3 destructured": { writings: [["const { now } = { now: new Date() };", "now"]] },
       "4 member": {
         writings: [
@@ -382,6 +396,9 @@ const ENTRIES: ReadonlyArray<Entry> = [
       "0 direct": { writings: [["", "Math.abs(a.offsetWidth - b.offsetWidth)"]] },
       "1 wrapper": { writings: [["", "(Math.abs(a.offsetWidth - b.offsetWidth) as number)"]] },
       "2 alias": { writings: [["const delta = Math.abs(a.offsetWidth - b.offsetWidth);", "delta"]] },
+      "2 single write": {
+        writings: [["let delta;\ndelta = Math.abs(a.offsetWidth - b.offsetWidth);", "delta"]],
+      },
       "3 destructured": {
         writings: [["const { delta } = { delta: Math.abs(a.offsetWidth - b.offsetWidth) };", "delta"]],
       },
@@ -413,6 +430,7 @@ const ENTRIES: ReadonlyArray<Entry> = [
       "0 direct": { writings: [["", ".toBe"]] },
       "1 wrapper": { excluded: MATCHER_KEY },
       "2 alias": { excluded: MATCHER_KEY },
+      "2 single write": { excluded: MATCHER_KEY },
       "3 destructured": { excluded: MATCHER_KEY },
       "4 member": {
         writings: [
@@ -437,6 +455,7 @@ const ENTRIES: ReadonlyArray<Entry> = [
       "0 direct": { writings: [["", FAKED_BODY]] },
       "1 wrapper": { writings: [["", `(${FAKED_BODY}) as () => void`]] },
       "2 alias": { writings: [[`const body = ${FAKED_BODY};`, "body"]] },
+      "2 single write": { writings: [[`let body;\nbody = ${FAKED_BODY};`, "body"]] },
       "3 destructured": { writings: [[`const { body } = { body: ${FAKED_BODY} };`, "body"]] },
       "4 member": {
         writings: [
@@ -464,6 +483,7 @@ const ENTRIES: ReadonlyArray<Entry> = [
       "0 direct": { writings: [["", "() => Date.now()"]] },
       "1 wrapper": { writings: [["", "((() => Date.now()) as () => number)"]] },
       "2 alias": { writings: [["const now = () => Date.now();", "now"]] },
+      "2 single write": { writings: [["let now;\nnow = () => Date.now();", "now"]] },
       "3 destructured": { writings: [["const { now } = { now: () => Date.now() };", "now"]] },
       "4 member": {
         writings: [

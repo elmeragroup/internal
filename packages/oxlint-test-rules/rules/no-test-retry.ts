@@ -88,8 +88,8 @@ function withDefaultReruns(context: Context, argument: ESTree.Node, fallback: ES
  * `vi.setConfig`, and none appears anywhere in a Vitest or Playwright config. A rerun turns a red
  * test green without a fix, so a test that flakes is made deterministic or deleted in the same
  * change. A value that is `0`, `false`, `undefined` or `null` in every alternative reruns nothing
- * and stays allowed, and so does a value the evaluator cannot know (`unknown`, such as a
- * reassigned binding), which is no evidence of a rerun. A helper's parameter is judged at every
+ * and stays allowed, and so does a value the evaluator cannot know (`unknown`, such as a binding
+ * written more than once), which is no evidence of a rerun. A helper's parameter is judged at every
  * call site of the helper: it reruns when any call passes a rerun (or leaves a rerunning default).
  *
  * Scope: follows what `resolve.ts` follows, for the test API (named, aliased or namespace import,

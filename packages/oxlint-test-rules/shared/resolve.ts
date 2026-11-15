@@ -37,7 +37,11 @@ import type { Alt, CalleeTarget, Entry } from "./value.ts";
  *
  * 1. Wrappers: parentheses, `await`, optional chains, `!` and TypeScript `as`/`satisfies`.
  * 2. A `const`, or a `let`/`var` that is never reassigned, to its initializer, through any chain
- *    of such aliases. A reassigned binding is `unknown`. An object or array literal the code
+ *    of such aliases. A `let` declared without an initializer (no loop's own binding) and written
+ *    exactly once, by a plain `=` assignment in the declaration's own function (not in a nested
+ *    function, closure or hook callback) that ends before every read in source order, to the
+ *    assigned value's alternatives plus `undefined`, since a read may still run before the write.
+ *    Any other reassigned binding is `unknown`. An object or array literal the code
  *    changes in place (an assigned, updated or deleted member, or a mutating method such as
  *    `push`), through its own binding or any value this list resolves to it (an alias, a
  *    property, a local function's return), stays that literal, but every member read off it is
@@ -147,6 +151,35 @@ const VALUES_AS_WRITTEN = new Analysis<Alt[]>([UNKNOWN]);
  */
 export function isReassigned(variable: Variable): boolean {
   return variable.references.some((reference) => reference.isWrite() && !reference.init);
+}
+
+/**
+ * The value a `let` declared without an initializer takes from its one write (step 2): a plain `=`
+ * assignment in the declaration's own function, nested functions and hook callbacks aside, that
+ * ends before every read in source order.
+ *
+ * @param variable - The variable.
+ * @param declarator - Its declarator.
+ * @returns The written expression, or `undefined` when the binding is no such `let`.
+ */
+function singleWrite(variable: Variable, declarator: ESTree.VariableDeclarator): ESTree.Node | undefined {
+  const declaration = declarator.parent;
+  if (declarator.init !== null || declaration.type !== "VariableDeclaration" || declaration.kind !== "let")
+    return undefined;
+  // A loop's own binding (`for (let i; …)`, `for (let x of …)`) is written once per iteration.
+  const owner = declaration.parent;
+  if (owner.type === "ForStatement" || owner.type === "ForOfStatement" || owner.type === "ForInStatement")
+    return undefined;
+  const [write, ...others] = variable.references.filter((reference) => reference.isWrite());
+  if (write === undefined || others.length > 0) return undefined;
+  const assignment = write.identifier.parent;
+  if (assignment.type !== "AssignmentExpression" || assignment.operator !== "=") return undefined;
+  if (assignment.left !== write.identifier) return undefined;
+  if (write.from.variableScope !== variable.scope.variableScope) return undefined;
+  const readsAfter = variable.references.every(
+    (reference) => !reference.isRead() || reference.identifier.start >= assignment.end
+  );
+  return readsAfter ? assignment.right : undefined;
 }
 
 /**
@@ -485,7 +518,11 @@ function evaluator(
     }
     const declarator = def.node;
     if (declarator.type !== "VariableDeclarator") return [UNKNOWN];
-    if (isReassigned(variable)) return [UNKNOWN];
+    if (isReassigned(variable)) {
+      const written = singleWrite(variable, declarator);
+      // A read may still run before the write (a conditional write, a skipped `try`): `undefined`.
+      return written === undefined ? [UNKNOWN] : named(alternatives(evaluateNode(written), [UNDEFINED]));
+    }
     if (declarator.init === null) {
       const loop = declarator.parent.parent;
       return loop?.type === "ForOfStatement" || loop?.type === "ForInStatement"

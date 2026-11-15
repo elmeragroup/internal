@@ -79,6 +79,17 @@ function walkFiltered(filter: string, steps = ""): string {
   return `for (const f of readdirSync(dir).filter((f) => ${filter})${steps}) readFileSync(f);`;
 }
 
+/**
+ * A docs-site test's shape: per directory, `listing` writes an uninitialised `let entries`, then
+ * the joined names ending with `extension` are gathered and each one read.
+ */
+function demoListing(listing: string, extension = ".tsx"): string {
+  return `const files: string[] = [];\nfor (const demosDir of dirs) {\n  let entries: string[];\n${listing}\n  for (const entry of entries) if (entry.endsWith("${extension}")) files.push(join(demosDir, entry));\n}\nfor (const f of files) readFileSync(f, "utf8");`;
+}
+
+/** The listing written once, in a `try` whose `catch` skips the directory. */
+const GUARDED_LISTING = "  try {\n    entries = readdirSync(demosDir);\n  } catch {\n    continue;\n  }";
+
 ruleTester.run("no-source-reading-tests", noSourceReadingTests, {
   valid: [
     // A helper's suffix parameter passed a data extension keeps no code.
@@ -165,6 +176,17 @@ ruleTester.run("no-source-reading-tests", noSourceReadingTests, {
     // A walker that keeps data files, through its own recursion or a helper that joins each name.
     recursiveWalker(".json"),
     collectingWalker(".json"),
+    // A listing written once into a `let` that keeps data files keeps no code.
+    demoListing(GUARDED_LISTING, ".json"),
+    // A `let` written twice, in a closure, in a hook, or read before its write holds nothing known.
+    demoListing("  try {\n    entries = readdirSync(demosDir);\n  } catch {\n    entries = [];\n  }"),
+    demoListing("  const load = () => {\n    entries = readdirSync(demosDir);\n  };\n  load();"),
+    demoListing("  beforeEach(() => {\n    entries = readdirSync(demosDir);\n  });"),
+    demoListing("  log(entries);\n  entries = readdirSync(demosDir);"),
+    // A path written once into a `let`, which may still be `undefined` where read, is judged by
+    // the written path alone: a file the test writes, or one under a temporary directory.
+    'it("x", () => {\n  let file;\n  file = join(dir, "fixture.ts");\n  writeFileSync(file, "a");\n  expect(readFileSync(file, "utf8")).toContain("a");\n});',
+    'it("emits", () => {\n  let dir;\n  dir = mkdtempSync(join(tmpdir(), "emit-"));\n  build(dir);\n  expect(readFileSync(join(dir, "out.js"), "utf8")).toContain("a");\n});',
     // Hang: a list spread into itself, and a doubled spread-push chain past the budget, prove nothing.
     "const all = [];\nall.push(...all);\nfor (const f of all) readFileSync(f);",
     doubledSpreads(25, "pushed"),
@@ -271,6 +293,8 @@ ruleTester.run("no-source-reading-tests", noSourceReadingTests, {
     // A walker that keeps code files, through its own recursion or a helper that joins each name.
     { code: recursiveWalker(".ts"), errors: [{ messageId: "source" }] },
     { code: collectingWalker(".ts"), errors: [{ messageId: "source" }] },
+    // A listing written once into a `let`, before every read in the same function, keeps its code.
+    { code: demoListing(GUARDED_LISTING), errors: [{ messageId: "source" }] },
     // A doubled spread-push chain within the budget keeps its listing's code.
     { code: doubledSpreads(3, "pushed"), errors: [{ messageId: "source" }] },
     // A list literal keeps what its spreads hold: a code listing, directly or through a helper.
