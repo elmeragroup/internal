@@ -113,6 +113,15 @@ ruleTester.run("no-class-assertions", noClassAssertions, {
       code: 'let prefix;\nprefix = "fixture-";\nrender(<Button className={[prefix, "block"].join("")} />);\nexpect(button).toHaveClass("block");',
       errors: [{ messageId: "pinned", data: { token: "block" } }],
     },
+    // A fixture built before a `let`'s one write captures no value from it, directly or through a `const`.
+    {
+      code: 'let props;\nconst view = <Button {...(props ?? {})} />;\nprops = { className: "h-9" };\nit("default", () => {\n  render(view);\n  expect(button).toHaveClass("h-9");\n});',
+      errors: [{ messageId: "pinned", data: { token: "h-9" } }],
+    },
+    {
+      code: 'let props;\nconst given = props ?? {};\nconst view = <Button {...given} />;\nprops = { className: "h-9" };\nit("default", () => {\n  render(view);\n  expect(button).toHaveClass("h-9");\n});',
+      errors: [{ messageId: "pinned", data: { token: "h-9" } }],
+    },
     // A parameter's class is not supplied by another parameter's.
     {
       code: 'it.each([["a", "b"]])("x", (supplied, asserted) => {\n  render(<Button className={supplied} />);\n  expect(button).toHaveClass(asserted, "h-9");\n});',

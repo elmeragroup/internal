@@ -179,22 +179,48 @@ export function heldExpression(variable: Variable): ESTree.Node | undefined {
 }
 
 /**
- * The expression a variable may hold, as code that only collects evidence for an exemption reads
- * it (`test-context.ts`'s reach): what `heldExpression` returns, or else the write of a `let` that
- * meets step 2's structure (`dominatingWrite`), wherever its reads sit. A read in another function
- * may run before that write, so the evaluator does not resolve it, but the write is still code the
- * read may see. The invariant is a superset: every expression `heldExpression` returns, this returns
- * too, never less. Evidence only exempts, so following more can never report.
+ * What a variable may hold, as code that only collects evidence for an exemption reads it
+ * (`possiblyHeldExpression`): its declarator's initializer, or the one write of a `let`, whose
+ * value only a read that may run after the assignment sees.
+ */
+export type PossiblyHeld =
+  | {
+      /** The variable holds its declarator's initializer wherever it is read. */
+      readonly _tag: "Initializer";
+      /** The initializer. */
+      readonly expression: ESTree.Node;
+    }
+  | {
+      /** The variable is a `let` that takes its value from one dominating write (step 2). */
+      readonly _tag: "Write";
+      /** The write; a read in the declaration's own function that starts before it ends cannot see it. */
+      readonly assignment: ESTree.AssignmentExpression;
+    };
+
+/**
+ * What a variable may hold, as code that only collects evidence for an exemption reads it
+ * (`test-context.ts`'s reach): its initializer when nothing writes it after its declaration, or
+ * else the write of a `let` that meets step 2's structure (`dominatingWrite`), wherever its reads
+ * sit. Which reads see that write is the caller's to judge against the returned assignment: a read
+ * in the declaration's own function that starts before the assignment ends never sees it, while a
+ * read in another function may run after it, so the evaluator does not resolve that read, but the
+ * write is still code the read may see. The invariant is a superset: for every read that
+ * `heldExpression` resolves, its expression is the initializer or the write returned here, and
+ * that read starts after the write in the declaration's own function. Evidence only exempts, so
+ * following more can never report.
  *
  * @param variable - The variable.
- * @returns The expression, or `undefined` for a variable with no single declarator, no initializer
- *   and no dominating write, or any other reassigned binding.
+ * @returns The initializer or the write, or `undefined` for a variable with no single declarator,
+ *   no initializer and no dominating write, or any other reassigned binding.
  */
-export function possiblyHeldExpression(variable: Variable): ESTree.Node | undefined {
+export function possiblyHeldExpression(variable: Variable): PossiblyHeld | undefined {
   const declarator = declaratorOf(variable);
   if (declarator === undefined) return undefined;
-  if (isReassigned(variable)) return dominatingWrite(variable, declarator)?.right;
-  return declarator.init ?? undefined;
+  if (isReassigned(variable)) {
+    const assignment = dominatingWrite(variable, declarator);
+    return assignment === undefined ? undefined : { _tag: "Write", assignment };
+  }
+  return declarator.init === null ? undefined : { _tag: "Initializer", expression: declarator.init };
 }
 
 /** A variable's one declarator, or `undefined` for any other definition or more than one. */
@@ -261,16 +287,19 @@ function singleWrite(variable: Variable, declarator: ESTree.VariableDeclarator):
 }
 
 /**
- * Whether a statement runs before every read that follows it, read off the syntax: every node
- * between the statement and the block that declares the binding is a block, or the block of a `try`
- * with no `finally` whose `catch`, if any, always completes abruptly (`exitsAbruptly`) and holds no
- * read, since it runs when the `try` block throws before the statement. A branch, loop, `switch`,
- * label, `catch` or `finally` body on the way may skip the statement.
+ * Whether a statement's enclosing syntax lets it run whenever the declaring block runs past it:
+ * every node between the statement and the block that declares the binding is a block, or the block
+ * of a `try` with no `finally` whose `catch`, if any, always completes abruptly (`exitsAbruptly`)
+ * and holds no read, since it runs when the `try` block throws before the statement. A branch, loop,
+ * `switch`, label, `catch` or `finally` body on the way may skip the statement. This checks the
+ * enclosing syntax only: `reads` serves only to reject a read inside an intervening `catch`, and
+ * where the reads sit, their order and their function, is `singleWrite`'s and `heldExpression`'s
+ * concern.
  *
  * @param statement - The statement.
  * @param holder - The node whose body declares the binding the statement writes.
- * @param reads - The binding's reads, each after the statement in source order.
- * @returns Whether every read sees the statement's write.
+ * @param reads - The binding's reads.
+ * @returns Whether no enclosing node may skip the statement.
  */
 function dominates(statement: ESTree.Node, holder: ESTree.Node, reads: ReadonlyArray<ESTree.Node>): boolean {
   let node: ESTree.Node = statement;

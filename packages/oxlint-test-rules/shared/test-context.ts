@@ -1,4 +1,4 @@
-import type { Context, ESTree } from "@oxlint/plugins";
+import type { Context, ESTree, Variable } from "@oxlint/plugins";
 
 import { memberName } from "./ast-names.ts";
 import { descendants, isFunction, unwrap, within } from "./ast-walk.ts";
@@ -380,8 +380,11 @@ export function evidenceSets(context: Context, node: ESTree.Node): ESTree.Node[]
 /**
  * The code reachable from roots: the roots themselves, plus the declaration of every local binding
  * they read (JSX component tags included) and the expression it may hold
- * (`possiblyHeldExpression`, a `let`'s one dominating write included, wherever it is read),
- * followed transitively.
+ * (`possiblyHeldExpression`), followed transitively. A `let`'s one dominating write is followed per
+ * read: not from an identifier in the binding's own function that starts before the write ends,
+ * which runs before it and sees no value, but from one after it or in another function, which may
+ * run after it. Reach still sees everything the evaluator resolves, since the evaluator follows no
+ * write that some read in the same function precedes.
  *
  * @param context - The rule context.
  * @param roots - Test callbacks, hook callbacks, or any nodes.
@@ -402,13 +405,42 @@ export function reachOf(context: Context, roots: ReadonlyArray<ESTree.Node>): ES
         .filter((def) => def.type === "Variable" || def.type === "FunctionName")
         .map((def) => def.node);
       const held = possiblyHeldExpression(variable);
-      for (const reached of held === undefined ? declarations : [...declarations, held]) {
+      const followed =
+        held === undefined
+          ? []
+          : held._tag === "Initializer"
+            ? [held.expression]
+            : seesWrite(context, node, variable, held.assignment)
+              ? [held.assignment.right]
+              : [];
+      for (const reached of [...declarations, ...followed]) {
         if (regions.some((seen) => within(reached, seen))) continue;
         regions.push(reached);
       }
     }
   }
   return regions;
+}
+
+/**
+ * Whether an identifier may see a `let`'s one write: it is in another function than the binding's,
+ * which may run after the write, or it starts after the write ends. One in the binding's own
+ * function that starts before, such as a fixture built ahead of the write, runs before it.
+ *
+ * @param context - The rule context.
+ * @param identifier - An identifier that names the binding.
+ * @param variable - The binding.
+ * @param assignment - Its one write.
+ * @returns Whether reach follows the write from the identifier.
+ */
+function seesWrite(
+  context: Context,
+  identifier: ESTree.Node,
+  variable: Variable,
+  assignment: ESTree.AssignmentExpression
+): boolean {
+  if (context.sourceCode.getScope(identifier).variableScope !== variable.scope.variableScope) return true;
+  return identifier.start >= assignment.end;
 }
 
 /**
