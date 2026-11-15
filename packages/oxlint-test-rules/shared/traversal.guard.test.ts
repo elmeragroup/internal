@@ -43,6 +43,8 @@ const BUILDERS = {
     `(() => {\n  const out = [];\n  out.push(...${p}, ...${p});\n  return out;\n})()`,
   "flat map": (p: string) => `[...${p}, ...${p}].flatMap((e) => [e])`,
   "date stamp": (p: string) => `new Date(${p} + ${p}).getTime()`,
+  "suffix helper": (p: string) =>
+    `(() => {\n  function pick(ext) {\n    return [...${p}, ...${p}].filter((n) => n.endsWith(ext));\n  }\n  return pick(".ts");\n})()`,
 };
 
 /** Each rule and the places it reads a value, `V` standing for the value. */

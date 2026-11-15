@@ -1,14 +1,17 @@
 import type { Context, ESTree } from "@oxlint/plugins";
 
 import { memberName } from "./ast-names.ts";
-import { descendants, unwrap } from "./ast-walk.ts";
+import { descendants, isFunction, unwrap, within } from "./ast-walk.ts";
 import type { Mutation } from "./mutations.ts";
 import { endingsOf } from "./pattern-endings.ts";
 import { anyViolates } from "./quantify.ts";
-import { calleeTargets, evaluate, mutationsOf, returnedValues } from "./resolve.ts";
+import { calleeTargets, evaluate, isReassigned, mutationsOf, returnedValues } from "./resolve.ts";
+import { bindingOf, contextOf, NO_CALLS } from "./source-call-context.ts";
+import type { Calls } from "./source-call-context.ts";
 import { staticText } from "./static-text.ts";
 import { callSitesOf } from "./test-context.ts";
 import { Analysis, isolated, pairKey } from "./traversal.ts";
+import type { StepKey } from "./traversal.ts";
 import { plain, product, stringValues } from "./value.ts";
 import type { Alt } from "./value.ts";
 
@@ -108,6 +111,9 @@ const ABSOLUTE_URL = /^[a-z][a-z0-9+.-]*:/iu;
  */
 type Selection = "code" | "other" | "any";
 
+/** A parameter alternative: a function's parameter by position. */
+type Parameter = Extract<Alt, { readonly kind: "parameter" }>;
+
 /**
  * What a path spells: its literal fragments, the walk-shaped values (a callback parameter or a
  * loop binding) it is computed from, and whether it is surely under a temporary directory.
@@ -153,10 +159,7 @@ const LISTS = new Analysis<Selection | undefined>(undefined);
 /** What each test on a file name keeps, per element it tests. */
 const TESTS = new Analysis<Selection>("any");
 
-/**
- * What each `endsWith` argument keeps, by the suffixes it may be. A helper's parameter
- * (`list(".ts")`) is judged at every call site and keeps something provable only when all agree.
- */
+/** What each `endsWith` argument keeps under a chain of binding calls (`selectionOfSuffix`). */
 const SUFFIXES = new Analysis<Selection>("any");
 
 /** Whether each expression is the element a selector tests, or a projection that keeps its name. */
@@ -376,22 +379,30 @@ export function sourcePaths(context: Context) {
     if (alternative.kind === "parameter" || alternative.kind === "loop")
       return [{ ...NOTHING, walked: [alternative] }];
     // A walked `Dirent`'s `.name` is the walked file name; its `.parentPath` or `.path` names the
-    // directory, which spells no file.
+    // directory, which spells no file. The name keeps the calls the member was returned through.
     if (
       alternative.kind === "member" &&
       (alternative.object.kind === "parameter" || alternative.object.kind === "loop")
     ) {
-      if (alternative.key === "name") return [{ ...NOTHING, walked: [alternative.object] }];
+      if (alternative.key === "name")
+        return [{ ...NOTHING, walked: [{ ...alternative.object, via: alternative.via }] }];
       if (DIRENT_DIRECTORIES.has(alternative.key)) return [NOTHING];
     }
     if (alternative.kind !== "opaque") return [NOTHING];
     const expression = alternative.node;
-    return SPELLINGS.run(
+    const spellings = SPELLINGS.run(
       context,
       expression,
       () => spellExpression(expression),
       () => [NOTHING]
     );
+    // A kept value returned through calls hands them to every value its parts walk, outermost first.
+    return alternative.via.length === 0
+      ? spellings
+      : spellings.map((spelling) => ({
+          ...spelling,
+          walked: spelling.walked.map((value) => ({ ...value, via: [...alternative.via, ...value.via] })),
+        }));
   };
 
   /** The strings a value is in every alternative, or `undefined` when one is not a string. */
@@ -489,15 +500,113 @@ export function sourcePaths(context: Context) {
   };
 
   /**
-   * What an `endsWith` argument keeps: what its suffixes name, or, for a helper's own parameter
-   * (`function list(ext) { … n.endsWith(ext) … }`), what every call site passes when every site
-   * keeps the same. Sites that disagree (`list(".ts")` and `list(".json")`) prove nothing, since one
-   * listing serves both. One step of `SUFFIXES` per argument.
+   * The argument a call passes for a parameter, or `undefined` when it passes none or a spread at
+   * or before the parameter's index leaves which argument lands there unknown.
    */
-  const selectionOfSuffix = (node: ESTree.Node): Selection =>
+  const argumentFor = (site: ESTree.CallExpression, index: number): ESTree.Node | undefined => {
+    const passed = site.arguments.slice(0, index + 1);
+    return passed.length > index && passed.every((one) => one.type !== "SpreadElement")
+      ? site.arguments[index]
+      : undefined;
+  };
+
+  /** Whether a function's own `arguments` object is read anywhere, nested arrow functions included. */
+  const readsArguments = (fn: ESTree.Node): boolean =>
+    (context.sourceCode.getScope(fn).set.get("arguments")?.references.length ?? 0) > 0;
+
+  /**
+   * Whether a function may write one of its parameters, so no call's argument proves what it holds:
+   * it writes the binding (`ext = ".json"`, `ext++`, `({ ext } = o)`), or, as a non-arrow function,
+   * it reads its own `arguments` object, through which sloppy code writes every parameter
+   * (`arguments[0] = ".json"`). A parameter the rule cannot find counts as written.
+   */
+  const isRebound = (parameter: Parameter): boolean => {
+    if (parameter.fn.type !== "ArrowFunctionExpression" && readsArguments(parameter.fn)) return true;
+    const params = isFunction(parameter.fn) ? parameter.fn.params : [];
+    const param = params[parameter.index];
+    const name = param?.type === "AssignmentPattern" ? param.left : param;
+    const variable = context.sourceCode
+      .getDeclaredVariables(parameter.fn)
+      .find((one) => one.defs.some((def) => def.type === "Parameter" && def.name === name));
+    return variable === undefined || isReassigned(variable);
+  };
+
+  /** Whether a call passes a parameter its own value: a recursion handing it on unchanged. */
+  const passesItself = (site: ESTree.CallExpression, parameter: Parameter): boolean => {
+    const argument = argumentFor(site, parameter.index);
+    if (argument === undefined) return false;
+    const values = evaluate(context, argument);
+    return (
+      values.length > 0 &&
+      values.every(
+        (value) => value.kind === "parameter" && value.fn === parameter.fn && value.index === parameter.index
+      )
+    );
+  };
+
+  /** What the argument a call passes for a parameter keeps, judged under the calls outside it. */
+  const selectionOfArgument = (site: ESTree.CallExpression, index: number, outer: Calls): Selection => {
+    const argument = argumentFor(site, index);
+    return argument === undefined ? "any" : selectionOfSuffix(argument, outer);
+  };
+
+  /**
+   * What the nearest call in a chain that invokes a parameter's function passes for it, judged
+   * under the calls outside that call; `undefined` when no call in the chain invokes it.
+   */
+  const boundSelection = (parameter: Parameter, calls: Calls): Selection | undefined => {
+    const binding = bindingOf(context, parameter.fn, calls);
+    return binding === undefined
+      ? undefined
+      : selectionOfArgument(binding.call, parameter.index, binding.outer);
+  };
+
+  /**
+   * Whether every call of a parameter's function inside its own body passes the parameter on
+   * unchanged, so every invocation a call starts holds the value that call passed.
+   */
+  const passesThrough = (parameter: Parameter): boolean =>
+    callSitesOf(context, parameter.fn)
+      .filter((site) => within(site, parameter.fn))
+      .every((site) => passesItself(site, parameter));
+
+  /**
+   * Whether a reference runs in the invocation of `fn` it is judged under: it sits in `fn`'s body,
+   * or in callbacks written inline in an element method (`filter`, `map`, `some`, …) there. Any
+   * other function between them may be stored, returned or passed on and run in another invocation.
+   */
+  const runsInBody = (node: ESTree.Node, fn: ESTree.Node): boolean => {
+    for (let parent = node.parent; parent !== null; parent = parent.parent) {
+      if (parent === fn) return true;
+      if (isFunction(parent) && elementCallOf(parent) === undefined) return false;
+    }
+    return false;
+  };
+
+  /**
+   * What an `endsWith` argument keeps under a chain of binding calls. Literal suffixes, or those of
+   * a list an element callback walks, name what they keep. A helper's own parameter
+   * (`function list(ext) { … n.endsWith(ext) … }`) is resolved in this order:
+   *
+   * 1. Write veto: a parameter the helper may write (`isRebound`, `arguments` included) keeps
+   *    nothing provable.
+   * 2. Its own provenance: a parameter carried out of a call (`make(".json").suffix`) is bound by
+   *    the nearest call invoking the helper in the chain `contextOf` gives it, and keeps nothing
+   *    provable when no such call exists.
+   * 3. The ambient binding: a reference that runs in the helper's body (`runsInBody`) is bound by
+   *    the nearest call in `calls` that invokes the helper.
+   * 4. Every call site, when every site keeps the same; sites that disagree (`list(".ts")` and
+   *    `list(".json")`) prove nothing, since one listing serves both, and a call passing the
+   *    parameter back into its own function adds no site.
+   *
+   * Steps 2 and 3 bind only a parameter every recursive call passes on unchanged (`passesThrough`);
+   * otherwise one invocation may hold another value, and step 4 decides. One step of `SUFFIXES` per
+   * argument and chain.
+   */
+  const selectionOfSuffix = (node: ESTree.Node, calls: Calls): Selection =>
     SUFFIXES.run(
       context,
-      node,
+      pairKey(node, calls.key),
       () => {
         const suffixes = suffixesOf(node);
         if (suffixes !== undefined) return selectionOfNames(suffixes);
@@ -509,14 +618,20 @@ export function sourcePaths(context: Context) {
           elementCallOf(parameter.fn) !== undefined
         )
           return "any";
-        const sites = callSitesOf(context, parameter.fn).map((site): Selection => {
-          const passed = site.arguments.slice(0, parameter.index + 1);
-          const argument = site.arguments[parameter.index];
-          if (argument === undefined || passed.some((one) => one.type === "SpreadElement")) return "any";
-          return selectionOfSuffix(argument);
-        });
-        const [agreed] = sites;
-        return agreed !== undefined && sites.every((one) => one === agreed) ? agreed : "any";
+        if (isRebound(parameter)) return "any";
+        const bindable = passesThrough(parameter);
+        if (parameter.via.length > 0)
+          return (
+            (bindable ? boundSelection(parameter, contextOf(context, parameter, calls)) : undefined) ?? "any"
+          );
+        const bound =
+          bindable && runsInBody(node, parameter.fn) ? boundSelection(parameter, calls) : undefined;
+        if (bound !== undefined) return bound;
+        const kept = callSitesOf(context, parameter.fn)
+          .filter((site) => !passesItself(site, parameter))
+          .map((site) => selectionOfArgument(site, parameter.index, NO_CALLS));
+        const [agreed] = kept;
+        return agreed !== undefined && kept.every((one) => one === agreed) ? agreed : "any";
       },
       () => "any"
     );
@@ -554,16 +669,17 @@ export function sourcePaths(context: Context) {
       : undefined;
   };
 
-  /** What the tests a callback returns keep, each judged against an element. */
+  /** What the tests a callback returns keep, each judged against an element under the binding calls. */
   const selectionOfCallback = (
     node: ESTree.Node | undefined,
-    elementFor: (fn: ESTree.Node) => Alt
+    elementFor: (fn: ESTree.Node) => Alt,
+    calls: Calls
   ): Selection => {
     if (node === undefined) return "any";
     const selections = evaluate(context, node).flatMap((callback): Selection[] =>
       callback.kind === "function"
         ? returnedValues(context, callback.fn).map((returned) =>
-            selectionOfTest(returned, elementFor(callback.fn))
+            selectionOfTest(returned, elementFor(callback.fn), contextOf(context, callback, calls))
           )
         : ["any"]
     );
@@ -573,30 +689,34 @@ export function sourcePaths(context: Context) {
   /**
    * What a test on the element keeps, by the positive selectors the rule recognises, each only
    * when what it inspects is the element or a projection of it: `&&` both, `||` either, and
-   * anything negated or unrecognised nothing provable. One step of `TESTS`.
+   * anything negated or unrecognised nothing provable. One step of `TESTS` per test, element and
+   * binding.
    */
-  const selectionOfTest = (node: ESTree.Node, element: Alt): Selection => {
+  const selectionOfTest = (node: ESTree.Node, element: Alt, calls: Calls): Selection => {
     const expression = unwrap(node);
     const key = elementKey(element);
     if (key === undefined) return "any";
     return TESTS.run(
       context,
-      pairKey(expression, key),
-      () => testSelection(expression, element),
+      pairKey(pairKey(expression, key), calls.key),
+      () => testSelection(expression, element, calls),
       () => "any"
     );
   };
 
   /** The body of `selectionOfTest`. */
-  const testSelection = (expression: ESTree.Node, element: Alt): Selection => {
+  const testSelection = (expression: ESTree.Node, element: Alt, calls: Calls): Selection => {
     switch (expression.type) {
       case "LogicalExpression":
         if (expression.operator === "&&")
-          return both(selectionOfTest(expression.left, element), selectionOfTest(expression.right, element));
+          return both(
+            selectionOfTest(expression.left, element, calls),
+            selectionOfTest(expression.right, element, calls)
+          );
         if (expression.operator === "||")
           return either(
-            selectionOfTest(expression.left, element),
-            selectionOfTest(expression.right, element)
+            selectionOfTest(expression.left, element, calls),
+            selectionOfTest(expression.right, element, calls)
           );
         return "any";
       case "BinaryExpression": {
@@ -615,7 +735,7 @@ export function sourcePaths(context: Context) {
         const [first] = expression.arguments;
         if (callee.type !== "MemberExpression" || method === undefined) return "any";
         if (method === "endsWith" && first !== undefined && isSubject(callee.object, element))
-          return selectionOfSuffix(first);
+          return selectionOfSuffix(first, calls);
         if (method === "test" && first !== undefined && isSubject(first, element))
           return selectionOfPattern(callee.object);
         if (method === "match" && first !== undefined && isSubject(callee.object, element))
@@ -626,7 +746,7 @@ export function sourcePaths(context: Context) {
           return strings === undefined ? "any" : selectionOfNames(strings);
         }
         // `LIST.some((e) => name.endsWith(e))` still tests the outer element.
-        if (SOME_STEPS.has(method)) return selectionOfCallback(first, () => element);
+        if (SOME_STEPS.has(method)) return selectionOfCallback(first, () => element, calls);
         return "any";
       }
       default:
@@ -635,15 +755,15 @@ export function sourcePaths(context: Context) {
   };
 
   /** What the guards between a node and the code around it keep: each `if` it runs under the consequent of. */
-  const guardsOf = (node: ESTree.Node, around: ESTree.Node, element: Alt): Selection => {
+  const guardsOf = (node: ESTree.Node, around: ESTree.Node, element: Alt, calls: Calls): Selection => {
     let selection: Selection = "any";
     for (let child = node, parent = node.parent; parent !== null && child !== around;) {
       if (parent.type === "IfStatement" && parent.consequent === child)
-        selection = both(selection, selectionOfTest(parent.test, element));
+        selection = both(selection, selectionOfTest(parent.test, element, calls));
       if (parent.type === "LogicalExpression" && parent.operator === "&&" && parent.right === child)
-        selection = both(selection, selectionOfTest(parent.left, element));
+        selection = both(selection, selectionOfTest(parent.left, element, calls));
       if (parent.type === "ConditionalExpression" && parent.consequent === child)
-        selection = both(selection, selectionOfTest(parent.test, element));
+        selection = both(selection, selectionOfTest(parent.test, element, calls));
       child = parent;
       parent = parent.parent;
     }
@@ -672,15 +792,15 @@ export function sourcePaths(context: Context) {
    * What one element written or pushed into a list keeps, judged where it is written: a path is
    * code or other by its spelling, else by the values it walks (`join(dir, name)`), as
    * `spellsCode` judges a read: code when any walked value keeps code, other only when every one
-   * provably keeps other.
+   * provably keeps other. Its walked values are judged under the calls that bind the list.
    */
-  const selectionOfElement = (node: ESTree.Node, at: ESTree.Node): Selection | undefined =>
+  const selectionOfElement = (node: ESTree.Node, at: ESTree.Node, calls: Calls): Selection | undefined =>
     joined(
       evaluate(context, node).flatMap((alternative) =>
         spell(alternative).map((spelling): Selection | undefined => {
           const named = namedSelection(spelling);
           if (named !== undefined) return named;
-          const walked = spelling.walked.map((value) => selectionOfWalked(value, at));
+          const walked = spelling.walked.map((value) => selectionOfWalked(value, at, calls));
           if (walked.includes("code")) return "code";
           return walked.length > 0 && walked.every((kept) => kept === "other") ? "other" : undefined;
         })
@@ -694,9 +814,10 @@ export function sourcePaths(context: Context) {
   /**
    * What a list literal and what is pushed into it keep. A spread, written in the literal
    * (`[...xs]`) or pushed (`push(...xs)`), appends every name the spread list holds. A sort or
-   * reverse in place keeps them; any other change in place leaves the list unprovable.
+   * reverse in place keeps them; any other change in place leaves the list unprovable. Everything
+   * is judged under the calls the literal was returned through.
    */
-  const literalSelection = (node: ESTree.ArrayExpression): Selection | undefined => {
+  const literalSelection = (node: ESTree.ArrayExpression, calls: Calls): Selection | undefined => {
     const pushes: Array<Extract<Mutation, { readonly kind: "push" }>> = [];
     for (const mutation of mutationsOf(context, node)) {
       if (mutation.kind === "push") pushes.push(mutation);
@@ -713,7 +834,7 @@ export function sourcePaths(context: Context) {
       const values = evaluate(context, list);
       if (values.length > 0 && values.every((value) => value.kind === "array" && value.node === node))
         continue;
-      const kept = selectionOfList(list);
+      const kept = selectionOfList(list, calls);
       if (kept === undefined) return undefined;
       selection = either(selection, kept);
     }
@@ -724,15 +845,15 @@ export function sourcePaths(context: Context) {
       ...pushes.flatMap((push) => push.values.map((value) => ({ node: value, at: push.site }))),
     ];
     for (const element of elements) {
-      const kept = selectionOfElement(element.node, element.at);
+      const kept = selectionOfElement(element.node, element.at, calls);
       if (kept === undefined) return undefined;
       selection = either(selection, kept);
     }
     return selection;
   };
 
-  /** What a listing or an array step on a list keeps: the body of one `LISTS` step for a call. */
-  const callSelection = (call: ESTree.CallExpression): Selection | undefined => {
+  /** What a listing or an array step on a list keeps under its binding calls: the body of one `LISTS` step for a call. */
+  const callSelection = (call: ESTree.CallExpression, calls: Calls): Selection | undefined => {
     const [first] = call.arguments;
     if (callsOneOf(call.callee, GLOB_LISTINGS)) {
       const patterns = first === undefined ? undefined : (stringsOf(first) ?? elementStrings(first));
@@ -745,13 +866,13 @@ export function sourcePaths(context: Context) {
     const callee = unwrap(call.callee);
     const method = memberName(callee);
     if (callee.type !== "MemberExpression" || method === undefined) return undefined;
-    const receiver = selectionOfList(callee.object);
+    const receiver = selectionOfList(callee.object, calls);
     if (receiver === undefined) return undefined;
-    if (method === "filter") return both(receiver, selectionOfCallback(first, elementOf));
+    if (method === "filter") return both(receiver, selectionOfCallback(first, elementOf, calls));
     if (KEEPING_STEPS.has(method)) return receiver;
     if (method === "concat") {
       return call.arguments.reduce<Selection>(
-        (selection, argument) => either(selection, selectionOfList(argument) ?? "any"),
+        (selection, argument) => either(selection, selectionOfList(argument, calls) ?? "any"),
         receiver
       );
     }
@@ -769,25 +890,29 @@ export function sourcePaths(context: Context) {
   /**
    * What a list expression keeps, `code` when any alternative keeps code, or `undefined` for a
    * value that is no list the rule can follow: a listing, an array step on one, or an array
-   * literal with what it spreads and what is pushed into it.
+   * literal with what it spreads and what is pushed into it. Each alternative is judged under the
+   * binding calls with the calls it was returned through (`via`) inside them. One step of `LISTS`
+   * per list and binding.
    */
-  const selectionOfList = (node: ESTree.Node): Selection | undefined => {
+  const selectionOfList = (node: ESTree.Node, calls: Calls): Selection | undefined => {
     const expression = unwrap(node);
     return LISTS.run(
       context,
-      expression,
+      pairKey(expression, calls.key),
       () => {
-        // Each combination of a literal's spreads is one alternative; the literal is judged once.
-        const literals = new Map<ESTree.Node, Selection | undefined>();
+        // Each combination of a literal's spreads is one alternative; the literal is judged once
+        // per binding.
+        const literals = new Map<StepKey, Selection | undefined>();
         return joined(
           evaluate(context, expression).map((alternative) => {
+            const bound = contextOf(context, alternative, calls);
             if (alternative.kind === "array") {
-              if (!literals.has(alternative.node))
-                literals.set(alternative.node, literalSelection(alternative.node));
-              return literals.get(alternative.node);
+              const key = pairKey(alternative.node, bound.key);
+              if (!literals.has(key)) literals.set(key, literalSelection(alternative.node, bound));
+              return literals.get(key);
             }
             if (alternative.kind !== "opaque" || alternative.node.type !== "CallExpression") return undefined;
-            return callSelection(alternative.node);
+            return callSelection(alternative.node, bound);
           })
         );
       },
@@ -798,19 +923,20 @@ export function sourcePaths(context: Context) {
   /**
    * What a walked value keeps where it is used (`at`): a loop binding keeps what its iterable
    * keeps and what the guards between the loop and `at` keep; an element callback's parameter,
-   * what the receiver keeps and the callback's guards.
+   * what the receiver keeps and the callback's guards; each under the chain `contextOf` gives it.
    */
-  const selectionOfWalked = (value: Alt, at: ESTree.Node): Selection | undefined => {
+  const selectionOfWalked = (value: Alt, at: ESTree.Node, around: Calls): Selection | undefined => {
+    const calls = contextOf(context, value, around);
     if (value.kind === "loop") {
       const loop = value.iterable.parent;
-      const kept = selectionOfList(value.iterable);
-      return kept === undefined || loop === null ? undefined : both(kept, guardsOf(at, loop, value));
+      const kept = selectionOfList(value.iterable, calls);
+      return kept === undefined || loop === null ? undefined : both(kept, guardsOf(at, loop, value, calls));
     }
     if (value.kind !== "parameter" || value.index !== 0) return undefined;
     const call = elementCallOf(value.fn);
     if (call === undefined) return undefined;
-    const kept = selectionOfList(call.receiver);
-    return kept === undefined ? undefined : both(kept, guardsOf(at, value.fn, value));
+    const kept = selectionOfList(call.receiver, calls);
+    return kept === undefined ? undefined : both(kept, guardsOf(at, value.fn, value, calls));
   };
 
   /**
@@ -872,7 +998,7 @@ export function sourcePaths(context: Context) {
     const named = namedSelection(spelling);
     if (named !== undefined) return named === "code";
     return spelling.walked.some((value) => {
-      if (selectionOfWalked(value, at) === "code") return true;
+      if (selectionOfWalked(value, at, NO_CALLS) === "code") return true;
       // A reader helper's parameter is judged at each call site, against what that site passes.
       if (value.kind !== "parameter" || elementCallOf(value.fn) !== undefined) return false;
       return callSitesOf(context, value.fn).some((site) => {

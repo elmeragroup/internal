@@ -29,9 +29,15 @@ const RAW_CODE_IMPORT = /(?<!\.d)\.[cm]?[jt]sx?\?raw$/u;
  * name.endsWith(e))`, combined with `&&` (both must keep code) and `||` (either may), and an `if`
  * around the read or around the `push` that fills a list. A negated or unrecognised selector keeps
  * nothing the rule can prove, so `!name.endsWith(".ts")` is no evidence. A helper's suffix
- * parameter (`function list(ext) { … name.endsWith(ext) … }`) keeps what its call sites pass when
- * every site keeps the same, so `list(".ts")` keeps code unless another site passes `".json"`. A
- * `$`-anchored pattern that matches no sample file name keeps what the extensions it ends with
+ * parameter (`function list(ext) { … name.endsWith(ext) … }`) keeps nothing provable when the helper
+ * may write it (an assignment, or its `arguments` object). Otherwise a value carried out of a call
+ * (`make(".json").suffix`) keeps what that call passes; a list read through a call keeps what the
+ * nearest call to the helper passes (`list(".ts")` keeps code beside a `list(".json")`, and through
+ * `ts(ext)` calling `list(ext)`), when the test runs in the helper's body or an element callback
+ * written there and every recursive call passes the parameter on unchanged; and failing that, what
+ * every call site passes when all keep the same, a call passing the parameter back into its own
+ * function skipped. An argument after a spread keeps nothing provable. A `$`-anchored pattern that
+ * matches no sample file name keeps what the extensions it ends with
  * name (`/button\.tsx?$/` keeps code), and `.d.ts` endings keep other files. `sort`, `slice` and
  * `reverse` keep the list's selection; `map` and `flatMap` keep it when the callback returns the
  * name or a path built from it (`flatMap` also `[name]`); `concat` joins the selections; and a

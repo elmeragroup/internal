@@ -139,6 +139,17 @@ const VALUES = new Analysis<Alt[]>([UNKNOWN]);
 const VALUES_AS_WRITTEN = new Analysis<Alt[]>([UNKNOWN]);
 
 /**
+ * Whether code writes a variable after it is declared: an assignment, an update or a destructuring
+ * target. Its declaration's own initializer, or a parameter's default, is no write.
+ *
+ * @param variable - The variable.
+ * @returns Whether any reference writes it.
+ */
+export function isReassigned(variable: Variable): boolean {
+  return variable.references.some((reference) => reference.isWrite() && !reference.init);
+}
+
+/**
  * The variable an identifier reads, through the scopes around it. A JSX tag such as `<InlineMenu />`
  * reads the component binding of its name; a lowercase tag such as `<button>` is an intrinsic
  * element and reads none.
@@ -474,7 +485,7 @@ function evaluator(
     }
     const declarator = def.node;
     if (declarator.type !== "VariableDeclarator") return [UNKNOWN];
-    if (variable.references.some((reference) => reference.isWrite() && !reference.init)) return [UNKNOWN];
+    if (isReassigned(variable)) return [UNKNOWN];
     if (declarator.init === null) {
       const loop = declarator.parent.parent;
       return loop?.type === "ForOfStatement" || loop?.type === "ForInStatement"

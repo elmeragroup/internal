@@ -48,6 +48,32 @@ function collectingWalker(extension: string): string {
   return `function collect(dir) {\n  const files = [];\n  for (const name of readdirSync(dir)) {\n    if (name.endsWith("${extension}")) files.push(join(dir, name));\n  }\n  return files;\n}\nfor (const f of collect(root)) readFileSync(f);`;
 }
 
+/**
+ * A recursive walker with a suffix parameter, passed on to each subdirectory's walk, keeping the
+ * joined names that end with it (a docs-site test helper's shape).
+ */
+function suffixWalker(): string {
+  return `function collectFiles(directory, prefix, suffix) {\n  const files = [];\n  for (const entry of readdirSync(directory, { withFileTypes: true })) {\n    const relative = join(prefix, entry.name);\n    if (entry.isDirectory()) files.push(...collectFiles(join(directory, entry.name), relative, suffix));\n    else if (entry.name.endsWith(suffix)) files.push(relative);\n  }\n  return files;\n}\n`;
+}
+
+/** A recursive walker that reads each file ending in `extension` itself, passing the suffix on. */
+function readingWalker(extension: string): string {
+  return `function readAll(dir, ext) {\n  for (const entry of readdirSync(dir, { withFileTypes: true })) {\n    if (entry.isDirectory()) readAll(join(dir, entry.name), ext);\n    else if (entry.name.endsWith(ext)) readFileSync(join(dir, entry.name));\n  }\n}\nreadAll(root, "${extension}");`;
+}
+
+/**
+ * A `make(ext, run)` helper returning `member` (a closure over `ext`) beside `files`, which holds
+ * what `call` returns when `run` is set; `captured` takes the closure from another `make` call.
+ */
+function closureHelper(member: string, call: string, captured: string): string {
+  return `function make(ext, run) {\n  return { ${member}, files: run ? ${call} : [] };\n}\n${captured}\nfor (const f of make(".ts", true).files) readFileSync(f);`;
+}
+
+/** `suffixWalker` called for styles and for TypeScript files, which `srcTsFiles` spreads together, then `read`. */
+function suffixWalkerSites(read: string): string {
+  return `${suffixWalker()}const styles = collectFiles(root, "src", ".css");\nfunction srcTsFiles() {\n  return [...collectFiles(root, "src", ".ts"), ...collectFiles(root, "src", ".tsx")];\n}\n${read}`;
+}
+
 /** A walk of `dir` whose filter keeps what `filter` keeps, then `steps` on the list, then a read of each file. */
 function walkFiltered(filter: string, steps = ""): string {
   return `for (const f of readdirSync(dir).filter((f) => ${filter})${steps}) readFileSync(f);`;
@@ -154,6 +180,59 @@ ruleTester.run("no-source-reading-tests", noSourceReadingTests, {
     // A helper handed only data or declaration extensions lists no code, spread or not.
     spreadHelper(".json", ".md"),
     spreadHelper(".d.ts", ".d.ts"),
+    // A suffix walker handed only data extensions, through its recursion too, lists no code.
+    suffixWalker() +
+      'for (const f of [...collectFiles(root, "src", ".css"), ...collectFiles(root, "data", ".json"), ...collectFiles(root, "docs", ".md")]) readFileSync(f);',
+    // The `.css` call's own list is judged by what it passes, though other calls pass `.ts`.
+    suffixWalkerSites("for (const f of styles) readFileSync(f);"),
+    // A declaration suffix lists no code module.
+    suffixWalker() + 'for (const f of collectFiles(root, "types", ".d.ts")) readFileSync(f);',
+    // A suffix the rule cannot read proves nothing.
+    suffixWalker() + 'for (const f of collectFiles(root, "src", ext)) readFileSync(f);',
+    // A value captured from another call of the helper is judged by that call, not the one around it.
+    'function make(ext, dir) {\n  return { suffix: ext, files: dir ? readdirSync(dir).filter((n) => n.endsWith(jsonSuffix)) : [] };\n}\nconst jsonSuffix = make(".json").suffix;\nfor (const f of make(".ts", "./fixtures").files) readFileSync(f);',
+    'function make(ext, dir) {\n  return { keep: (n) => n.endsWith(ext), files: dir ? readdirSync(dir).filter(jsonKeep) : [] };\n}\nconst jsonKeep = make(".json").keep;\nfor (const f of make(".ts", "./fixtures").files) readFileSync(f);',
+    // A spread before the parameter's argument makes that argument unknowable: no self-pass.
+    'function walk(dir, ext) {\n  if (dir === "entry") return walk(...["fixtures", ".json"], ext);\n  for (const n of readdirSync(dir)) if (n.endsWith(ext)) readFileSync(n);\n}\nwalk("entry", ".ts");',
+    // A parameter the helper writes to holds no value its callers pass.
+    'function walk(dir, ext) {\n  if (dir === "entry") {\n    ext = ".json";\n    return walk("fixtures", ext);\n  }\n  for (const n of readdirSync(dir)) if (n.endsWith(ext)) readFileSync(n);\n}\nwalk("entry", ".ts");',
+    'function list(ext) {\n  ext = ".json";\n  return readdirSync(d).filter((n) => n.endsWith(ext));\n}\nfor (const f of list(".ts")) readFileSync(f);',
+    // A walker reading inside its own recursion, handed a data extension.
+    readingWalker(".json"),
+    // A closure returned out of another call of the helper reads that call's suffix, wherever it is stored.
+    closureHelper(
+      "list: () => readdirSync(d).filter((n) => n.endsWith(ext))",
+      "jsonList()",
+      'const jsonList = make(".json").list;'
+    ),
+    closureHelper(
+      "lists: [() => readdirSync(d).filter((n) => n.endsWith(ext))]",
+      "jsonLists[0]()",
+      'const jsonLists = make(".json").lists;'
+    ),
+    closureHelper(
+      "list: () => readdirSync(d).filter((n) => n.endsWith(ext))",
+      "jsonList()",
+      'function listOf(ext) {\n  return make(ext).list;\n}\nconst jsonList = listOf(".json");'
+    ),
+    closureHelper(
+      "list: () => {\n    const out = [];\n    for (const n of readdirSync(d)) if (n.endsWith(ext)) out.push(n);\n    return out;\n  }",
+      "jsonList()",
+      'const jsonList = make(".json").list;'
+    ),
+    // A loop value carried out of another call of the helper keeps that call's suffix.
+    'function make(ext, run) {\n  for (const n of readdirSync(d)) {\n    if (n.endsWith(ext)) return { name: n, files: run ? [saved] : [] };\n  }\n}\nconst saved = make(".json").name;\nfor (const f of make(".ts", true).files) readFileSync(f);',
+    'function make(ext, run) {\n  for (const n of readdirSync(d)) {\n    if (n.endsWith(ext)) return { names: [n], files: run ? [saved[0]] : [] };\n  }\n}\nconst saved = make(".json").names;\nfor (const f of make(".ts", true).files) readFileSync(f);',
+    'function make(ext, run) {\n  const files = [];\n  for (const n of readdirSync(d)) {\n    if (n.endsWith(ext)) {\n      if (run) files.push(saved);\n      return { name: n, files };\n    }\n  }\n}\nconst saved = make(".json").name;\nfor (const f of make(".ts", true).files) readFileSync(f);',
+    // A recursion that passes another suffix is one more call site, which disagrees with the outer one.
+    'function list(ext, again = true) {\n  const out = [];\n  if (again) out.push(...list(".json", false));\n  else for (const n of readdirSync(d)) if (n.endsWith(ext)) out.push(n);\n  return out;\n}\nfor (const f of list(".ts")) readFileSync(f);',
+    // In sloppy code, a write through `arguments` changes the parameter it maps.
+    {
+      code: 'function list(ext) {\n  arguments[0] = ".json";\n  return readdirSync(d).filter((n) => n.endsWith(ext));\n}\nlist(".json");\nfor (const f of list(".ts")) readFileSync(f);',
+      languageOptions: { sourceType: "script" },
+    },
+    // Hang: two walkers passing the suffix to each other.
+    'function walkA(dir, ext) {\n  const out = [];\n  for (const name of readdirSync(dir)) {\n    if (name.endsWith(ext)) out.push(name);\n    else out.push(...walkB(join(dir, name), ext));\n  }\n  return out;\n}\nfunction walkB(dir, ext) {\n  return [...walkA(dir, ext)];\n}\nfor (const f of walkA(root, ".json")) readFileSync(f);',
     // A pattern anchored at the end keeps what its trailing extension names: a data file here.
     walkFiltered("/fixture\\.json$/.test(f)"),
     walkFiltered('/^report\\.(json|md)$/.test(f) && f.endsWith(".ts")'),
@@ -217,6 +296,33 @@ ruleTester.run("no-source-reading-tests", noSourceReadingTests, {
     { code: spreadHelper(".ts", ".tsx"), errors: [{ messageId: "source" }] },
     {
       code: spreadHelper(".ts", ".tsx", "tsFiles().map((f) => readFileSync(f));"),
+      errors: [{ messageId: "source" }],
+    },
+    // A recursive walker's suffix is what its one outside call passes; the recursion passes it on.
+    {
+      code: suffixWalker() + 'for (const f of collectFiles(root, "src", ".ts")) readFileSync(f);',
+      errors: [{ messageId: "source" }],
+    },
+    // A list read through a call is judged by that call's suffix, though another call passes `.css`.
+    {
+      code: LIST_HELPER + 'list(".css");\nfor (const f of list(".ts")) readFileSync(f);',
+      errors: [{ messageId: "source" }],
+    },
+    {
+      code: suffixWalkerSites('for (const f of srcTsFiles()) readFileSync(f, "utf8");'),
+      errors: [{ messageId: "source" }],
+    },
+    // A helper wrapping the walker binds the suffix it passes on.
+    {
+      code:
+        suffixWalker() +
+        'function ts(ext) {\n  return collectFiles(root, "src", ext);\n}\nts(".css");\nfor (const f of ts(".ts")) readFileSync(f);',
+      errors: [{ messageId: "source" }],
+    },
+    // A walker reading inside its own recursion: the recursion passes the suffix on and adds no site.
+    { code: readingWalker(".ts"), errors: [{ messageId: "source" }] },
+    {
+      code: suffixWalkerSites('collectFiles(root, "src", ".ts").map((f) => readFileSync(f));'),
       errors: [{ messageId: "source" }],
     },
     {
