@@ -231,10 +231,6 @@ export const noGeometryAssertions: Rule = {
       alternative.node.type === "CallExpression" &&
       isApi(context, alternative.node.callee, "Math.abs");
 
-    /** Whether a bound may stand on one alternative: a distance, or `undefined`, which measures nothing. */
-    const isBounded = (alternative: Alt): boolean =>
-      alternative.kind === "undefined" || isDistance(alternative);
-
     return {
       CallExpression(node) {
         const assertion = assertionOf(context, node);
@@ -244,7 +240,7 @@ export const noGeometryAssertions: Rule = {
         const measured = assertion.actuals.some((actual) => {
           const values = evaluate(context, actual);
           // A tolerance or radius bounds a distance only when every alternative is one.
-          if (BOUNDS.has(assertion.matcher) && allQualify(values, isBounded)) return false;
+          if (BOUNDS.has(assertion.matcher) && allQualify(values, isDistance)) return false;
           return anyViolates(values, (alternative) => measureOf(alternative) !== undefined);
         });
         if (measured) context.report({ node, messageId: "pixel" });

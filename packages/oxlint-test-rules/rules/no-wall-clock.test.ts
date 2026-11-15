@@ -90,6 +90,11 @@ ruleTester.run("no-wall-clock", noWallClock, {
     'it("a", () => {\n  vi.useFakeTimers();\n  const start = new Date(Date.now());\n  vi.advanceTimersByTime(1000);\n  expect(Date.now() - start.getTime()).toBe(1000);\n});',
     // A `toFake` list keeps its written entries across a spread push.
     'it("a", () => {\n  const toFake = ["Date"];\n  toFake.push(...more);\n  vi.useFakeTimers({ toFake });\n  const s = Date.now();\n  log(Date.now() - s);\n});',
+    // A `let` written once, before every read, holds the written value alone: one reading, a
+    // constant duration, and the fake-timer install.
+    'it("a", () => {\n  let now;\n  now = Date.now();\n  log(now - (now % 86400000));\n});',
+    'it("a", () => {\n  let now;\n  now = Date.now();\n  let duration;\n  duration = 1000;\n  const cutoff = now - duration;\n  log(cutoff);\n});',
+    'it("a", () => {\n  let install;\n  install = vi.useFakeTimers;\n  install();\n  const s = Date.now();\n  log(Date.now() - s);\n});',
   ],
   invalid: [
     // A date built from a clock reading captures the time as `new Date()` does.

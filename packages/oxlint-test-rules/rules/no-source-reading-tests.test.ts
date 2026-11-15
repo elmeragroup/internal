@@ -183,10 +183,21 @@ ruleTester.run("no-source-reading-tests", noSourceReadingTests, {
     demoListing("  const load = () => {\n    entries = readdirSync(demosDir);\n  };\n  load();"),
     demoListing("  beforeEach(() => {\n    entries = readdirSync(demosDir);\n  });"),
     demoListing("  log(entries);\n  entries = readdirSync(demosDir);"),
-    // A path written once into a `let`, which may still be `undefined` where read, is judged by
-    // the written path alone: a file the test writes, or one under a temporary directory.
-    'it("x", () => {\n  let file;\n  file = join(dir, "fixture.ts");\n  writeFileSync(file, "a");\n  expect(readFileSync(file, "utf8")).toContain("a");\n});',
-    'it("emits", () => {\n  let dir;\n  dir = mkdtempSync(join(tmpdir(), "emit-"));\n  build(dir);\n  expect(readFileSync(join(dir, "out.js"), "utf8")).toContain("a");\n});',
+    // So does one whose write some path may skip: under a branch, in a loop, in a `try` whose
+    // `catch` falls through, reads the binding or has a `finally` beside it, or in a `switch` case.
+    demoListing("  if (flag) entries = readdirSync(demosDir);"),
+    demoListing("  for (const attempt of attempts) entries = readdirSync(demosDir);"),
+    demoListing("  try {\n    entries = readdirSync(demosDir);\n  } catch (e) {\n    log(e);\n  }"),
+    demoListing(
+      "  try {\n    entries = readdirSync(demosDir);\n  } catch {\n    log(entries);\n    continue;\n  }"
+    ),
+    demoListing("  try {\n    entries = readdirSync(demosDir);\n  } finally {\n    log(demosDir);\n  }"),
+    demoListing('  switch (mode) {\n    case "list":\n      entries = readdirSync(demosDir);\n  }'),
+    'let file;\nif (flag) file = () => "out.ts";\nwriteFileSync(file(), "a");\nreadFileSync(file());',
+    // A `let` written once, before every read, holds the written value alone: a temporary
+    // directory, and `JSON.parse`, which consumes the read.
+    'let dir;\ndir = mkdtempSync(join(tmpdir(), "x-"));\nreadFileSync(`${dir}/out.js`);',
+    'let parse;\nparse = JSON.parse;\nconst data = parse(readFileSync(join(root, "src/data.ts"), "utf8"));',
     // Hang: a list spread into itself, and a doubled spread-push chain past the budget, prove nothing.
     "const all = [];\nall.push(...all);\nfor (const f of all) readFileSync(f);",
     doubledSpreads(25, "pushed"),
@@ -295,6 +306,15 @@ ruleTester.run("no-source-reading-tests", noSourceReadingTests, {
     { code: collectingWalker(".ts"), errors: [{ messageId: "source" }] },
     // A listing written once into a `let`, before every read in the same function, keeps its code.
     { code: demoListing(GUARDED_LISTING), errors: [{ messageId: "source" }] },
+    {
+      code: demoListing("  {\n    entries = readdirSync(demosDir);\n  }"),
+      errors: [{ messageId: "source" }],
+    },
+    // A prefix written once into a `let` names `fixture-button.ts`, a code file.
+    {
+      code: 'let prefix;\nprefix = "fixture-";\nreadFileSync([prefix, "button.ts"].join(""));',
+      errors: [{ messageId: "source" }],
+    },
     // A doubled spread-push chain within the budget keeps its listing's code.
     { code: doubledSpreads(3, "pushed"), errors: [{ messageId: "source" }] },
     // A list literal keeps what its spreads hold: a code listing, directly or through a helper.

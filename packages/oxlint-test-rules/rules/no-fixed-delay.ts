@@ -226,14 +226,14 @@ function isInPollingLoop(context: Context, node: ESTree.Node): boolean {
  * positive number, a duration string, or a value held by name only (an imported constant,
  * `Duration.millis(200)`). Allowed: a delay of 0, `undefined` (a timer with no delay), `null`, a
  * negative or `NaN` number (one turn), a parameter no call sets, or a value the evaluator cannot
- * know (a binding written more than once); a wait inside a polling loop, whose test or early exit checks state
- * rather than a stepped counter; `Effect.sleep` on the test clock; and a global `setTimeout` or
- * `sleep`-style helper that a simulated clock faking `setTimeout` covers, as `fake-clock.ts` models
- * one, at the call that sets the delay: in the test, in a setup hook after the hook's own install,
- * or in a helper or component that only covered tests call or render, however the call reaches it
- * (an alias, an object property, a destructured binding). A timer read through an alias is judged
- * where the alias read the global (`const later = setTimeout` at module scope stays real). A
- * callee that may be a timer waits when any alternative does.
+ * know (a binding written twice or under a branch); a wait inside a polling loop, whose test or
+ * early exit checks state rather than a stepped counter; `Effect.sleep` on the test clock; and a
+ * global `setTimeout` or `sleep`-style helper that a simulated clock faking `setTimeout` covers, as
+ * `fake-clock.ts` models one, at the call that sets the delay: in the test, in a setup hook after
+ * the hook's own install, or in a helper or component that only covered tests call or render,
+ * however the call reaches it (an alias, an object property, a destructured binding). A timer read
+ * through an alias is judged where the alias read the global (`const later = setTimeout` at module
+ * scope stays real). A callee that may be a timer waits when any alternative does.
  *
  * Options: `waitHelpers` names the helpers that wait on the global timers (default `sleep` and
  * `delay`), `realWaitHelpers` the helpers that wait for real under any fake timers (default none;

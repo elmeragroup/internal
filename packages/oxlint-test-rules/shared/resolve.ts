@@ -36,18 +36,19 @@ import type { Alt, CalleeTarget, Entry } from "./value.ts";
  * The evaluator follows exactly these steps, and nothing else:
  *
  * 1. Wrappers: parentheses, `await`, optional chains, `!` and TypeScript `as`/`satisfies`.
- * 2. A `const`, or a `let`/`var` that is never reassigned, to its initializer, through any chain
- *    of such aliases. A `let` declared without an initializer (no loop's own binding) and written
- *    exactly once, by a plain `=` assignment in the declaration's own function (not in a nested
- *    function, closure or hook callback) that ends before every read in source order, to the
- *    assigned value's alternatives plus `undefined`, since a read may still run before the write.
- *    Any other reassigned binding is `unknown`. An object or array literal the code
- *    changes in place (an assigned, updated or deleted member, or a mutating method such as
- *    `push`), through its own binding or any value this list resolves to it (an alias, a
- *    property, a local function's return), stays that literal, but every member read off it is
- *    `unknown`; a literal only pushed to (spread arguments included) keeps its written elements and
- *    leaves its end `unknown`. A change through a value the list does not resolve to the literal,
- *    such as a parameter, is not followed (`mutationsOf`).
+ * 2. A `const`, or a `let`/`var` that is never reassigned, to its initializer, through any chain of such
+ *    aliases. A `let` written after its declaration resolves the same way, to its written value alone, when
+ *    all five hold: it has no initializer and is no loop's own binding; it has exactly one write, a plain
+ *    `=`; the write is in the declaration's own function, not a nested function, closure or hook callback;
+ *    the write ends before every read in source order; and the write dominates every read, being a whole
+ *    `x = v;` statement whose every enclosing node, up to the block that declares the `let`, is a block, or
+ *    the block of a `try` with no `finally` whose `catch`, if any, ends in `continue`, `break`, `return` or
+ *    `throw` and holds no read. Any other reassigned binding is `unknown`. An object or array literal the
+ *    code changes in place (an assigned, updated or deleted member, or a mutating method such as `push`),
+ *    through its own binding or any value this list resolves to it (an alias, a property, a local function's
+ *    return), stays that literal, but every member read off it is `unknown`; a literal only pushed to (spread
+ *    arguments included) keeps its written elements and leaves its end `unknown`. A change through a value
+ *    the list does not resolve to the literal, such as a parameter, is not followed (`mutationsOf`).
  * 3. A key destructured from an object pattern (`const { a: b } = value`, `const { "a": b } =
  *    value`) to that member of each alternative of the value, as step 4 reads it; with a default
  *    (`const { a = 0 } = value`), to the default where the member is `undefined`, and to both
@@ -156,7 +157,8 @@ export function isReassigned(variable: Variable): boolean {
 /**
  * The value a `let` declared without an initializer takes from its one write (step 2): a plain `=`
  * assignment in the declaration's own function, nested functions and hook callbacks aside, that
- * ends before every read in source order.
+ * ends before every read in source order and dominates every read (`dominates`), so every read sees
+ * exactly the written value.
  *
  * @param variable - The variable.
  * @param declarator - Its declarator.
@@ -174,12 +176,61 @@ function singleWrite(variable: Variable, declarator: ESTree.VariableDeclarator):
   if (write === undefined || others.length > 0) return undefined;
   const assignment = write.identifier.parent;
   if (assignment.type !== "AssignmentExpression" || assignment.operator !== "=") return undefined;
-  if (assignment.left !== write.identifier) return undefined;
   if (write.from.variableScope !== variable.scope.variableScope) return undefined;
-  const readsAfter = variable.references.every(
-    (reference) => !reference.isRead() || reference.identifier.start >= assignment.end
+  const reads = variable.references
+    .filter((reference) => reference.isRead())
+    .map(({ identifier }) => identifier);
+  if (reads.some((read) => read.start < assignment.end)) return undefined;
+  const statement = assignment.parent;
+  if (statement.type !== "ExpressionStatement") return undefined;
+  return dominates(statement, declaration.parent, reads) ? assignment.right : undefined;
+}
+
+/**
+ * Whether a statement runs before every read that follows it, read off the syntax: every node
+ * between the statement and the block that declares the binding is a block, or the block of a `try`
+ * with no `finally` whose `catch`, if any, always completes abruptly (`exitsAbruptly`) and holds no
+ * read, since it runs when the `try` block throws before the statement. A branch, loop, `switch`,
+ * label, `catch` or `finally` body on the way may skip the statement.
+ *
+ * @param statement - The statement.
+ * @param holder - The node whose body declares the binding the statement writes.
+ * @param reads - The binding's reads, each after the statement in source order.
+ * @returns Whether every read sees the statement's write.
+ */
+function dominates(statement: ESTree.Node, holder: ESTree.Node, reads: ReadonlyArray<ESTree.Node>): boolean {
+  let node: ESTree.Node = statement;
+  while (node.parent !== holder) {
+    const parent: ESTree.Node | null = node.parent;
+    if (parent === null) return false;
+    if (parent.type === "TryStatement") {
+      const { block, finalizer, handler } = parent;
+      if (block !== node || finalizer !== null) return false;
+      if (handler !== null) {
+        const inHandler = (read: ESTree.Node) => read.start >= handler.start && read.end <= handler.end;
+        if (!exitsAbruptly(handler.body) || reads.some(inHandler)) return false;
+      }
+    } else if (parent.type !== "BlockStatement") return false;
+    node = parent;
+  }
+  return true;
+}
+
+/**
+ * Whether a block always completes abruptly, read off its last statement: `continue`, `break`,
+ * `return` or `throw`.
+ *
+ * @param block - The block.
+ * @returns Whether control never falls out of its end.
+ */
+function exitsAbruptly(block: ESTree.BlockStatement): boolean {
+  const last = block.body.at(-1);
+  return (
+    last?.type === "ContinueStatement" ||
+    last?.type === "BreakStatement" ||
+    last?.type === "ReturnStatement" ||
+    last?.type === "ThrowStatement"
   );
-  return readsAfter ? assignment.right : undefined;
 }
 
 /**
@@ -520,8 +571,7 @@ function evaluator(
     if (declarator.type !== "VariableDeclarator") return [UNKNOWN];
     if (isReassigned(variable)) {
       const written = singleWrite(variable, declarator);
-      // A read may still run before the write (a conditional write, a skipped `try`): `undefined`.
-      return written === undefined ? [UNKNOWN] : named(alternatives(evaluateNode(written), [UNDEFINED]));
+      return written === undefined ? [UNKNOWN] : named(evaluateNode(written));
     }
     if (declarator.init === null) {
       const loop = declarator.parent.parent;

@@ -68,6 +68,10 @@ ruleTester.run("no-geometry-assertions", noGeometryAssertions, {
     "expect(panel.getBoundingClientRect()).toMatchObject({ width: Infinity });",
     // A pixel string too long for a finite number (`Number` reads it as `Infinity`) is no length.
     `expect(getComputedStyle(panel).width).toBe("${"9".repeat(320)}px");`,
+    // A `let` written once, before every read, holds the written value alone: `Math.abs` makes a
+    // distance, and a plain object's `offsetWidth` is data, not a measurement.
+    "let abs;\nabs = Math.abs;\nlet delta;\ndelta = abs(a.offsetWidth - b.offsetWidth);\nexpect(delta).toBeLessThan(2);",
+    "let box;\nbox = { offsetWidth: 12 };\nexpect(box.offsetWidth).toBe(12);",
   ],
   invalid: [
     // A doubled measurement within the budget is still a length.

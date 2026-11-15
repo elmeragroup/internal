@@ -53,8 +53,6 @@ ruleTester.run("no-class-assertions", noClassAssertions, {
     'render(<Button className="marker-1" />);\nexpect(button).toHaveClass(`marker-${1}`);',
     // The matcher's options object names no class.
     'render(<Button className="marker" />);\nexpect(button).toHaveClass("marker", { exact: true });',
-    // Options written once into a `let`, which may still be `undefined` where read, name no class.
-    'render(<Button className="marker" />);\nlet options;\noptions = { exact: true };\nexpect(button).toHaveClass("marker", options);',
     // A pattern that matches a supplied class.
     'render(<Button className="marker-x" />);\nexpect(button).toHaveClass(/marker-/);',
     // `concat` assembles statically.
@@ -100,8 +98,15 @@ ruleTester.run("no-class-assertions", noClassAssertions, {
     // A class the test assigns itself, by `setAttribute` or `className`, is supplied.
     'it("a", () => {\n  el.setAttribute("class", "probe");\n  expect(el).toHaveClass("probe");\n});',
     'it("a", () => {\n  root.className = "existing";\n  apply(root);\n  expect(root).toHaveClass("existing");\n});',
+    // A class list and expected list each written once into a `let` hold the written values alone.
+    'render(<Button className="marker" />);\nlet actual;\nactual = [...button.classList];\nlet markers;\nmarkers = ["marker"];\nexpect(actual).toEqual([...markers]);',
   ],
   invalid: [
+    // A prefix written once into a `let` supplies `fixture-block`, not `block`.
+    {
+      code: 'let prefix;\nprefix = "fixture-";\nrender(<Button className={[prefix, "block"].join("")} />);\nexpect(button).toHaveClass("block");',
+      errors: [{ messageId: "pinned", data: { token: "block" } }],
+    },
     // A parameter's class is not supplied by another parameter's.
     {
       code: 'it.each([["a", "b"]])("x", (supplied, asserted) => {\n  render(<Button className={supplied} />);\n  expect(button).toHaveClass(asserted, "h-9");\n});',

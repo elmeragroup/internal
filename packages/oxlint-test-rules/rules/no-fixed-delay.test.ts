@@ -177,6 +177,11 @@ ruleTester.run("no-fixed-delay", noFixedDelay, {
     'const button = () => {\n  setTimeout(fire, 100);\n};\nit("faked", () => {\n  vi.useFakeTimers();\n  button();\n});\nit("real", () => {\n  render(<button type="button">x</button>);\n});',
     // A component the test renders under fake timers runs its timers on the fake clock.
     'function Later() {\n  useEffect(() => {\n    setTimeout(fire, 500);\n  }, []);\n  return null;\n}\nit("a", () => {\n  vi.useFakeTimers();\n  render(<Later />);\n});',
+    // A `let` written under a branch holds nothing known, so its member is no delay.
+    "let options;\nif (flag) options = { ms: 0 };\nsetTimeout(tick, options.ms);",
+    // A `let` written once, before every read, holds the written value alone: the global
+    // `setTimeout`, and a local function returning 0.
+    "let later;\nlater = setTimeout;\nlet zero;\nzero = () => 0;\nlater(tick, zero());",
   ],
   invalid: [
     // A spread push keeps the list's written elements: the first delay is still known.

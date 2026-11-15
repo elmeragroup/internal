@@ -257,12 +257,10 @@ export const noClassAssertions: Rule = {
       const symbol = symbolOf(alternative);
       if (symbol !== undefined && supplied.symbols.has(symbol)) return undefined;
       switch (alternative.kind) {
-        // A value the evaluator cannot resolve (a parameter, a loop binding) pins nothing provable,
-        // and `undefined` (a `let` read before its one write) names no class.
+        // A value the evaluator cannot resolve (a parameter, a loop binding) pins nothing provable.
         case "unknown":
         case "parameter":
         case "loop":
-        case "undefined":
           return undefined;
         case "string": {
           const tokens = classesOf(alternative.value);
@@ -322,14 +320,9 @@ export const noClassAssertions: Rule = {
       const { matcher, expected } = assertion;
       const [first, second] = expected;
       if (matcher === "toHaveClass") {
-        // A trailing options object (`{ exact: true }`) configures the matcher; it names no class,
-        // nor does `undefined`, which leaves the options at their defaults.
+        // A trailing options object (`{ exact: true }`) configures the matcher; it names no class.
         return expected.filter(
-          (argument) =>
-            !allQualify(
-              evaluate(context, argument),
-              (option) => option.kind === "object" || option.kind === "undefined"
-            )
+          (argument) => !allQualify(evaluate(context, argument), (option) => option.kind === "object")
         );
       }
       if (matcher === "toHaveAttribute" && first !== undefined && namesClass(first)) {
