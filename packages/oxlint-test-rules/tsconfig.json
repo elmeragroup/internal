@@ -1,0 +1,12 @@
+{
+  "extends": "@elmeragroup/typescript-config/internal-package.json",
+  "compilerOptions": {
+    "noEmit": true,
+    // Oxlint loads the rules through Node's type stripping, which cannot run enums or parameter properties.
+    "erasableSyntaxOnly": true,
+    "exactOptionalPropertyTypes": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true
+  },
+  "include": ["index.ts", "index.d.ts", "rules", "shared", "vitest.config.ts"]
+}

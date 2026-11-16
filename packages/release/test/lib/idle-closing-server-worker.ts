@@ -86,10 +86,12 @@ function sendHeaders(response: Response, status: number): void {
 function reply(response: Response, answer: Reply): void {
   if (answer.kind === "late-not-found") {
     sendHeaders(response, 404);
+    // oxlint-disable-next-line tests/no-fixed-delay -- models a 404 whose body trails its headers, which the client must leave unread without stalling its pool
     setTimeout(() => response.end(JSON.stringify({ message: "Not Found" })), 20);
     return;
   }
   // Holding each response briefly makes concurrent requests open separate connections.
+  // oxlint-disable-next-line tests/no-fixed-delay -- models server latency, so the pooling tests' concurrent requests hold separate connections to count
   setTimeout(() => {
     sendHeaders(response, answer.status);
     response.end(JSON.stringify(answer.body));
@@ -112,6 +114,7 @@ function closeWhenIdle(request: Request, response: Response): void {
   if (connection === undefined) return;
   clearTimeout(idleTimers.get(connection.key));
   response.on("finish", () => {
+    // oxlint-disable-next-line tests/no-fixed-delay -- the server's idle-close is the behaviour under test: the client must survive a connection GitHub closed while it was blocked
     idleTimers.set(connection.key, setTimeout(connection.close, options.idleLimit));
   });
 }

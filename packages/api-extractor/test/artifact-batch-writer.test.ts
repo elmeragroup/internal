@@ -12,18 +12,61 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { writeArtifactBatchOrThrow } from "../scripts/artifact-batch-writer.ts";
 import { makeArtifactBatchWriterForTest, writeArtifactBatch } from "../scripts/artifact-batch-writer.ts";
 
 const faultInjectionDeadlineMs = 250;
 
+/** The recovery deadline of the rollback test, shorter than the primary one so recovery times out first. */
+const rollbackRecoveryDeadlineMs = 50;
+
+/**
+ * A fake clock for the deadline tests: the writer's deadline timer and `Date.now()` move only when
+ * the test advances them, once the write has reached its stall, so no test races real time.
+ */
+function useDeadlineClock(): void {
+  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+}
+
+/** A signal the stall hook raises when the write reaches the operation that never settles. */
+type StallSignal = {
+  /** Settles once the stall hook has raised the signal. */
+  readonly reached: Promise<void>;
+  /** Raises the signal; the stall hook calls it as it starts the operation that never settles. */
+  readonly raise: () => void;
+};
+
+/** A fresh stall signal, not yet raised. */
+function stallSignal(): StallSignal {
+  let raise: () => void = () => undefined;
+  const reached = new Promise<void>((resolve) => {
+    raise = resolve;
+  });
+  return { reached, raise };
+}
+
+/** The write's result once it has reached its stall and its deadline has passed on the fake clock. */
+async function afterDeadline<Value>(
+  pending: Promise<Value>,
+  stall: Promise<void>,
+  deadlineMs: number = faultInjectionDeadlineMs
+): Promise<Value> {
+  await stall;
+  await vi.advanceTimersByTimeAsync(deadlineMs);
+  return pending;
+}
+
 function transactionEntries(root: string): readonly string[] {
   return readdirSync(root).filter((entry) => entry.startsWith(".artifact-batch-"));
 }
 
 describe("artifact batch writer", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("writes a complete multi-artifact batch and removes transaction state", async () => {
     const root = mkdtempSync(join(tmpdir(), "api-extractor-artifact-batch-"));
     try {
@@ -138,22 +181,30 @@ describe("artifact batch writer", () => {
   it("reports uncertain lock cleanup when acquisition times out after mkdir starts", async () => {
     const root = mkdtempSync(join(tmpdir(), "api-extractor-artifact-lock-timeout-"));
     try {
+      useDeadlineClock();
+      const stall = stallSignal();
       let lockStalled = false;
       const writeWithUncertainLock = makeArtifactBatchWriterForTest({
         maximumDurationMs: faultInjectionDeadlineMs,
         runFileSystemOperation: ({ kind, path, run }) => {
           if (!lockStalled && kind === "make-directory" && path.endsWith(".artifact-batch-lock")) {
             lockStalled = true;
-            return run().then(() => new Promise<never>(() => undefined));
+            return run().then(() => {
+              stall.raise();
+              return new Promise<never>(() => undefined);
+            });
           }
           return run();
         },
       });
 
-      const result = await writeWithUncertainLock({
-        outputRoot: root,
-        artifacts: [{ destination: "report.json", content: "report\n", evidence: "generated" }],
-      });
+      const result = await afterDeadline(
+        writeWithUncertainLock({
+          outputRoot: root,
+          artifacts: [{ destination: "report.json", content: "report\n", evidence: "generated" }],
+        }),
+        stall.reached
+      );
 
       expect(result).toEqual({
         status: "failure",
@@ -611,22 +662,27 @@ describe("artifact batch writer", () => {
     }
   });
 
-  it("returns an interrupted failure within a bounded time and restores the destination", async () => {
+  it("interrupts an artifact write that never settles at its deadline and restores the destination", async () => {
     const root = mkdtempSync(join(tmpdir(), "api-extractor-artifact-timeout-"));
     try {
       writeFileSync(join(root, "report.json"), "original report\n");
+      useDeadlineClock();
+      const stall = stallSignal();
       const writeThatStalls = makeArtifactBatchWriterForTest({
         maximumDurationMs: faultInjectionDeadlineMs,
-        beforeArtifactWrite: () => new Promise<void>(() => undefined),
+        beforeArtifactWrite: () => {
+          stall.raise();
+          return new Promise<void>(() => undefined);
+        },
       });
-      const startedAt = Date.now();
+      const result = await afterDeadline(
+        writeThatStalls({
+          outputRoot: root,
+          artifacts: [{ destination: "report.json", content: "replacement\n", evidence: "reviewed" }],
+        }),
+        stall.reached
+      );
 
-      const result = await writeThatStalls({
-        outputRoot: root,
-        artifacts: [{ destination: "report.json", content: "replacement\n", evidence: "reviewed" }],
-      });
-
-      expect(Date.now() - startedAt).toBeLessThan(1_000);
       expect(result).toEqual({
         status: "failure",
         error: {
@@ -646,29 +702,32 @@ describe("artifact batch writer", () => {
     }
   });
 
-  it("bounds a stalled filesystem operation and restores the destination", async () => {
+  it("interrupts a filesystem operation that never settles and restores the destination", async () => {
     const root = mkdtempSync(join(tmpdir(), "api-extractor-artifact-filesystem-timeout-"));
     try {
       writeFileSync(join(root, "report.json"), "original report\n");
+      useDeadlineClock();
+      const stall = stallSignal();
       let renameStalled = false;
       const writeWithStalledRename = makeArtifactBatchWriterForTest({
         maximumDurationMs: faultInjectionDeadlineMs,
         runFileSystemOperation: ({ kind, path, run }) => {
           if (!renameStalled && kind === "rename" && path.endsWith("report.json")) {
             renameStalled = true;
+            stall.raise();
             return new Promise<never>(() => undefined);
           }
           return run();
         },
       });
-      const startedAt = Date.now();
+      const result = await afterDeadline(
+        writeWithStalledRename({
+          outputRoot: root,
+          artifacts: [{ destination: "report.json", content: "replacement\n", evidence: "reviewed" }],
+        }),
+        stall.reached
+      );
 
-      const result = await writeWithStalledRename({
-        outputRoot: root,
-        artifacts: [{ destination: "report.json", content: "replacement\n", evidence: "reviewed" }],
-      });
-
-      expect(Date.now() - startedAt).toBeLessThan(1_000);
       expect(result).toEqual({
         status: "failure",
         error: {
@@ -692,28 +751,31 @@ describe("artifact batch writer", () => {
     const root = mkdtempSync(join(tmpdir(), "api-extractor-artifact-recovery-deadline-"));
     try {
       writeFileSync(join(root, "report.json"), "original report\n");
+      useDeadlineClock();
+      const stall = stallSignal();
       let renameStalled = false;
       const writeWithStalledRename = makeArtifactBatchWriterForTest({
         maximumDurationMs: faultInjectionDeadlineMs,
-        beforeTemporaryCleanup: ({ kind }) =>
-          kind === "transaction"
-            ? new Promise<void>((resolve) => {
-                setTimeout(resolve, faultInjectionDeadlineMs / 2);
-              })
-            : undefined,
+        // Recovery starts after the primary deadline has passed, so a cleanup step that is held to
+        // that deadline fails at once; one held to its own recovery deadline completes.
+        beforeTemporaryCleanup: ({ kind }) => (kind === "transaction" ? Promise.resolve() : undefined),
         runFileSystemOperation: ({ kind, path, run }) => {
           if (!renameStalled && kind === "rename" && path.endsWith("report.json")) {
             renameStalled = true;
+            stall.raise();
             return new Promise<never>(() => undefined);
           }
           return run();
         },
       });
 
-      const result = await writeWithStalledRename({
-        outputRoot: root,
-        artifacts: [{ destination: "report.json", content: "replacement\n", evidence: "reviewed" }],
-      });
+      const result = await afterDeadline(
+        writeWithStalledRename({
+          outputRoot: root,
+          artifacts: [{ destination: "report.json", content: "replacement\n", evidence: "reviewed" }],
+        }),
+        stall.reached
+      );
 
       expect(result).toEqual({
         status: "failure",
@@ -738,23 +800,32 @@ describe("artifact batch writer", () => {
     const root = mkdtempSync(join(tmpdir(), "api-extractor-artifact-uncertain-timeout-"));
     try {
       writeFileSync(join(root, "report.json"), "original report\n");
+      useDeadlineClock();
+      const stall = stallSignal();
       let renameStalled = false;
+      let detachedRename: Promise<unknown> = Promise.resolve();
       const writeWithUncertainRename = makeArtifactBatchWriterForTest({
         maximumDurationMs: faultInjectionDeadlineMs,
         runFileSystemOperation: ({ kind, path, run }) => {
           if (!renameStalled && kind === "rename" && path.endsWith("report.json")) {
             renameStalled = true;
-            void run();
+            detachedRename = run();
+            stall.raise();
             return new Promise<never>(() => undefined);
           }
           return run();
         },
       });
 
-      const result = await writeWithUncertainRename({
-        outputRoot: root,
-        artifacts: [{ destination: "report.json", content: "replacement\n", evidence: "reviewed" }],
-      });
+      const result = await afterDeadline(
+        writeWithUncertainRename({
+          outputRoot: root,
+          artifacts: [{ destination: "report.json", content: "replacement\n", evidence: "reviewed" }],
+        }),
+        stall.reached
+      );
+      // The rename the writer left running still lands; wait for it so the tree is settled.
+      await detachedRename;
 
       expect(result).toEqual({
         status: "failure",
@@ -780,28 +851,38 @@ describe("artifact batch writer", () => {
     try {
       writeFileSync(join(root, "first.json"), "first original\n");
       writeFileSync(join(root, "second.json"), "second original\n");
+      useDeadlineClock();
+      const stall = stallSignal();
       let rollbackRemoveStalled = false;
       const writeWithUncertainRollback = makeArtifactBatchWriterForTest({
-        maximumRecoveryDurationMs: 50,
+        maximumRecoveryDurationMs: rollbackRecoveryDeadlineMs,
         beforeArtifactWrite: ({ index }) => {
           if (index === 1) throw new Error("synthetic second write failure");
         },
         runFileSystemOperation: ({ kind, path, run }) => {
           if (!rollbackRemoveStalled && kind === "remove" && path.endsWith("first.json")) {
             rollbackRemoveStalled = true;
-            return run().then(() => new Promise<never>(() => undefined));
+            // The remove lands before the stall, so no operation is left running past the result.
+            return run().then(() => {
+              stall.raise();
+              return new Promise<never>(() => undefined);
+            });
           }
           return run();
         },
       });
 
-      const result = await writeWithUncertainRollback({
-        outputRoot: root,
-        artifacts: [
-          { destination: "first.json", content: "first replacement\n", evidence: "generated" },
-          { destination: "second.json", content: "second replacement\n", evidence: "reviewed" },
-        ],
-      });
+      const result = await afterDeadline(
+        writeWithUncertainRollback({
+          outputRoot: root,
+          artifacts: [
+            { destination: "first.json", content: "first replacement\n", evidence: "generated" },
+            { destination: "second.json", content: "second replacement\n", evidence: "reviewed" },
+          ],
+        }),
+        stall.reached,
+        rollbackRecoveryDeadlineMs
+      );
 
       expect(result).toEqual({
         status: "failure",

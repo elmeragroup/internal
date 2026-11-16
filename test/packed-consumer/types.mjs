@@ -11,6 +11,7 @@ import type { ApiPart } from "@elmeragroup/internal/api-artifacts/model";
 import { ProjectExtractor } from "@elmeragroup/internal/api-extractor";
 import elmera from "@elmeragroup/internal/oxlint";
 import antiSlop from "@elmeragroup/internal/oxlint/anti-slop";
+import tests from "@elmeragroup/internal/oxlint/tests";
 import {
   assertCanaryReleaseVersion,
   assertReleaseVersion,
@@ -29,6 +30,7 @@ import type {
 void ProjectExtractor;
 void elmera;
 void antiSlop;
+void tests;
 void ReleaseError;
 void assertCanaryReleaseVersion;
 void assertReleaseVersion;

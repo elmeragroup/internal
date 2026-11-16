@@ -46,6 +46,7 @@ function writeWorkspaceFixture(workspace: string): void {
     "api-extractor",
     "oxlint-plugin",
     "oxlint-anti-slop",
+    "oxlint-test-rules",
     "release",
   ]) {
     mkdirSync(join(workspace, "packages", name), { recursive: true });
@@ -115,6 +116,7 @@ describe("changesets umbrella release plan", () => {
     "@elmeragroup/api-artifacts",
     "@elmeragroup/oxlint-plugin",
     "@elmeragroup/oxlint-plugin-anti-slop",
+    "@elmeragroup/oxlint-test-rules",
     "@elmeragroup/release",
   ])(
     "does not release private changes to %s",

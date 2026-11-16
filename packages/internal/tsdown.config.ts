@@ -7,6 +7,7 @@ export default defineConfig({
     "api-extractor": "src/api-extractor.ts",
     oxlint: "src/oxlint.ts",
     "oxlint/anti-slop": "src/oxlint-anti-slop.ts",
+    "oxlint/tests": "src/oxlint-tests.ts",
     release: "src/release.ts",
   },
   platform: "node",

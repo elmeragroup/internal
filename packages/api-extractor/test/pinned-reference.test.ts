@@ -1,4 +1,4 @@
-import { cpSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, cpSync, readFileSync, rmSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -47,7 +47,7 @@ describe("Issue 14 pinned reference", () => {
     try {
       cpSync(fixtureRoot, temporaryFixtures, { recursive: true });
       const target = join(temporaryFixtures, "class-members-visibility-and-signatures", "input.ts");
-      writeFileSync(target, readFileSync(target, "utf8") + "\n// recursive audit mutation\n");
+      appendFileSync(target, "\n// recursive audit mutation\n");
       expect(() => auditPinnedReference("required", { fixtureRoot: temporaryFixtures })).toThrow(
         /bytes changed/u
       );
@@ -81,7 +81,7 @@ describe("Issue 14 pinned reference", () => {
         "class-members-visibility-and-signatures",
         "input.ts"
       );
-      writeFileSync(target, readFileSync(target, "utf8") + "\n// dirty checkout mutation\n");
+      appendFileSync(target, "\n// dirty checkout mutation\n");
       expect(() => auditPinnedReference("required", { referenceRoot: temporaryReference })).toThrow(/dirty/u);
     } finally {
       rmSync(temporaryRoot, { recursive: true, force: true });

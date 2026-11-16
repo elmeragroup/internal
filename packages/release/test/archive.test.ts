@@ -11,7 +11,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { verifyReleaseArchive } from "../src/archive.ts";
 import type { ReleaseIntent } from "../src/intent.ts";
@@ -127,12 +127,17 @@ describe("release archive verification", () => {
   });
 
   it("removes the scratch directory when verification fails", async () => {
-    const prefix = "elmera-release-";
-    const before = new Set(readdirSync(tmpdir()).filter((name) => name.startsWith(prefix)));
-    await expect(verify(archiveBytes(validManifest({ name: "@other/app" })))).rejects.toThrow(
-      "does not match"
-    );
-    const leftover = readdirSync(tmpdir()).filter((name) => name.startsWith(prefix) && !before.has(name));
-    expect(leftover).toEqual([]);
+    const bytes = archiveBytes(validManifest({ name: "@other/app" }));
+    // A temporary root of its own, so scratch directories that other test files create while they
+    // run in parallel cannot show up here.
+    const root = mkdtempSync(join(tmpdir(), "elmera-archive-scratch-root-"));
+    vi.stubEnv("TMPDIR", root);
+    try {
+      await expect(verify(bytes)).rejects.toThrow("does not match");
+      expect(readdirSync(root)).toEqual([]);
+    } finally {
+      vi.unstubAllEnvs();
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });

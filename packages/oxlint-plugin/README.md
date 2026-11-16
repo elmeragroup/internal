@@ -24,11 +24,21 @@ shared helpers: `filename-normalizer.js` (POSIX path checks, test-file predicate
 | `no-rac-outside-quarantine`         | React Aria packages are importable only from the `src/react-aria` quarantine                                               |
 | `no-raw-class-map`                  | Class maps and hand-spelled class constants must be `tv()` recipes or `cn()`                                               |
 | `no-tailwind-dark-variant`          | No Tailwind `dark:` variant; the dark axis is token-reserved behind `[data-theme="dark"]`                                  |
+| `require-disable-reason`            | Every lint disable comment gives a `--` reason; options limit directive kinds and require one rule                         |
 | `require-icon-button-label`         | Icon-only `*Button` JSX needs a nonempty `aria-label`                                                                      |
 | `restrict-browser-helper-copy`      | Browser suites import the shared harness helpers instead of re-declaring them                                              |
 | `restrict-focus-ring-call`          | `focusRing({…})` calls live in `styles/utils.ts` and `react-aria/link` only                                                |
 | `restrict-package-root-from-script` | `dirname(fileURLToPath(import.meta.url))` lives only in `scripts/paths.ts`                                                 |
 | `restrict-process-env`              | Direct `process.env` access only for the `NODE_ENV` comparison in the theme validator                                      |
+
+## `require-disable-reason` and blanket disables
+
+The rule reports through Oxlint like every other rule, so an inline directive that silences it
+hides its reports too: a blanket disable (`/* oxlint-disable */`, a bare `// oxlint-disable-line`)
+or one naming `elmera/require-disable-reason`. Oxlint 1.93 has no switch that ignores inline
+directives, so a lint pass cannot close this. Pair the rule with a check outside lint where the
+contract must hold; this repository's `test/extractor-lint-policy.test.mjs` rejects such directives
+in `packages/api-extractor`.
 
 ## Fixed-path assumptions
 

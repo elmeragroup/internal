@@ -11,6 +11,7 @@
     "packages/internal/src",
     "packages/release/src",
     "packages/oxlint-plugin/index.js",
-    "packages/oxlint-anti-slop/index.ts"
+    "packages/oxlint-anti-slop/index.ts",
+    "packages/oxlint-test-rules/index.ts"
   ]
 }

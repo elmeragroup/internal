@@ -10,6 +10,7 @@ import noPrimitiveColors from "./rules/no-primitive-colors.js";
 import noRacOutsideQuarantine from "./rules/no-rac-outside-quarantine.js";
 import noRawClassMap from "./rules/no-raw-class-map.js";
 import noTailwindDarkVariant from "./rules/no-tailwind-dark-variant.js";
+import requireDisableReason from "./rules/require-disable-reason.js";
 import requireIconButtonLabel from "./rules/require-icon-button-label.js";
 import restrictBrowserHelperCopy from "./rules/restrict-browser-helper-copy.js";
 import restrictFocusRingCall from "./rules/restrict-focus-ring-call.js";
@@ -31,6 +32,7 @@ export default eslintCompatPlugin({
     "no-rac-outside-quarantine": noRacOutsideQuarantine,
     "no-raw-class-map": noRawClassMap,
     "no-tailwind-dark-variant": noTailwindDarkVariant,
+    "require-disable-reason": requireDisableReason,
     "require-icon-button-label": requireIconButtonLabel,
     "restrict-browser-helper-copy": restrictBrowserHelperCopy,
     "restrict-focus-ring-call": restrictFocusRingCall,

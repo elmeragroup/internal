@@ -81,9 +81,10 @@ function freezeFact<Result>(value: Result): Result {
  * this short-circuit removes.
  *
  * A new `Object.freeze` in `src/**` breaks that invariant the moment it
- * freezes a literal with mutable children. `test/session-fact-cache-freeze
- * .test.ts` fails on any freeze site outside those two, so the invariant is
- * re-argued rather than silently lost.
+ * freezes a literal with mutable children. `no-restricted-properties` in the
+ * root `.oxlintrc.json` reports every freeze site in `src/**`; these two carry
+ * a disable naming the invariant, so a third is re-argued rather than
+ * silently lost.
  */
 function deepFreezeFact<Result>(value: Result, seen: WeakSet<object>): Result {
   // oxlint-disable-next-line anti-slop/no-runtime-typeof -- normalized compiler facts are deep-frozen before caching.
@@ -93,5 +94,6 @@ function deepFreezeFact<Result>(value: Result, seen: WeakSet<object>): Result {
   for (const descriptor of Object.values(Object.getOwnPropertyDescriptors(value))) {
     if ("value" in descriptor) deepFreezeFact(descriptor.value, seen);
   }
+  // oxlint-disable-next-line no-restricted-properties -- the deep freeze itself: every child above is frozen first.
   return Object.freeze(value);
 }

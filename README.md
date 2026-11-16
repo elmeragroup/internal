@@ -37,6 +37,7 @@ Generate artifacts during the build, then import the JSON from your docs pages. 
 - [release](packages/release): private publication identity, configuration, versioning, policy, and Effect operations.
 - `packages/oxlint-plugin`: private Elmera lint rules.
 - `packages/oxlint-anti-slop`: private code-quality rules.
+- [oxlint-test-rules](packages/oxlint-test-rules): private test-shape rules.
 - `tooling/typescript`: private workspace TypeScript configuration.
 
 Only `@elmeragroup/internal` is published, with one Changesets version. The extractor,
@@ -53,6 +54,7 @@ The package has explicit ESM entries:
 | `@elmeragroup/internal/api-extractor`       | Low-level Effect extraction, models, schemas, and errors                  |
 | `@elmeragroup/internal/oxlint`              | Elmera Oxlint plugin default export                                       |
 | `@elmeragroup/internal/oxlint/anti-slop`    | Anti-slop Oxlint plugin default export                                    |
+| `@elmeragroup/internal/oxlint/tests`        | Test-shape Oxlint plugin default export                                   |
 | `@elmeragroup/internal/release`             | Checked-commit publication, recorded-archive retry, and release-PR checks |
 
 tsrs, Effect, and `@oxlint/plugins` are pinned runtime dependencies. Installing the package
@@ -84,7 +86,7 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request.
 
 `packages:pack` builds the package archive without publishing. `canary:pack` is a compatibility alias
 for the same command. The consumer test installs the packed package in a temporary project and
-checks extraction, defaults, drift detection, all public declarations, both lint plugins, consumer tree-shaking, and packed UI-shaped release consumption without workspace links.
+checks extraction, defaults, drift detection, all public declarations, the three lint plugins, consumer tree-shaking, and packed UI-shaped release consumption without workspace links.
 It runs every check against a private snapshot of the archive, so repacking after verification
 requires re-running `pnpm test:packed-consumer` before preparing a release record.
 

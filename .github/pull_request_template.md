@@ -18,6 +18,12 @@ See CONTRIBUTING.md#one-problem. -->
 <!-- How this fixes the problem. If it touches several packages, say why the same fix needs each
 of them. -->
 
+## Test value
+
+<!-- The answers to the authoring gate in .agents/skills/test-audit/SKILL.md#authoring-gate: every
+question for each added or changed test, or the gate's reason for adding none.
+See CONTRIBUTING.md#test-value. -->
+
 ## Verification
 
 <!-- The commands you ran and their results. Explain each semantic change in regenerated evidence

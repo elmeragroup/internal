@@ -245,16 +245,14 @@ describe("compiler boundary", () => {
       mkdirSync(parseDirectory, { recursive: true });
       const leafPath = join(parseDirectory, "leaf.ts");
       const modelPath = join(directory, "src/model.ts");
-      writeFileSync(
-        leafPath,
-        'import type { SemanticType } from "../model.ts";\nexport type T = SemanticType;\n'
-      );
+      const leafSource = 'import type { SemanticType } from "../model.ts";\nexport type T = SemanticType;\n';
+      writeFileSync(leafPath, leafSource);
       writeFileSync(
         modelPath,
         'import { Schema } from "effect";\nexport type SemanticType = typeof Schema.String;\n'
       );
 
-      expect(scanValueModuleSpecifiers(readFileSync(leafPath, "utf8"))).toEqual([]);
+      expect(scanValueModuleSpecifiers(leafSource)).toEqual([]);
       expect(effectImportViolations([leafPath])).toEqual([]);
     } finally {
       rmSync(directory, { recursive: true, force: true });
@@ -298,13 +296,14 @@ describe("compiler boundary", () => {
       mkdirSync(parseDirectory, { recursive: true });
       const leafPath = join(parseDirectory, "leaf.ts");
       const helperPath = join(directory, "src/bridge.ts");
-      writeFileSync(leafPath, 'import type { Thing } from "../bridge.js";\nexport type T = Thing;\n');
+      const leafSource = 'import type { Thing } from "../bridge.js";\nexport type T = Thing;\n';
+      writeFileSync(leafPath, leafSource);
       writeFileSync(
         helperPath,
         'import { Data } from "effect";\nexport type Thing = typeof Data;\nexport default Data;\n'
       );
 
-      expect(scanValueModuleSpecifiers(readFileSync(leafPath, "utf8"))).toEqual([]);
+      expect(scanValueModuleSpecifiers(leafSource)).toEqual([]);
       expect(effectImportViolations([leafPath])).toEqual([]);
     } finally {
       rmSync(directory, { recursive: true, force: true });

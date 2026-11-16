@@ -187,8 +187,8 @@ node scripts/conformance/report.ts --audit-reference --reference-required
 
 ## Lint exceptions
 
-This package takes no path-wide lint exemption: `.oxlintrc.json` has no override for it, and no
-file carries an `oxlint-disable` header. Every exception applies to one line. Use an
+This package takes no path-wide lint exemption: no `.oxlintrc.json` override relaxes a rule for it,
+and no file carries an `oxlint-disable` header. Every exception applies to one line. Use an
 `oxlint-disable-next-line` naming one rule and why that rule cannot hold there, or the `SAFETY:`
 comment a rule asks for instead of a disable.
 
@@ -197,10 +197,19 @@ JSON encoding means, and that is what the byte-compared oracles record. The rest
 compiler seam in `src/backend/ts7/**`, where facts arrive as untyped primitives and are narrowed
 before they cross the backend contract.
 
-Do not add a file-wide `/* oxlint-disable … */` header and do not add an override for this path:
-`test/extractor-lint-exceptions.test.mjs` in the repository's root `test/` project fails on either,
-and on a next-line disable with no `--` reason. When a disable stops exempting anything, delete it
-rather than keeping an unused exemption.
+The `packages/api-extractor/**` override configures `elmera/require-disable-reason` to accept only
+`oxlint-disable-next-line` comments that name one rule and give a `--` reason, so `pnpm lint` fails on
+a file-wide header that names a rule, a same-line disable, several rules in one comment, or a missing
+reason. `pnpm lint` also fails on a disable that stops exempting anything. A directive that names no
+rule, or names the guard, silences the guard itself, so lint cannot catch it.
+`test/extractor-lint-policy.test.mjs` in the repository's root `test/` project fails on such a
+directive, on an override that relaxes a rule for this path (globs matched as oxlint matches them,
+checked against the oxlint CLI; a glob outside oxlint's grammar, such as an extglob, fails), on a weaker `require-disable-reason` setting, and when any rule's
+next-line disables exceed the per-rule ceiling.
+
+`src/**` also turns on `no-restricted-properties` for `Object.freeze`: the fact cache's deep freeze
+stops at an already frozen record, so every freeze site carries a disable that says why nothing
+mutable sits beneath it.
 
 ## Local checks
 
