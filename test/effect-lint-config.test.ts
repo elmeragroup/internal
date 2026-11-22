@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, matchesGlob } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseSync } from "oxc-parser";
@@ -135,7 +135,11 @@ const tsrs = asString(
   "tsrs"
 );
 
-/** A tsconfig's `extends` targets, resolved to repository paths: a workspace preset, or a path beside the file. */
+/**
+ * A tsconfig's `extends` targets, resolved to repository paths: a workspace preset, or a path beside the file. A small
+ * walker over the repository's own two specifier shapes, not the compiler's resolver: the root test project reads no
+ * `tsrs/*` API, and these configs extend nothing else.
+ */
 function extendsOf(path: string): ReadonlyArray<string> {
   const config = parseJsonc(read(path), path);
   const targets = Array.isArray(config.extends)
@@ -145,9 +149,11 @@ function extendsOf(path: string): ReadonlyArray<string> {
       : [config.extends];
   return targets.map((target) => {
     const name = asString(target, `${path} extends`);
-    return name.startsWith("@elmeragroup/typescript-config/")
+    const literal = name.startsWith("@elmeragroup/typescript-config/")
       ? join("tooling/typescript", name.slice("@elmeragroup/typescript-config/".length))
       : join(dirname(path), name);
+    // As tsc and tsrs resolve `extends`: the path as written, else with `.json` appended when it lacks the extension.
+    return existsSync(join(repoRoot, literal)) || literal.endsWith(".json") ? literal : `${literal}.json`;
   });
 }
 

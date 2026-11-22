@@ -33,8 +33,9 @@ const DIRECTIVE = /^\s*(?:oxlint|eslint)-(disable(?:-next-line|-line)?)(?=\s|$)/
  * - ` -- ` means nothing to it: `--` is one more token, and a pair written after it, in the reason, still applies.
  *
  * This rule reads the same lines the same way. A relaxing directive outside a comment is reported, since no comment
- * can carry its reason; one inside a comment needs its relaxing pair before ` -- ` and a reason after it, and takes
- * the allowed-kinds and one-rule options, a `skip-file` pair counting as the file-wide `disable` kind.
+ * can carry its reason; one inside a comment writes every pair it relaxes before ` -- ` (one in the reason still
+ * applies) and a reason after it, ending where a block comment closes, and takes the allowed-kinds and one-rule options,
+ * a `skip-file` pair counting as the file-wide `disable` kind.
  */
 
 /** The upstream directive pattern, with RE2's ASCII classes. */
@@ -110,7 +111,8 @@ function optionsOf(context) {
  * @property {ReadonlyArray<string>} rules - The rules it names; `*` names every rule.
  * @property {string} reason - The text after its ` -- ` separator, less any rule the backend still reads there.
  * @property {boolean} inComment - Whether it is written in a comment, where a reason can follow it.
- * @property {boolean} rulesAfterReasonOnly - Whether every rule it relaxes is written after ` -- `.
+ * @property {boolean} relaxesInReason - Whether it relaxes a rule written after ` -- `, which `@effect/tsgo` applies.
+ * @property {boolean} skipsFile - Whether a `skip-file` pair, rather than its form, makes it file-wide.
  * @property {Location} loc - Where to report it.
  */
 
@@ -134,7 +136,8 @@ function oxlintDirective(text, loc) {
     rules: namedRules(separator === -1 ? rest : rest.slice(0, separator)),
     reason: separator === -1 ? "" : rest.slice(separator + SEPARATOR.length),
     inComment: true,
-    rulesAfterReasonOnly: false,
+    relaxesInReason: false,
+    skipsFile: false,
     loc,
   };
 }
@@ -156,7 +159,7 @@ function spellEffect(kind) {
  * that only raises rules to errors needs no reason.
  *
  * @param {string} text - The whole source text.
- * @param {ReadonlyArray<{ start: number, end: number }>} comments - Its comments, as offsets into `text`.
+ * @param {ReadonlyArray<{ type: string, start: number, end: number }>} comments - Its comments, as offsets into `text`.
  * @param {(offset: number) => { line: number, column: number }} locate - Maps an offset to a location.
  * @returns {Directive[]}
  */
@@ -179,7 +182,10 @@ function effectDirectives(text, comments, locate) {
       if (relaxing.length > 0) {
         const start = lineStart + match.index;
         const comment = comments.find((candidate) => candidate.start <= start && start < candidate.end);
-        const lineEnd = comment === undefined ? line.length : Math.min(line.length, comment.end - lineStart);
+        // A block comment's closing `*/` ends the reason, so it never counts toward the reason's length.
+        const commentEnd =
+          comment === undefined ? line.length : comment.end - lineStart - (comment.type === "Block" ? 2 : 0);
+        const lineEnd = Math.min(line.length, commentEnd);
         const separatorAt = line.indexOf(SEPARATOR, match.index);
         const separator = separatorAt === -1 || separatorAt >= lineEnd ? lineEnd : separatorAt;
         const afterSeparator = pairs.filter((pair) => pair.start >= separator);
@@ -189,17 +195,16 @@ function effectDirectives(text, comments, locate) {
           reason = reason.slice(0, at) + reason.slice(at + pair.end - pair.start);
         }
         const next = match[1] ?? "";
+        const skipsFile = pairs.some(({ severity }) => severity === EFFECT_SKIP_FILE);
         found.push({
           directive: `@effect-diagnostics${next}`,
-          kind:
-            next === "" || pairs.some(({ severity }) => severity === EFFECT_SKIP_FILE)
-              ? "disable"
-              : "disable-next-line",
+          kind: next === "" || skipsFile ? "disable" : "disable-next-line",
+          skipsFile,
           spell: spellEffect,
           rules: pairs.map(({ rule }) => rule),
           reason,
           inComment: comment !== undefined,
-          rulesAfterReasonOnly: relaxing.every((pair) => pair.start >= separator),
+          relaxesInReason: relaxing.some((pair) => pair.start >= separator),
           loc: { start: locate(start), end: locate(lineStart + match.index + match[0].length) },
         });
       }
@@ -250,8 +255,10 @@ export default defineRule({
         "`{{directive}}` is not allowed here, and this configuration allows no directive of its kind; fix what it would silence.",
       outsideComment:
         "`{{directive}}` is outside a comment, yet `@effect/tsgo` reads every source line and applies it here; write it in a comment with a reason, or spell the text so it no longer reads as a directive (for example `\\x40effect-diagnostics`).",
+      skipFile:
+        "`{{directive}}` with a `skip-file` severity silences the rule for the whole file, which is not allowed here; use `@effect-diagnostics-next-line <rule>:off` on the line that needs it, with a reason.",
       ruleAfterReason:
-        "Write the rule this `{{directive}}` relaxes before ` -- `; `@effect/tsgo` applies a `rule:severity` after the separator too, so it is no reason.",
+        "Write every rule this `{{directive}}` relaxes before ` -- `; `@effect/tsgo` applies a relaxing `rule:severity` after the separator too, so it is no reason.",
     },
   },
   create(context) {
@@ -271,11 +278,16 @@ export default defineRule({
           rules: named,
           reason,
           inComment,
-          rulesAfterReasonOnly,
+          relaxesInReason,
+          skipsFile,
           loc,
         } of found) {
           if (!inComment) {
             context.report({ loc, messageId: "outsideComment", data: { directive } });
+            continue;
+          }
+          if (!directives.includes(kind) && skipsFile && directives.includes("disable-next-line")) {
+            context.report({ loc, messageId: "skipFile", data: { directive } });
             continue;
           }
           if (!directives.includes(kind)) {
@@ -287,7 +299,7 @@ export default defineRule({
             );
             continue;
           }
-          if (rulesAfterReasonOnly) {
+          if (relaxesInReason) {
             context.report({ loc, messageId: "ruleAfterReason", data: { directive } });
           }
           if (rules === "one" && (named.length !== 1 || named[0] === "*")) {

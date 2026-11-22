@@ -30,7 +30,8 @@ The whole workspace compiles with `tsrs`, a Rust port of the TypeScript 7 compil
 TypeScript 7.1: type-check scripts, builds, declaration emit, evidence scripts, and the runtime
 `tsrs/*` API. The `typescript` package is not a dependency. Type-aware Oxlint also runs on tsrs: the
 lint scripts set `OXLINT_TSGOLINT_PATH=node_modules/.bin/tsrs-lint`, so run Oxlint through
-`pnpm lint` or with that variable set. `pnpm lint` is `turbo run lint`: it builds the packages whose
+`pnpm lint` or with that variable set. `pnpm lint` runs the turbo tasks `//#lint:oxlint` and
+`//#lint:effect`: it builds the packages whose
 declarations the passes read, then runs two passes over the whole workspace, `lint:oxlint` and
 `lint:effect`, the Effect diagnostics of `@effect/tsgo` (they fire only on Effect values) through
 the Effect-patched Oxlint and `.oxlintrc.effect.json`. Those two scripts are the raw passes turbo

@@ -98,6 +98,10 @@ tester.run("elmera/require-disable-reason", requireDisableReason, {
       options: [{ directives: ["disable", "disable-next-line"], rules: "one" }],
     },
     {
+      name: "a rule the reason raises to an error relaxes nothing",
+      code: `// ${EFFECT}-next-line floatingEffect:off -- the fiber is forked; globalDate:error stays on\nconst value = 1;\n`,
+    },
+    {
       name: "a file-wide skip where file-wide directives are allowed",
       code: `// ${EFFECT}-next-line preferNamespaceImport:skip-file -- this example is generated\nconst value = 1;\n`,
     },
@@ -215,7 +219,7 @@ tester.run("elmera/require-disable-reason", requireDisableReason, {
       name: "an Effect pair hidden in the reason counts as a rule it names",
       code: `// ${EFFECT}-next-line floatingEffect:off -- see globalDate:off too\nconst value = 1;\n`,
       options: strict,
-      errors: [oneRule, missingReason],
+      errors: [ruleAfterReason, oneRule, missingReason],
     },
     {
       name: "an Effect directive in a string literal still applies, outside any comment",
@@ -231,7 +235,7 @@ tester.run("elmera/require-disable-reason", requireDisableReason, {
       name: "skip-file behind the next-line prefix is file-wide where only next-line directives are allowed",
       code: `// ${EFFECT}-next-line preferNamespaceImport:skip-file -- this example is generated\nconst value = 1;\n`,
       options: strict,
-      errors: [forbiddenDirective],
+      errors: [{ messageId: "skipFile", data: { directive: "\x40effect-diagnostics-next-line" } }],
     },
     {
       name: "a rule written only after the separator is no reason",
@@ -241,7 +245,7 @@ tester.run("elmera/require-disable-reason", requireDisableReason, {
     {
       name: "a rule after the separator does not count toward the reason's length",
       code: `// ${EFFECT}-next-line floatingEffect:off -- globalDate:off\nconst value = 1;\n`,
-      errors: [missingReason],
+      errors: [ruleAfterReason, missingReason],
     },
     {
       name: "the suggestion names only the Effect forms the configuration allows",
@@ -253,6 +257,21 @@ tester.run("elmera/require-disable-reason", requireDisableReason, {
           data: { directive: "\x40effect-diagnostics-next-line", allowed: "\x40effect-diagnostics" },
         },
       ],
+    },
+    {
+      name: "a second relaxing rule in a next-line directive's reason",
+      code: `// ${EFFECT}-next-line floatingEffect:off -- unlike preferNamespaceImport:off this is deliberate\nconst value = 1;\n`,
+      errors: [ruleAfterReason],
+    },
+    {
+      name: "a second relaxing rule in a section directive's reason",
+      code: `// ${EFFECT} floatingEffect:off -- generated fixture also documents preferNamespaceImport:off\nconst value = 1;\n`,
+      errors: [ruleAfterReason],
+    },
+    {
+      name: "a block comment's closing delimiter is no part of a seven-character reason",
+      code: `/* ${EFFECT}-next-line floatingEffect:off -- abcdefg */\nconst value = 1;\n`,
+      errors: [missingReason],
     },
     {
       name: "a configuration that allows no Effect form says so",
