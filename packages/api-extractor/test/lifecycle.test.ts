@@ -167,11 +167,9 @@ describe("ProjectExtractor native compiler lifecycle", () => {
     vi.stubEnv("TSRS_BINARY", missingBinary);
     try {
       const failure = await Effect.runPromise(
-        Effect.scoped(
-          Effect.gen(function* () {
-            yield* ProjectExtractor;
-          }).pipe(Effect.provide(ProjectExtractor.live({ tsconfigPath })))
-        ).pipe(Effect.flip)
+        Effect.scoped(ProjectExtractor.pipe(Effect.provide(ProjectExtractor.live({ tsconfigPath })))).pipe(
+          Effect.flip
+        )
       );
 
       expect(failure).toBeInstanceOf(BackendError);

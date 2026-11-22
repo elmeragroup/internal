@@ -1,5 +1,7 @@
-import { Context, Effect, Layer } from "effect";
-import type { Scope } from "effect";
+import * as Context from "effect/Context";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import type * as Scope from "effect/Scope";
 
 import { BackendError, ConfigError, safeCause } from "../errors.ts";
 import type { InternalOpenProjectOptions } from "../internal/project-options.ts";

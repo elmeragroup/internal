@@ -5,7 +5,7 @@
  * npm packument. Plain HTTP sends no `Keep-Alive` hint, as GitHub sends none. Over TLS it prefers
  * HTTP/2 through ALPN, as GitHub and npm do, and still accepts HTTP/1.1.
  */
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 import { createServer } from "node:http";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { createSecureServer, Http2ServerRequest, Http2ServerResponse } from "node:http2";

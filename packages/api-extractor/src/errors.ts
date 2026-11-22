@@ -1,4 +1,4 @@
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 
 /** The one runtime `typeof` in this module — untrusted thrown values are narrowed at this seam. */
 // oxlint-disable-next-line anti-slop/no-unknown-parameters -- untrusted thrown values are narrowed at this seam.

@@ -34,6 +34,26 @@ import { asRecord, asRecordArray, isString, readJsonObject } from "../scripts/li
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const extractorRoot = join(repoRoot, "packages", "api-extractor");
+
+/** Globs the oxlint CLI differential runs, each as an override's `files` and as its `excludeFiles`. */
+const DIFFERENTIAL_GLOBS = [
+  "./packages/api-extractor/**",
+  "!packages/release/**",
+  "packages/*/src/**",
+  "packages/{api-extractor,release}/**",
+  "*.ts",
+  "!*.test.ts",
+  "./e.ts",
+  "**/test/**",
+];
+/*
+ * Hang guards, not time budgets: one oxlint run takes about 0.1 s, but a loaded machine stretches the differential's
+ * sequential runs, two per glob, past Vitest's 5 s default. A hung run fails at its own guard, since a test timeout
+ * cannot interrupt a synchronous spawn, and the test's guard covers every run.
+ */
+const OXLINT_RUN_TIMEOUT_MS = 15_000;
+const DIFFERENTIAL_TIMEOUT_MS = DIFFERENTIAL_GLOBS.length * 2 * OXLINT_RUN_TIMEOUT_MS;
+
 const lintConfig = readJsonObject(join(repoRoot, ".oxlintrc.json"));
 
 /** The disable contract every api-extractor file is linted with. */
@@ -237,65 +257,61 @@ describe("api-extractor lint policy", () => {
     expect(breaks.every((entry) => entry.endsWith('elmera/require-disable-reason is "error"'))).toBe(true);
   });
 
-  it("matches override and exclude globs as the oxlint CLI does", () => {
-    /** Files of every shape the extractor policy cares about, each with a `debugger` to report. */
-    const fixture = [
-      "packages/api-extractor/src/a.ts",
-      "packages/api-extractor/b.ts",
-      "packages/api-extractor/test/f.test.ts",
-      "packages/release/src/c.ts",
-      "src/d.ts",
-      "e.ts",
-    ];
-    const globs = [
-      "./packages/api-extractor/**",
-      "!packages/release/**",
-      "packages/*/src/**",
-      "packages/{api-extractor,release}/**",
-      "*.ts",
-      "!*.test.ts",
-      "./e.ts",
-      "**/test/**",
-    ];
-    const root = mkdtempSync(join(tmpdir(), "oxlint-globs-"));
-    try {
-      for (const file of fixture) {
-        mkdirSync(dirname(join(root, file)), { recursive: true });
-        writeFileSync(join(root, file), "debugger;\n");
-      }
-      const oxlint = join(repoRoot, "node_modules", ".bin", "oxlint");
-      /** The fixture files oxlint reports `debugger` in under one override. */
-      const lintedUnder = (/** @type {Record<string, unknown>} */ override) => {
-        const config = {
-          categories: { correctness: "off" },
-          rules: { "no-debugger": "off" },
-          overrides: [{ ...override, rules: { "no-debugger": "error" } }],
+  it(
+    "matches override and exclude globs as the oxlint CLI does",
+    { timeout: DIFFERENTIAL_TIMEOUT_MS },
+    () => {
+      /** Files of every shape the extractor policy cares about, each with a `debugger` to report. */
+      const fixture = [
+        "packages/api-extractor/src/a.ts",
+        "packages/api-extractor/b.ts",
+        "packages/api-extractor/test/f.test.ts",
+        "packages/release/src/c.ts",
+        "src/d.ts",
+        "e.ts",
+      ];
+      const root = mkdtempSync(join(tmpdir(), "oxlint-globs-"));
+      try {
+        for (const file of fixture) {
+          mkdirSync(dirname(join(root, file)), { recursive: true });
+          writeFileSync(join(root, file), "debugger;\n");
+        }
+        const oxlint = join(repoRoot, "node_modules", ".bin", "oxlint");
+        /** The fixture files oxlint reports `debugger` in under one override. */
+        const lintedUnder = (/** @type {Record<string, unknown>} */ override) => {
+          const config = {
+            categories: { correctness: "off" },
+            rules: { "no-debugger": "off" },
+            overrides: [{ ...override, rules: { "no-debugger": "error" } }],
+          };
+          writeFileSync(join(root, ".oxlintrc.json"), JSON.stringify(config));
+          const run = spawnSync(oxlint, ["-c", ".oxlintrc.json", "--format", "json", "."], {
+            cwd: root,
+            encoding: "utf8",
+            timeout: OXLINT_RUN_TIMEOUT_MS,
+          });
+          if (run.error !== undefined) throw run.error;
+          const report = asRecord(JSON.parse(run.stdout), "oxlint report");
+          const linted = asRecordArray(report.diagnostics, "diagnostics").map((diagnostic) =>
+            String(diagnostic.filename)
+          );
+          return [...new Set(linted)].sort();
         };
-        writeFileSync(join(root, ".oxlintrc.json"), JSON.stringify(config));
-        const run = spawnSync(oxlint, ["-c", ".oxlintrc.json", "--format", "json", "."], {
-          cwd: root,
-          encoding: "utf8",
-        });
-        const report = asRecord(JSON.parse(run.stdout), "oxlint report");
-        const linted = asRecordArray(report.diagnostics, "diagnostics").map((diagnostic) =>
-          String(diagnostic.filename)
-        );
-        return [...new Set(linted)].sort();
-      };
-      for (const glob of globs) {
-        expect({ glob, files: fixture.filter((file) => matches(file, glob)).sort() }).toEqual({
-          glob,
-          files: lintedUnder({ files: [glob] }),
-        });
-        expect({ excluded: glob, files: fixture.filter((file) => !matches(file, glob)).sort() }).toEqual({
-          excluded: glob,
-          files: lintedUnder({ files: ["**"], excludeFiles: [glob] }),
-        });
+        for (const glob of DIFFERENTIAL_GLOBS) {
+          expect({ glob, files: fixture.filter((file) => matches(file, glob)).sort() }).toEqual({
+            glob,
+            files: lintedUnder({ files: [glob] }),
+          });
+          expect({ excluded: glob, files: fixture.filter((file) => !matches(file, glob)).sort() }).toEqual({
+            excluded: glob,
+            files: lintedUnder({ files: ["**"], excludeFiles: [glob] }),
+          });
+        }
+      } finally {
+        rmSync(root, { recursive: true, force: true });
       }
-    } finally {
-      rmSync(root, { recursive: true, force: true });
     }
-  });
+  );
 
   it("matches the globs oxlint normalises or negates, so neither can relax a rule unseen", () => {
     const dotted = withOverrides([

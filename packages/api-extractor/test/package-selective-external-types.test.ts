@@ -1,4 +1,4 @@
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -165,7 +165,7 @@ describe("package-selective external-type expansion", () => {
       ],
       synthesized: false,
     });
-    expect(Schema.decodeUnknownSync(ExtractionResultSchema)(result)).toEqual(result);
+    expect(Schema.decodeSync(ExtractionResultSchema)(result)).toEqual(result);
   });
 
   it("uses the same selection for mapped members, keyof, and mixed declaration owners", async () => {

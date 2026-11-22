@@ -1,4 +1,4 @@
-import { Layer } from "effect";
+import * as Layer from "effect/Layer";
 
 import { CompilerBackend } from "../backend/service.ts";
 import type { BackendError, ConfigError } from "../errors.ts";

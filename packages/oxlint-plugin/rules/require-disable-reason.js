@@ -16,6 +16,45 @@ import { defineRule } from "@oxlint/plugins";
  */
 const DIRECTIVE = /^\s*(?:oxlint|eslint)-(disable(?:-next-line|-line)?)(?=\s|$)/u;
 
+/*
+ * Effect directives, as the pinned `@effect/tsgo` 0.70.0 reads them (`crates/ets_directives/src/parser.rs`,
+ * `collect_effect_directives` and `build_directive_set`; Go twin `internal/directives/parser.go`):
+ *
+ * - It scans every physical line of the source (the text split at `\n`), blind to comments, strings and templates, so
+ *   a directive spelled in a string literal applies as surely as one in a comment.
+ * - It takes the leftmost match of the directive pattern on each line and ignores the rest of the line.
+ * - The match's token run (whitespace-separated runs of `[0-9A-Za-z_:\-*]`) yields every `rule:severity` pair found
+ *   anywhere in it, inside a longer token too. A line whose run holds no pair is no directive.
+ * - The severity is read case-blind: `off`, `skip-file`, `warning`/`warn`, `suggestion`, `message`, `error`; any
+ *   other word reads as `error`. A rule name matches case-blind, and `*` matches every rule.
+ * - A `skip-file` pair holds for the whole file wherever it is written, behind the next-line prefix too. Otherwise the
+ *   next-line form holds for the following line, and the bare form for its own line and every later one, until a later
+ *   bare directive names the rule again.
+ * - ` -- ` means nothing to it: `--` is one more token, and a pair written after it, in the reason, still applies.
+ *
+ * This rule reads the same lines the same way. A relaxing directive outside a comment is reported, since no comment
+ * can carry its reason; one inside a comment writes every pair it relaxes before ` -- ` (one in the reason still
+ * applies) and a reason after it, ending where a block comment closes, and takes the allowed-kinds and one-rule options,
+ * a `skip-file` pair counting as the file-wide `disable` kind. A pair after ` -- ` that relaxes nothing, such as
+ * `node:fs`, silences nothing, so it stays part of the reason and names no rule.
+ */
+
+/** The upstream directive pattern, with RE2's ASCII classes. */
+const EFFECT_DIRECTIVE =
+  /@effect-diagnostics(-next-line)?[\t\n\f\r ]+([0-9A-Za-z_:\-*]+(?:[\t\n\f\r ]+[0-9A-Za-z_:\-*]+)*)/u;
+
+/** The upstream `rule:severity` pattern, applied across a directive's whole token run. */
+const EFFECT_RULE_SEVERITY = /([0-9A-Za-z_]+|\*):([0-9A-Za-z_]+(?:-[0-9A-Za-z_]+)?)/gu;
+
+/**
+ * The severities below `error` (`etscore/severity.go`). Each relaxes a rule below the error a gate configures;
+ * `skip-file` also makes a directive file-wide.
+ */
+const EFFECT_RELAXING = new Set(["off", "skip-file", "warning", "warn", "suggestion", "message"]);
+
+/** The severity that holds for the whole file wherever it is written. */
+const EFFECT_SKIP_FILE = "skip-file";
+
 /** The separator between a directive's rules and its reason. */
 const SEPARATOR = " -- ";
 
@@ -56,6 +95,148 @@ function optionsOf(context) {
 }
 
 /**
+ * @typedef {object} Location
+ * @property {{ line: number, column: number }} start
+ * @property {{ line: number, column: number }} end
+ */
+
+/**
+ * A relaxing Effect directive outside every comment, where no reason can follow it.
+ *
+ * @typedef {object} OutsideComment
+ * @property {"outsideComment"} _tag
+ * @property {string} directive - The directive as written, for messages.
+ * @property {Location} loc - Where to report it.
+ */
+
+/**
+ * One directive in a comment, in either family, as the policy checks it.
+ *
+ * @typedef {object} InComment
+ * @property {"inComment"} _tag
+ * @property {string} directive - The directive as written, for messages.
+ * @property {DirectiveKind} kind - Its scope: `disable-next-line` for a next-line directive, `disable`
+ *   for one that holds to the end of the file or of its section.
+ * @property {(kind: DirectiveKind) => string | undefined} spell - How its family writes a directive of a
+ *   kind, or `undefined` for a kind the family has no form for.
+ * @property {ReadonlyArray<string>} rules - The rules it names; `*` names every rule.
+ * @property {string} reason - The text after its ` -- ` separator, less any rule the backend still reads there.
+ * @property {boolean} relaxesInReason - Whether it relaxes a rule written after ` -- `, which `@effect/tsgo` applies.
+ * @property {boolean} skipsFile - Whether a `skip-file` pair, rather than its form, makes it file-wide.
+ * @property {Location} loc - Where to report it.
+ */
+
+/** @typedef {OutsideComment | InComment} Directive */
+
+/**
+ * The oxlint or eslint disable directive at the start of a comment.
+ *
+ * @param {string} text - The comment's text.
+ * @param {Location} loc - The comment's location.
+ * @returns {InComment | undefined}
+ */
+function oxlintDirective(text, loc) {
+  const match = DIRECTIVE.exec(text);
+  const kind = match?.[1];
+  if (match === null || kind === undefined || !isDirectiveKind(kind)) return undefined;
+  const rest = text.slice(match[0].length);
+  const separator = rest.indexOf(SEPARATOR);
+  return {
+    _tag: "inComment",
+    directive: match[0].trim(),
+    kind,
+    spell: (allowed) => `oxlint-${allowed}`,
+    rules: namedRules(separator === -1 ? rest : rest.slice(0, separator)),
+    reason: separator === -1 ? "" : rest.slice(separator + SEPARATOR.length),
+    relaxesInReason: false,
+    skipsFile: false,
+    loc,
+  };
+}
+
+/**
+ * How `@effect/tsgo` writes a directive of a kind; it has no same-line form.
+ *
+ * @param {DirectiveKind} kind
+ * @returns {string | undefined}
+ */
+function spellEffect(kind) {
+  if (kind === "disable") return "@effect-diagnostics";
+  if (kind === "disable-next-line") return "@effect-diagnostics-next-line";
+  return undefined;
+}
+
+/**
+ * The Effect directives in a source that relax a rule, read as `@effect/tsgo` reads them (see above). A directive
+ * that only raises rules to errors needs no reason.
+ *
+ * @param {string} text - The whole source text.
+ * @param {ReadonlyArray<{ type: string, start: number, end: number }>} comments - Its comments, as offsets into `text`.
+ * @param {(offset: number) => { line: number, column: number }} locate - Maps an offset to a location.
+ * @returns {Directive[]}
+ */
+function effectDirectives(text, comments, locate) {
+  /** @type {Directive[]} */
+  const found = [];
+  let lineStart = 0;
+  for (const line of text.split("\n")) {
+    const match = EFFECT_DIRECTIVE.exec(line);
+    const tokens = match?.[2];
+    if (match !== null && tokens !== undefined) {
+      const tokensStart = match.index + match[0].length - tokens.length;
+      const pairs = [...tokens.matchAll(EFFECT_RULE_SEVERITY)].map((pair) => ({
+        rule: pair[1] ?? "",
+        severity: (pair[2] ?? "").toLowerCase(),
+        start: tokensStart + pair.index,
+        end: tokensStart + pair.index + pair[0].length,
+      }));
+      const relaxing = pairs.filter(({ severity }) => EFFECT_RELAXING.has(severity));
+      if (relaxing.length > 0) {
+        const start = lineStart + match.index;
+        const loc = { start: locate(start), end: locate(start + match[0].length) };
+        const next = match[1] ?? "";
+        const directive = `@effect-diagnostics${next}`;
+        const comment = comments.find((candidate) => candidate.start <= start && start < candidate.end);
+        if (comment === undefined) {
+          found.push({ _tag: "outsideComment", directive, loc });
+        } else {
+          // A block comment's closing `*/` ends the reason, so it never counts toward the reason's length.
+          const lineEnd = Math.min(line.length, comment.end - lineStart - (comment.type === "Block" ? 2 : 0));
+          const separatorAt = line.indexOf(SEPARATOR, match.index);
+          const separator = separatorAt === -1 || separatorAt >= lineEnd ? lineEnd : separatorAt;
+          const beforeSeparator = pairs.filter((pair) => pair.start < separator);
+          // A pair after the separator that relaxes nothing silences nothing (its severity reads as `error`), so it
+          // stays reason prose; a relaxing one still applies, so it is a rule, not reason.
+          const relaxingAfterSeparator = relaxing.filter((pair) => pair.start >= separator);
+          const rules = [...beforeSeparator, ...relaxingAfterSeparator].map(({ rule }) => rule);
+          const relaxesInReason = relaxingAfterSeparator.length > 0;
+          let reason = line.slice(separator + SEPARATOR.length, lineEnd);
+          // Strip from the end so each earlier pair's offset still holds; nothing reads the array after this.
+          for (const pair of relaxingAfterSeparator.reverse()) {
+            const at = pair.start - separator - SEPARATOR.length;
+            reason = reason.slice(0, at) + reason.slice(at + pair.end - pair.start);
+          }
+          const skipsFile = relaxing.some(({ severity }) => severity === EFFECT_SKIP_FILE);
+          found.push({
+            _tag: "inComment",
+            directive,
+            kind: next === "" || skipsFile ? "disable" : "disable-next-line",
+            skipsFile,
+            spell: spellEffect,
+            rules,
+            reason,
+            relaxesInReason,
+            loc,
+          });
+        }
+      }
+    }
+    lineStart += line.length + 1;
+  }
+  return found;
+}
+
+/**
  * The rules a directive names, split at commas, before its reason.
  *
  * @param {string} list - The text between the directive and its ` -- ` separator.
@@ -73,7 +254,7 @@ export default defineRule({
     type: "problem",
     docs: {
       description:
-        "Require a reason after ` -- ` on every lint disable comment, and optionally one rule per comment and only some directive kinds",
+        "Require a reason after ` -- ` on every lint disable comment and every Effect directive that relaxes a rule, and optionally one rule per comment and only some directive kinds",
     },
     schema: [
       {
@@ -89,38 +270,60 @@ export default defineRule({
       missingReason:
         "Give this disable comment a reason: `{{directive}} <rule> -- <why the rule does not apply here>`, at least 8 non-space characters.",
       oneRule:
-        "Name exactly one rule in this `{{directive}}` comment, so its reason covers exactly what it silences.",
+        "Name exactly one rule, not `*`, in this `{{directive}}` comment, so its reason covers exactly what it silences.",
       forbiddenDirective:
         "`{{directive}}` is not allowed here; use `{{allowed}}` on the line that needs it, naming one rule and a reason.",
+      noAllowedDirective:
+        "`{{directive}}` is not allowed here, and this configuration allows no directive of its kind; fix what it would silence.",
+      outsideComment:
+        "`{{directive}}` is outside a comment, yet `@effect/tsgo` reads every source line and applies it here; write it in a comment with a reason, or spell the text so it no longer reads as a directive (for example `\\x40effect-diagnostics`).",
+      skipFile:
+        "`{{directive}}` with a `skip-file` severity silences the rule for the whole file, which is not allowed here; use `@effect-diagnostics-next-line <rule>:off` on the line that needs it, with a reason.",
+      ruleAfterReason:
+        "Write every rule this `{{directive}}` relaxes before ` -- `; `@effect/tsgo` applies a relaxing `rule:severity` after the separator too, so it is no reason.",
     },
   },
   create(context) {
     const { directives, rules } = optionsOf(context);
     return {
       Program() {
-        for (const comment of context.sourceCode.getAllComments()) {
-          if (comment.type === "Shebang") continue;
-          const match = DIRECTIVE.exec(comment.value);
-          const kind = match?.[1];
-          if (match === null || kind === undefined || !isDirectiveKind(kind)) continue;
-          const directive = match[0].trim();
-          if (!directives.includes(kind)) {
+        const { sourceCode } = context;
+        const comments = sourceCode.getAllComments().filter((comment) => comment.type !== "Shebang");
+        const found = [
+          ...comments.flatMap((comment) => oxlintDirective(comment.value, comment.loc) ?? []),
+          ...effectDirectives(sourceCode.text, comments, (offset) => sourceCode.getLocFromIndex(offset)),
+        ];
+        for (const entry of found) {
+          if (entry._tag === "outsideComment") {
             context.report({
-              loc: comment.loc,
-              messageId: "forbiddenDirective",
-              data: { directive, allowed: directives.map((allowed) => `oxlint-${allowed}`).join("`, `") },
+              loc: entry.loc,
+              messageId: "outsideComment",
+              data: { directive: entry.directive },
             });
             continue;
           }
-          const rest = comment.value.slice(match[0].length);
-          const separator = rest.indexOf(SEPARATOR);
-          const list = separator === -1 ? rest : rest.slice(0, separator);
-          const reason = separator === -1 ? "" : rest.slice(separator + SEPARATOR.length);
-          if (rules === "one" && namedRules(list).length !== 1) {
-            context.report({ loc: comment.loc, messageId: "oneRule", data: { directive } });
+          const { directive, kind, spell, rules: named, reason, relaxesInReason, skipsFile, loc } = entry;
+          if (!directives.includes(kind)) {
+            if (skipsFile && directives.includes("disable-next-line")) {
+              context.report({ loc, messageId: "skipFile", data: { directive } });
+              continue;
+            }
+            const allowed = directives.flatMap((candidate) => spell(candidate) ?? []);
+            context.report(
+              allowed.length === 0
+                ? { loc, messageId: "noAllowedDirective", data: { directive } }
+                : { loc, messageId: "forbiddenDirective", data: { directive, allowed: allowed.join("`, `") } }
+            );
+            continue;
+          }
+          if (relaxesInReason) {
+            context.report({ loc, messageId: "ruleAfterReason", data: { directive } });
+          }
+          if (rules === "one" && (named.length !== 1 || named[0] === "*")) {
+            context.report({ loc, messageId: "oneRule", data: { directive } });
           }
           if (reason.replace(/[\s*]/gu, "").length < MINIMUM_REASON) {
-            context.report({ loc: comment.loc, messageId: "missingReason", data: { directive } });
+            context.report({ loc, messageId: "missingReason", data: { directive } });
           }
         }
       },

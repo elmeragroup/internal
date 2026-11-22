@@ -1,4 +1,4 @@
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 import { Worker } from "node:worker_threads";
 import { onTestFinished } from "vitest";
 

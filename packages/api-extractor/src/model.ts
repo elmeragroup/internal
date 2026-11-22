@@ -1,4 +1,4 @@
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 
 import { ProvenanceEntrySchema } from "./provenance.ts";
 import { ExtractWarningSchema } from "./warnings.ts";

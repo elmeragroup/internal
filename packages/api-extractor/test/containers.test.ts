@@ -1,4 +1,4 @@
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 import { resolve } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 

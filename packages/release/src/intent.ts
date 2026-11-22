@@ -1,4 +1,4 @@
-import type { Brand } from "effect";
+import type * as Brand from "effect/Brand";
 
 import type { CanaryVersion, StableVersion } from "./version.ts";
 

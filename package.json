@@ -7,7 +7,9 @@
     "ci:checks": "oxfmt --check && turbo run ci:checks",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
-    "lint": "OXLINT_TSGOLINT_PATH=node_modules/.bin/tsrs-lint oxlint . --deny-warnings --report-unused-disable-directives-severity=error",
+    "lint": "turbo run //#lint:oxlint //#lint:effect",
+    "lint:oxlint": "OXLINT_TSGOLINT_PATH=node_modules/.bin/tsrs-lint oxlint . --deny-warnings --report-unused-disable-directives-severity=error",
+    "lint:effect": "effect-tsgo --tsrs-lint=0.25.0-ts7.1.0-beta oxlint -c .oxlintrc.effect.json . --deny-warnings",
     "lint:fix": "OXLINT_TSGOLINT_PATH=node_modules/.bin/tsrs-lint oxlint --fix .",
     "test": "turbo run test",
     "test:repo-policy": "vitest run --config test/vitest.config.mjs",
@@ -24,6 +26,7 @@
   },
   "devDependencies": {
     "@changesets/cli": "catalog:",
+    "@effect/tsgo": "catalog:",
     "@elmeragroup/oxlint-plugin": "workspace:*",
     "@elmeragroup/oxlint-plugin-anti-slop": "workspace:*",
     "@elmeragroup/oxlint-test-rules": "workspace:*",

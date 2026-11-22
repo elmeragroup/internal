@@ -6,6 +6,14 @@ const missingReason = { messageId: "missingReason" };
 const oneRule = { messageId: "oneRule" };
 const forbiddenDirective = { messageId: "forbiddenDirective" };
 const strict = [{ directives: ["disable-next-line"], rules: "one" }];
+const ruleAfterReason = { messageId: "ruleAfterReason" };
+const outsideComment = { messageId: "outsideComment" };
+const noAllowedDirective = { messageId: "noAllowedDirective" };
+/**
+ * The Effect directive marker, spelled so no line of this file reads as a directive: \`@effect/tsgo\` applies one
+ * found anywhere on a source line, strings included, and a literal one here would relax the Effect rules for this file.
+ */
+const EFFECT = "\x40effect-diagnostics";
 
 tester.run("elmera/require-disable-reason", requireDisableReason, {
   valid: [
@@ -45,6 +53,71 @@ tester.run("elmera/require-disable-reason", requireDisableReason, {
     {
       name: "an enable directive needs no reason",
       code: "/* oxlint-enable no-console */\nconst value = 1;\n",
+    },
+    {
+      name: "Effect next-line directive with a reason",
+      code: `// ${EFFECT}-next-line floatingEffect:off -- the fiber is forked on purpose\nconst value = 1;\n`,
+    },
+    {
+      name: "Effect section directive with a reason by default",
+      code: `// ${EFFECT} globalDate:off -- this script stamps wall-clock time\nconst value = 1;\n`,
+    },
+    {
+      name: "Effect directive that only raises a rule needs no reason",
+      code: `// ${EFFECT} floatingEffect:error\nconst value = 1;\n`,
+    },
+    {
+      name: "Effect next-line directive naming one rule under the strict options",
+      code: `// ${EFFECT}-next-line floatingEffect:off -- the fiber is forked on purpose\nconst value = 1;\n`,
+      options: strict,
+    },
+    {
+      name: "a comment that only describes the Effect directive form",
+      code: `// Suppress with \`${EFFECT}-next-line <rule>:off\` and a reason.\nconst value = 1;\n`,
+    },
+    {
+      name: "an escaped marker in a string reads as no directive",
+      code: 'const snippet = "\\x40effect-diagnostics-next-line floatingEffect:off";\n',
+    },
+    {
+      name: "a string that only raises an Effect rule relaxes nothing",
+      code: `const snippet = "${EFFECT}-next-line floatingEffect:error";\n`,
+    },
+    {
+      name: "only a line's leftmost Effect directive applies",
+      code: `const snippet = "${EFFECT} floatingEffect:error"; // ${EFFECT}-next-line globalDate:off\nconst value = 1;\n`,
+    },
+    {
+      name: "an Effect directive on a later line of a block comment, with a reason",
+      code: `/*\n * ${EFFECT}-next-line floatingEffect:off -- the fiber is forked on purpose\n */\nconst value = 1;\n`,
+      options: strict,
+    },
+    {
+      name: "a next-line Effect directive whose pairs all come before its reason",
+      code: `// ${EFFECT}-next-line floatingEffect:off -- the fiber is forked on purpose\nconst value = 1;\n`,
+      options: [{ directives: ["disable", "disable-next-line"], rules: "one" }],
+    },
+    {
+      name: "a rule the reason raises to an error relaxes nothing",
+      code: `// ${EFFECT}-next-line floatingEffect:off -- the fiber is forked and globalDate:error stays on\nconst value = 1;\n`,
+    },
+    {
+      name: "a rule the reason raises to an error is no second rule under the strict options",
+      code: `// ${EFFECT}-next-line floatingEffect:off -- the fiber is forked and globalDate:error stays on\nconst value = 1;\n`,
+      options: strict,
+    },
+    {
+      name: "a non-relaxing colon token in the reason stays part of the reason",
+      code: `// ${EFFECT}-next-line globalDate:off -- uses node:fs\nconst value = 1;\n`,
+    },
+    {
+      name: "a non-relaxing colon token in the reason is no second rule under the strict options",
+      code: `// ${EFFECT}-next-line globalDate:off -- uses node:fs synchronously at the boundary\nconst value = 1;\n`,
+      options: strict,
+    },
+    {
+      name: "a file-wide skip where file-wide directives are allowed",
+      code: `// ${EFFECT}-next-line preferNamespaceImport:skip-file -- this example is generated\nconst value = 1;\n`,
     },
   ],
   invalid: [
@@ -112,6 +185,113 @@ tester.run("elmera/require-disable-reason", requireDisableReason, {
       code: "// oxlint-disable-next-line no-console, no-debugger\nconsole.log(1);\n",
       options: strict,
       errors: [oneRule, missingReason],
+    },
+    {
+      name: "Effect next-line directive without a reason",
+      code: `// ${EFFECT}-next-line floatingEffect:off\nconst value = 1;\n`,
+      errors: [missingReason],
+    },
+    {
+      name: "Effect file-wide wildcard without a reason",
+      code: `// ${EFFECT} *:off\nconst value = 1;\n`,
+      errors: [missingReason],
+    },
+    {
+      name: "Effect skip-file without a reason",
+      code: `/* ${EFFECT} *:skip-file */\nconst value = 1;\n`,
+      errors: [missingReason],
+    },
+    {
+      name: "Effect downgrade to a warning without a reason",
+      code: `// ${EFFECT}-next-line floatingEffect:warning\nconst value = 1;\n`,
+      errors: [missingReason],
+    },
+    {
+      name: "Effect directive mid-comment without a reason",
+      code: `// see below ${EFFECT}-next-line floatingEffect:off\nconst value = 1;\n`,
+      errors: [missingReason],
+    },
+    {
+      name: "Effect section directive where only next-line directives are allowed",
+      code: `// ${EFFECT} preferNamespaceImport:off -- this module keeps named imports\nconst value = 1;\n`,
+      options: strict,
+      errors: [forbiddenDirective],
+    },
+    {
+      name: "Effect wildcard under the one-rule option silences every rule",
+      code: `// ${EFFECT}-next-line *:off -- the fiber is forked on purpose\nconst value = 1;\n`,
+      options: strict,
+      errors: [oneRule],
+    },
+    {
+      name: "two Effect rules under the one-rule option",
+      code: `// ${EFFECT}-next-line floatingEffect:off globalDate:off -- a deliberate fixture\nconst value = 1;\n`,
+      options: strict,
+      errors: [oneRule],
+    },
+    {
+      name: "an Effect pair hidden in the reason counts as a rule it names",
+      code: `// ${EFFECT}-next-line floatingEffect:off -- see globalDate:off too\nconst value = 1;\n`,
+      options: strict,
+      errors: [ruleAfterReason, oneRule, missingReason],
+    },
+    {
+      name: "an Effect directive in a string literal still applies, outside any comment",
+      code: `export const snippet = "${EFFECT}-next-line preferNamespaceImport:off";\nconst value = 1;\n`,
+      errors: [outsideComment],
+    },
+    {
+      name: "an Effect directive on a later line of a template literal still applies",
+      code: `export const snippet = \`\n${EFFECT} *:skip-file -- not a comment\n\`;\n`,
+      errors: [outsideComment],
+    },
+    {
+      name: "skip-file behind the next-line prefix is file-wide where only next-line directives are allowed",
+      code: `// ${EFFECT}-next-line preferNamespaceImport:skip-file -- this example is generated\nconst value = 1;\n`,
+      options: strict,
+      errors: [{ messageId: "skipFile", data: { directive: "\x40effect-diagnostics-next-line" } }],
+    },
+    {
+      name: "a rule written only after the separator is no reason",
+      code: `// ${EFFECT}-next-line -- preferNamespaceImport:off\nconst value = 1;\n`,
+      errors: [ruleAfterReason, missingReason],
+    },
+    {
+      name: "a rule after the separator does not count toward the reason's length",
+      code: `// ${EFFECT}-next-line floatingEffect:off -- globalDate:off\nconst value = 1;\n`,
+      errors: [ruleAfterReason, missingReason],
+    },
+    {
+      name: "the suggestion names only the Effect forms the configuration allows",
+      code: `// ${EFFECT}-next-line floatingEffect:off -- the fiber is forked on purpose\nconst value = 1;\n`,
+      options: [{ directives: ["disable", "disable-line"] }],
+      errors: [
+        {
+          messageId: "forbiddenDirective",
+          data: { directive: "\x40effect-diagnostics-next-line", allowed: "\x40effect-diagnostics" },
+        },
+      ],
+    },
+    {
+      name: "a second relaxing rule in a next-line directive's reason",
+      code: `// ${EFFECT}-next-line floatingEffect:off -- unlike preferNamespaceImport:off this is deliberate\nconst value = 1;\n`,
+      errors: [ruleAfterReason],
+    },
+    {
+      name: "a second relaxing rule in a section directive's reason",
+      code: `// ${EFFECT} floatingEffect:off -- generated fixture also documents preferNamespaceImport:off\nconst value = 1;\n`,
+      errors: [ruleAfterReason],
+    },
+    {
+      name: "a block comment's closing delimiter is no part of a seven-character reason",
+      code: `/* ${EFFECT}-next-line floatingEffect:off -- abcdefg */\nconst value = 1;\n`,
+      errors: [missingReason],
+    },
+    {
+      name: "a configuration that allows no Effect form says so",
+      code: `// ${EFFECT}-next-line floatingEffect:off -- the fiber is forked on purpose\nconst value = 1;\n`,
+      options: [{ directives: ["disable-line"] }],
+      errors: [noAllowedDirective],
     },
   ],
 });

@@ -1,5 +1,5 @@
-import { Schema } from "effect";
-import type { Effect } from "effect";
+import type * as Effect from "effect/Effect";
+import * as Schema from "effect/Schema";
 
 import { liftPromise } from "./errors.ts";
 import type { ReleaseError } from "./errors.ts";

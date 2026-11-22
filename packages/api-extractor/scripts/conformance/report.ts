@@ -1,4 +1,7 @@
-import { Cause, Effect, Exit, Schema } from "effect";
+import * as Cause from "effect/Cause";
+import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
+import * as Schema from "effect/Schema";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -426,9 +429,15 @@ export type FixtureExtractionValue = {
 /**
  * Testable adapter for the public extraction seam.  Keeping this callback
  * narrow lets the conformance loop inject one typed failure without replacing
- * the real ProjectExtractor service or its project lifecycle.
+ * the real ProjectExtractor service or its project lifecycle. It fails with
+ * the seam's own errors, so an injected failure is one extractModule can produce.
  */
-export type FixtureExtraction = (inputPath: string) => Effect.Effect<FixtureExtractionValue, unknown>;
+export type FixtureExtraction = (
+  inputPath: string
+) => Effect.Effect<
+  FixtureExtractionValue,
+  Effect.Error<ReturnType<ProjectExtractorService["extractModule"]>>
+>;
 
 function assertCompilerIdentity(): void {
   const actual = compilerIdentity();

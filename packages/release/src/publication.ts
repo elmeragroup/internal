@@ -1,4 +1,7 @@
-import { Duration, Effect, Result, Schedule } from "effect";
+import * as Duration from "effect/Duration";
+import * as Effect from "effect/Effect";
+import * as Result from "effect/Result";
+import * as Schedule from "effect/Schedule";
 
 import { lift, ReleaseError } from "./errors.ts";
 import type { VerifiedRelease } from "./intent.ts";

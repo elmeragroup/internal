@@ -1,5 +1,5 @@
-import { Effect, Layer } from "effect";
-import type { Error as EffectError } from "effect/Effect";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, expectTypeOf, it } from "vitest";
@@ -22,7 +22,7 @@ const fixtureDirectory = resolve(import.meta.dirname, "fixtures/basic");
 const tsconfigPath = resolve(fixtureDirectory, "tsconfig.json");
 const inputPath = resolve(fixtureDirectory, "input.ts");
 
-type ExtractModuleError = EffectError<ReturnType<ProjectExtractorService["extractModule"]>>;
+type ExtractModuleError = Effect.Error<ReturnType<ProjectExtractorService["extractModule"]>>;
 type ExtractModuleEffect = ReturnType<ProjectExtractorService["extractModule"]>;
 type InspectEffect = ReturnType<ProjectExtractorService["inspectComponentSources"]>;
 type ExpectedExtractModuleEffect = Effect.Effect<

@@ -30,9 +30,20 @@ The whole workspace compiles with `tsrs`, a Rust port of the TypeScript 7 compil
 TypeScript 7.1: type-check scripts, builds, declaration emit, evidence scripts, and the runtime
 `tsrs/*` API. The `typescript` package is not a dependency. Type-aware Oxlint also runs on tsrs: the
 lint scripts set `OXLINT_TSGOLINT_PATH=node_modules/.bin/tsrs-lint`, so run Oxlint through
-`pnpm lint` or with that variable set. The workspace is supported on macOS
-arm64/x64 and Linux x64/arm64 (glibc and musl). tsrs also ships Windows x64 and arm64 binaries, but Windows is
-not supported: extraction path identity is not Windows-aware yet.
+`pnpm lint` or with that variable set. `pnpm lint` runs the turbo tasks `//#lint:oxlint` and
+`//#lint:effect`: it builds the packages whose
+declarations the passes read, then runs two passes over the whole workspace, `lint:oxlint` and
+`lint:effect`, the Effect diagnostics of `@effect/tsgo` (they fire only on Effect values) through
+the Effect-patched Oxlint and `.oxlintrc.effect.json`. Those two scripts are the raw passes turbo
+calls; run them directly only on a built tree, or unbuilt workspace types read as `any`. `tooling/typescript/effect.json`
+decides each Effect rule, error or off with its reason, and `test/effect-lint-config.test.ts` holds
+the two configs equal. The type-check stays on stock tsrs. A rule turned off for a later redesign
+says which change re-enables it.
+
+The published package runs on macOS arm64/x64 and Linux x64/arm64 (glibc and musl). Development
+needs macOS or glibc Linux: `@effect/tsgo` ships no musl build, so `lint:effect` fails there with
+"Linux musl is not supported by the packaged Oxlint integration." tsrs also ships Windows x64 and
+arm64 binaries, but Windows is not supported: extraction path identity is not Windows-aware yet.
 
 Run commands from the repository root unless stated otherwise.
 
@@ -64,7 +75,12 @@ Fix the underlying issue before adding a lint exception. Every disable carries a
 names the contract it guards (`elmera/require-disable-reason`), and lint reports unused disables as
 errors. Use a `SAFETY:` comment where the assertion rule requires it.
 
-`api-extractor` takes next-line disables only, each naming one rule, which lint enforces. No override
+An `@effect-diagnostics` directive that relaxes a rule sits in a comment and carries a `--` reason
+too, under the same rule; `@effect/tsgo` reads it from strings as well, so spell a quoted one as
+`\x40effect-diagnostics`.
+Only the Effect-patched editor reports an unused one ("directive has no effect"); `lint:effect` cannot.
+`api-extractor` takes next-line disables only, each naming one rule, which lint enforces, and the same
+of Effect directives (`@effect-diagnostics-next-line`, never `*`). No override
 may relax a rule for its files, and no disable may name `elmera/require-disable-reason` or no rule at
 all, which `test/extractor-lint-policy.test.mjs` enforces.
 

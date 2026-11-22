@@ -1,4 +1,6 @@
-import { Schema, Effect, Layer } from "effect";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Schema from "effect/Schema";
 import { isAbsolute, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -218,8 +220,8 @@ describe("Issue 03 object APIs, documentation, enums, and provenance", () => {
   it("decodes semantic output and provenance as independent schemas", async () => {
     const result = await extractFixture({ tsconfigPath }, inputPath);
 
-    expect(Schema.decodeUnknownSync(ExtractionResultSchema)(result)).toEqual(result);
-    expect(Schema.decodeUnknownSync(ProvenanceSchema)(result.provenance)).toEqual(result.provenance);
+    expect(Schema.decodeSync(ExtractionResultSchema)(result)).toEqual(result);
+    expect(Schema.decodeSync(ProvenanceSchema)(result.provenance)).toEqual(result.provenance);
     expect(() =>
       Schema.decodeUnknownSync(ProvenanceSchema)([
         {
@@ -516,7 +518,7 @@ describe("synthesized properties and missing enums through a replacement backend
       { path: ["Synthesized"], declarations: [], synthesized: true },
       { path: ["Synthesized", "properties", "generated"], declarations: [], synthesized: true },
     ]);
-    expect(Schema.decodeUnknownSync(ExtractionResultSchema)(result)).toEqual(result);
+    expect(Schema.decodeSync(ExtractionResultSchema)(result)).toEqual(result);
   });
 
   it("emits shared enum warnings at each occurrence with its own breadcrumb", async () => {
@@ -583,7 +585,7 @@ describe("synthesized properties and missing enums through a replacement backend
     expect(result.warnings.map((entry) => entry.message)).toEqual([enumMessage, enumMessage]);
     expect(facts.warnings).toEqual([warning]);
     expect(warning.parsedSymbolStack).toEqual([]);
-    expect(Schema.decodeUnknownSync(ExtractionResultSchema)(result)).toEqual(result);
+    expect(Schema.decodeSync(ExtractionResultSchema)(result)).toEqual(result);
   });
 
   it("returns missing enum declarations as independently decodable structured warnings", async () => {
@@ -635,6 +637,6 @@ describe("synthesized properties and missing enums through a replacement backend
         parsedSymbolStack: [fakeInputPath, "MissingMode"],
       }),
     ]);
-    expect(Schema.decodeUnknownSync(ExtractionResultSchema)(result)).toEqual(result);
+    expect(Schema.decodeSync(ExtractionResultSchema)(result)).toEqual(result);
   });
 });

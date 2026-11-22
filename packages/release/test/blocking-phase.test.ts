@@ -1,4 +1,8 @@
-import { Effect, Exit, Redacted, Schema, Scope } from "effect";
+import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
+import * as Redacted from "effect/Redacted";
+import * as Schema from "effect/Schema";
+import * as Scope from "effect/Scope";
 import { describe, expect, it, onTestFinished } from "vitest";
 
 import { createGitHubClient, releaseEnvironment } from "../src/github.ts";

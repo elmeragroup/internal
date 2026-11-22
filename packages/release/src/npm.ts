@@ -1,5 +1,5 @@
-import { Schema } from "effect";
-import type { Effect } from "effect";
+import type * as Effect from "effect/Effect";
+import * as Schema from "effect/Schema";
 import { spawnSync } from "node:child_process";
 
 import { lift, liftPromise } from "./errors.ts";

@@ -1,4 +1,6 @@
-import { Effect, Redacted, Schema } from "effect";
+import * as Effect from "effect/Effect";
+import * as Redacted from "effect/Redacted";
+import * as Schema from "effect/Schema";
 import { describe, expect, it } from "vitest";
 
 import { createGitHubClient, releaseAssetId, releaseId } from "../src/github.ts";

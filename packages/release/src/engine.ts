@@ -1,5 +1,5 @@
-import { Effect } from "effect";
-import type { Scope } from "effect";
+import * as Effect from "effect/Effect";
+import type * as Scope from "effect/Scope";
 
 import { verifyReleaseArchive } from "./archive.ts";
 import { lift, ReleaseError } from "./errors.ts";

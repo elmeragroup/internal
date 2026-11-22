@@ -24,7 +24,7 @@ shared helpers: `filename-normalizer.js` (POSIX path checks, test-file predicate
 | `no-rac-outside-quarantine`         | React Aria packages are importable only from the `src/react-aria` quarantine                                               |
 | `no-raw-class-map`                  | Class maps and hand-spelled class constants must be `tv()` recipes or `cn()`                                               |
 | `no-tailwind-dark-variant`          | No Tailwind `dark:` variant; the dark axis is token-reserved behind `[data-theme="dark"]`                                  |
-| `require-disable-reason`            | Every lint disable comment gives a `--` reason; options limit directive kinds and require one rule                         |
+| `require-disable-reason`            | Every lint disable comment and relaxing `@effect-diagnostics` directive gives a `--` reason; options limit kinds and rules |
 | `require-icon-button-label`         | Icon-only `*Button` JSX needs a nonempty `aria-label`                                                                      |
 | `restrict-browser-helper-copy`      | Browser suites import the shared harness helpers instead of re-declaring them                                              |
 | `restrict-focus-ring-call`          | `focusRing({…})` calls live in `styles/utils.ts` and `react-aria/link` only                                                |
@@ -39,6 +39,22 @@ or one naming `elmera/require-disable-reason`. Oxlint 1.93 has no switch that ig
 directives, so a lint pass cannot close this. Pair the rule with a check outside lint where the
 contract must hold; this repository's `test/extractor-lint-policy.test.mjs` rejects such directives
 in `packages/api-extractor`.
+
+An `@effect/tsgo` directive that relaxes a rule (`:off`, `:skip-file`, or a severity below `error`)
+needs the same reason. The rule reads directives as `@effect/tsgo` 0.70.0 does (its doc comment
+cites the parser): the leftmost match on every physical source line, comments, strings and
+templates alike. Every `rule:severity` pair before `--` counts as a rule it names, and so does
+every relaxing `rule:severity` pair after `--`, which `@effect/tsgo` still applies; a pair after
+`--` that relaxes nothing, such as `node:fs`, silences nothing and stays reason prose. So:
+
+- A relaxing directive outside a comment is reported, since `@effect/tsgo` applies it there too.
+  To write the text in a string or a test fixture, spell it so no line reads as a directive, such
+  as `"\x40effect-diagnostics"`.
+- The relaxing rule comes before `--`, and a rule written after it does not count as reason.
+- A `skip-file` pair makes the directive file-wide (the `disable` kind) behind either prefix.
+  Otherwise the section form `@effect-diagnostics` counts as `disable` and
+  `@effect-diagnostics-next-line` as `disable-next-line`. `*` never counts as one rule.
+- A directive that only raises a rule to `error` needs no reason.
 
 ## Fixed-path assumptions
 

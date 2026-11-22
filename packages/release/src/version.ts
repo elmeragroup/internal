@@ -1,4 +1,4 @@
-import type { Brand } from "effect";
+import type * as Brand from "effect/Brand";
 
 const numericIdentifier = /^(?:0|[1-9]\d*)$/;
 const canaryMarker = "-canary.";

@@ -1,4 +1,4 @@
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -48,7 +48,7 @@ describe("wrapped React component warnings and fixture audit", () => {
         expectedWarningCodes(expectedFixtureWarnings, definition.fixture)
       );
       for (const provenance of result.provenance) {
-        expect(() => Schema.decodeUnknownSync(ProvenanceEntrySchema)(provenance)).not.toThrow();
+        expect(() => Schema.decodeSync(ProvenanceEntrySchema)(provenance)).not.toThrow();
       }
     }
   });

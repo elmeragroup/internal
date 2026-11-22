@@ -1,5 +1,5 @@
-import { Schema } from "effect";
-import type { Effect } from "effect";
+import type * as Effect from "effect/Effect";
+import * as Schema from "effect/Schema";
 import { execFileSync } from "node:child_process";
 import { mkdirSync, rmSync } from "node:fs";
 import { createRequire } from "node:module";

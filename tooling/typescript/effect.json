@@ -1,0 +1,218 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "display": "Effect",
+  // The Effect language service (@effect/tsgo). base.json extends it, so every workspace tsconfig carries the same
+  // options and no list of Effect packages can miss one. `pnpm lint:effect` runs these rules through the Effect-patched
+  // oxlint, which reads the options below from each file's tsconfig; .oxlintrc.effect.json lists every rule this file
+  // turns to error, and test/effect-lint-config.test.ts holds the two lists equal. The editor reads the same file
+  // through the Effect-patched tsrs (CONTRIBUTING.md, Effect diagnostics); the type-check stays on stock tsrs, which
+  // ignores the plugin. Every rule is an error or off, the contract .oxlintrc.json keeps. The one rule left unnamed is
+  // `preferSchemaOverJson`: deprecated in 0.70.0, so naming it, even off, raises a warning.
+  "compilerOptions": {
+    "plugins": [
+      {
+        "name": "@effect/language-service",
+        // A suggestion from a rule a later @effect/tsgo adds stays out of the editor's errors until a bump lists it.
+        "includeSuggestionsInTsc": false,
+        // `import * as Effect from "effect/Effect"`: one module per namespace, as effect's own docs write it, and the
+        // form preferNamespaceImport holds.
+        "namespaceImportPackages": ["effect"],
+        // effectFnOpportunity also reports an exported arrow that returns Effect.gen, with the span name it infers.
+        "effectFn": ["span", "inferred-span", "suggested-span"],
+        // The workspace uses no effect module marked `@stability unstable` today, and @elmeragroup/internal ships what
+        // it uses. A layer that adopts one (effect/FileSystem, effect/cli) names that module here.
+        "allowedUnstableApis": [],
+        "diagnosticSeverity": {
+          // Correctness.
+          "anyUnknownInErrorContext": "error",
+          "classSelfMismatch": "error",
+          "duplicatePackage": "error",
+          "effectFnImplicitAny": "error",
+          "errorPayloadShadowsName": "error",
+          "experimentalApiUsage": "error",
+          "floatingEffect": "error",
+          "floatingEffectInVitest": "error",
+          "genericEffectServices": "error",
+          "missingEffectContext": "error",
+          "missingEffectError": "error",
+          "missingLayerContext": "error",
+          "missingReturnYieldStar": "error",
+          "missingStarInYieldEffectGen": "error",
+          "nonObjectEffectServiceType": "error",
+          "obsoleteMatchImport": "error",
+          "obsoleteSchemaImport": "error",
+          "outdatedApi": "error",
+          "overriddenSchemaConstructor": "error",
+          "promiseInEffectSuccess": "error",
+          "schemaClassObjectLiteral": "error",
+          "schemaLiteralNonFinite": "error",
+          "schemaOpaqueInstanceMember": "error",
+          "unsafeEffectTypeAssertion": "error",
+          "unstableApiUsage": "error",
+          // A tagged error is told apart by its `_tag`, so a nominal brand on every Schema class adds nothing, and on
+          // the extractor's exported errors it would change the published declarations.
+          "schemaClassMissingBrand": "off",
+
+          // Anti-patterns.
+          "catchUnfailableEffect": "error",
+          "effectFnIife": "error",
+          "effectGenUsesAdapter": "error",
+          "effectInFailure": "error",
+          "effectInVoidSuccess": "error",
+          "globalErrorInEffectCatch": "error",
+          "globalErrorInEffectFailure": "error",
+          "layerMergeAllWithDependencies": "error",
+          "lazyPromiseInEffectSync": "error",
+          "leakingRequirements": "error",
+          "multipleEffectProvide": "error",
+          "preferUnsafeConstructor": "error",
+          "returnEffectInGen": "error",
+          "runEffectInsideEffect": "error",
+          "schemaSyncInEffect": "error",
+          "scopeInLayerEffect": "error",
+          "tryCatchInEffectGen": "error",
+          "unknownInEffectCatch": "error",
+          // ADR 0006: a public operation (generateApiArtifacts, the release operations) provides its own production
+          // layers, and tests provide theirs, so a layer is provided away from the entry point this rule assumes.
+          "strictEffectProvide": "off",
+          // The extractor's finalizers ignore a failing close (`Effect.try(...).pipe(Effect.ignore)`), because a
+          // throwing finalizer would mask the primary failure; giving that failure its own tagged error is typed-error
+          // design, re-enabled by the tagged-errors layer.
+          "effectTryWithoutCatch": "off",
+          // releaseEnvironment() and acquireReleaseTransport() build the release engine's scoped dependencies; making
+          // them layers is the release service design, re-enabled by the services layer.
+          "lazyEffect": "off",
+
+          // Effect-native APIs, inside Effect code only: each *InEffect rule reports only inside an Effect generator or
+          // Effect.fn, so code that does not use Effect is never reported.
+          "abortControllerInEffect": "error",
+          "cryptoRandomUUIDInEffect": "error",
+          "globalConsoleInEffect": "error",
+          "globalDateInEffect": "error",
+          "globalFetchInEffect": "error",
+          "globalJsonInEffect": "error",
+          "globalRandomInEffect": "error",
+          "globalTimersInEffect": "error",
+          "processEnvInEffect": "error",
+          // The extractor classifies a value thrown across its synchronous compiler seam with `instanceof` on its
+          // tagged error classes (src/extractor.ts, src/backend/service.ts); `Schema.is` also validates fields, so the
+          // swap is not behaviour-identical. Re-enabled by the tagged-errors layer, which replaces that classification.
+          "instanceOfSchema": "off",
+          // These report outside Effect code too: the workspace keeps plain code beside its Effect code (the oxlint
+          // plugins, which their synchronous host calls; the extractor's pure analysis; JSON and node:fs at a script
+          // boundary), and that code keeps its own conventions (.oxlintrc.json). Each *InEffect variant above still
+          // holds the Effect code.
+          "asyncFunction": "off",
+          "cryptoRandomUUID": "off",
+          "extendsNativeError": "off",
+          "globalConsole": "off",
+          "globalDate": "off",
+          "globalFetch": "off",
+          "globalJson": "off",
+          "globalRandom": "off",
+          "globalTimers": "off",
+          "newPromise": "off",
+          "nodeBuiltinImport": "off",
+          "processEnv": "off",
+          "schemaSync": "off",
+          "strictBooleanExpressions": "off",
+          "preferEffectArray": "off",
+          "preferEffectRecord": "off",
+          "preferEffectString": "off",
+
+          // Style. Every rule here reports only Effect code.
+          "acquireReleaseDisposable": "error",
+          "allOfMapToForEach": "error",
+          "catchAllTagDispatchToCatchTag": "error",
+          "catchAllToMapError": "error",
+          "catchChainToFirstSuccessOf": "error",
+          "catchConditionalRefailToCatchIf": "error",
+          "catchDieToOrDie": "error",
+          "catchIfTagToCatchTag": "error",
+          "catchRefailToTapError": "error",
+          "catchTagToCatchReason": "error",
+          "catchToIgnore": "error",
+          "catchToOrElseSucceed": "error",
+          "effectMapFlatten": "error",
+          "effectMapVoid": "error",
+          "effectSleepZeroToYieldNow": "error",
+          "effectSucceedWithUndefined": "error",
+          "effectSucceedWithVoid": "error",
+          "failCauseToConstructor": "error",
+          "flatMapConditionalToFilterOrFail": "error",
+          "flatMapIdentityToFlatten": "error",
+          "flatMapIgnoredParamToAndThen": "error",
+          "flatMapProvideServiceToProvideServiceEffect": "error",
+          "flatMapToMap": "error",
+          "flatMapToTap": "error",
+          "manualMetricTapToTrack": "error",
+          "mapConstToAs": "error",
+          "mapSomeCatchNoSuchElement": "error",
+          "mapSomeToAsSome": "error",
+          "matchBooleanToIsSuccess": "error",
+          "matchEffectToMapBoth": "error",
+          "matchEffectToMatch": "error",
+          "matchToResultOrOption": "error",
+          "multipleCatchTag": "error",
+          "onExitFailureToOnError": "error",
+          "optionMatchToFromOption": "error",
+          "preferSchemaTaggedError": "error",
+          "preferSucceedSomeOrNone": "error",
+          "preferTypedSchemaDecoder": "error",
+          "provideLayerSucceedToProvideService": "error",
+          "provideMergeAllToArray": "error",
+          "raceFirstWithSleepToTimeout": "error",
+          "redundantMapError": "error",
+          "redundantOrDie": "error",
+          "redundantSchemaTagIdentifier": "error",
+          "resultMatchToFromResult": "error",
+          "runOfExitToRunExit": "error",
+          "schemaStructWithTag": "error",
+          "suspendFailToFailSync": "error",
+          "syncToSucceed": "error",
+          "timeoutCatchTagToTimeoutOrElse": "error",
+          "unnecessaryEffectGen": "error",
+          "unnecessaryFailYieldableError": "error",
+          "unnecessaryPipe": "error",
+          "unnecessaryPipeChain": "error",
+          "unnecessaryTypeofType": "error",
+          "preferNamespaceImport": "error",
+          "serviceNotAsClass": "error",
+          // A service key is `elmera/<package>/<Service>` (src/backend/service.ts, src/extractor.ts); no keyPatterns
+          // formula of @effect/tsgo 0.70.0 produces it (each starts with the full package name or with none), and a key
+          // is the service's runtime identity.
+          "deterministicKeys": "off",
+          // Effect.fn gives each operation a span and a name, the operation design of the services layer, which
+          // re-enables it.
+          "effectFnOpportunity": "off",
+          // Schema.Finite narrows what decodes and changes the declared schema types, and the extractor's model and
+          // warning schemas (src/model.ts, src/warnings.ts) are published through @elmeragroup/internal/api-extractor.
+          // Re-enabled by the extractor layer, which owns those public types.
+          "schemaNumber": "off",
+          // Taste rules the formatter and the code's own conventions already decide.
+          "effectDoNotation": "off",
+          "forLoopPushToForEach": "off",
+          "mapMapErrorToMapBoth": "off",
+          "missedPipeableOpportunity": "off",
+          "missingConcurrencyOption": "off",
+          "nestedEffectGenYield": "off",
+          "newSchemaClass": "off",
+          "preferBarrelImport": "off",
+          "preferSchemaTypeProperty": "off",
+          "schemaUnionOfLiterals": "off",
+          "typeUnionToSchemaUnion": "off",
+          "unnecessaryArrowBlock": "off",
+          "yieldInCallArgument": "off",
+          // Effect.Service dependencies are a v3 API. Pipeable overloads on every export are a design choice for the
+          // public surface, which is plain functions in the extractor, the artifact generator and the oxlint plugins.
+          "missingEffectServiceDependency": "off",
+          "missingPipeableSignature": "off",
+
+          // Maintainers: an export whose type exposes a less stable effect API than the export itself. It ignores
+          // allowedUnstableApis, so a layer that exports a type naming an allowed unstable module decides it again.
+          "apiStabilityLeak": "error"
+        }
+      }
+    ]
+  }
+}

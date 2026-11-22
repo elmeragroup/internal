@@ -1,5 +1,8 @@
-import { Brand, Effect, Redacted, Schema } from "effect";
-import type { Scope } from "effect";
+import * as Brand from "effect/Brand";
+import * as Effect from "effect/Effect";
+import * as Redacted from "effect/Redacted";
+import * as Schema from "effect/Schema";
+import type * as Scope from "effect/Scope";
 
 import { decodeJson } from "./json.ts";
 import { acquireReleaseTransport } from "./release-transport.ts";

@@ -1,4 +1,4 @@
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 import { readFileSync } from "node:fs";
 
 /** Parses `text` as JSON and decodes it. Throws `"<label> is not valid JSON"` or `"<label> is invalid"`. */

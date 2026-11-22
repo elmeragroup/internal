@@ -1,4 +1,4 @@
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -107,7 +107,7 @@ describe("component recognition boundaries", () => {
       name: "MaybeBadge",
       line: 28,
     });
-    expect(() => Schema.decodeUnknownSync(ExtractWarningSchema)(uncertain)).not.toThrow();
+    expect(() => Schema.decodeSync(ExtractWarningSchema)(uncertain)).not.toThrow();
     const rendered = warningMessage(uncertain);
     expect(rendered.message).toContain('Could not classify "MaybeBadge" as a React component');
     expect(rendered.message).toContain("Review the export if it should be a component");

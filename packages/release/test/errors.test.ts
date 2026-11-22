@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import * as Effect from "effect/Effect";
 import { describe, expect, it } from "vitest";
 
 import { lift, liftPromise, ReleaseError } from "../src/errors.ts";

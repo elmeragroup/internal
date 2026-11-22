@@ -1,5 +1,5 @@
-import { Effect } from "effect";
-import { Schema } from "effect";
+import * as Effect from "effect/Effect";
+import * as Schema from "effect/Schema";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 

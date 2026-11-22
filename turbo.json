@@ -5,7 +5,7 @@
   "globalEnv": ["NODE_ENV"],
   "globalPassThroughEnv": ["GITHUB_REPOSITORY"],
   "tasks": {
-    "//#lint": {
+    "//#lint:oxlint": {
       "inputs": [
         "$TURBO_DEFAULT$",
         "packages/oxlint-plugin/**",
@@ -14,11 +14,25 @@
       ],
       "dependsOn": ["@elmeragroup/internal#build"]
     },
+    // The Effect lint pass: type-aware over the whole workspace and every declaration it imports, so no input list
+    // can name what it reads, and a cached run would replay green. It reads the built declarations of the workspace
+    // packages, as the main pass does.
+    "//#lint:effect": {
+      "cache": false,
+      "dependsOn": ["@elmeragroup/internal#build"]
+    },
     "//#test:repo-policy": {
       "dependsOn": ["@elmeragroup/release#build"],
       "inputs": [
         "test/**",
         ".oxlintrc.json",
+        ".oxlintrc.effect.json",
+        // test/effect-lint-config.test.ts walks the extends chain of every file `git ls-files "*tsconfig*.json"`
+        // lists. That pathspec's `*` crosses directories, so it names every `.json` path with `tsconfig` in its file
+        // name or in a directory name: these two globs.
+        "**/*tsconfig*.json",
+        "**/*tsconfig*/**/*.json",
+        "tooling/typescript/**",
         "packages/api-extractor/**",
         "packages/release/**",
         "scripts/**",
@@ -29,7 +43,10 @@
         ".github/workflows/publish-release.yml",
         ".github/workflows/version-packages.yml",
         "package.json",
-        "pnpm-workspace.yaml"
+        "pnpm-workspace.yaml",
+        // Installed files are never committed, so the globs above never mean them; the lockfile's external-dependency
+        // hash already covers what is installed.
+        "!**/node_modules/**"
       ]
     },
     "build": {
@@ -37,7 +54,12 @@
       "outputs": ["dist/**"],
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/scripts/build-package.ts"]
     },
+    // `turbo run lint` runs the two workspace passes, after the builds whose declarations they read, whether or not a
+    // package has a lint script of its own, plus each package's own lint. `pnpm lint` runs only the two passes
+    // (`turbo run //#lint:oxlint //#lint:effect`), since the extractor's own lint repeats the stock pass for its files.
+    // The root `lint` script is not a turbo task, so it never runs itself.
     "lint": {
+      "dependsOn": ["//#lint:oxlint", "//#lint:effect"],
       "inputs": [
         "$TURBO_DEFAULT$",
         "packages/oxlint-plugin/**",
@@ -56,7 +78,8 @@
     },
     "ci:checks": {
       "dependsOn": [
-        "//#lint",
+        "//#lint:oxlint",
+        "//#lint:effect",
         "//#test:repo-policy",
         "type-check",
         "test",
