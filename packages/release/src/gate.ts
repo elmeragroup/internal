@@ -1,4 +1,5 @@
-import { Effect, Schema } from "effect";
+import * as Effect from "effect/Effect";
+import * as Schema from "effect/Schema";
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 

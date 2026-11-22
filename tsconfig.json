@@ -1,3 +1,6 @@
 {
-  "extends": "@elmeragroup/typescript-config/base.json"
+  "extends": "@elmeragroup/typescript-config/base.json",
+  // Type-aware lint reads every file this program includes. Build output and dependencies are not source, and a build
+  // running beside lint deletes and rewrites them mid-read; the base's own `exclude` resolves against its directory.
+  "exclude": ["**/node_modules", "**/dist", "**/.cache", "**/.turbo", ".ref"]
 }

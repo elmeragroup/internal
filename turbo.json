@@ -5,7 +5,7 @@
   "globalEnv": ["NODE_ENV"],
   "globalPassThroughEnv": ["GITHUB_REPOSITORY"],
   "tasks": {
-    "//#lint": {
+    "//#lint:oxlint": {
       "inputs": [
         "$TURBO_DEFAULT$",
         "packages/oxlint-plugin/**",
@@ -14,11 +14,20 @@
       ],
       "dependsOn": ["@elmeragroup/internal#build"]
     },
+    // The Effect lint pass: type-aware over the whole workspace and every declaration it imports, so no input list
+    // can name what it reads, and a cached run would replay green. It reads the built declarations of the workspace
+    // packages, as the main pass does.
+    "//#lint:effect": {
+      "cache": false,
+      "dependsOn": ["@elmeragroup/internal#build"]
+    },
     "//#test:repo-policy": {
       "dependsOn": ["@elmeragroup/release#build"],
       "inputs": [
         "test/**",
         ".oxlintrc.json",
+        ".oxlintrc.effect.json",
+        "tooling/typescript/effect.json",
         "packages/api-extractor/**",
         "packages/release/**",
         "scripts/**",
@@ -56,7 +65,8 @@
     },
     "ci:checks": {
       "dependsOn": [
-        "//#lint",
+        "//#lint:oxlint",
+        "//#lint:effect",
         "//#test:repo-policy",
         "type-check",
         "test",

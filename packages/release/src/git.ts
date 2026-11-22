@@ -1,4 +1,4 @@
-import type { Effect } from "effect";
+import type * as Effect from "effect/Effect";
 import { execFileSync, spawnSync } from "node:child_process";
 
 import { lift } from "./errors.ts";

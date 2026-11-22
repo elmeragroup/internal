@@ -1,4 +1,4 @@
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 
 /**
  * Who owns one declaration file, as the backend classified it: the extracted

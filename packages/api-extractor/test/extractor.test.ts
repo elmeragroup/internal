@@ -1,4 +1,8 @@
-import { Cause, Effect, Layer, Option, Schema } from "effect";
+import * as Cause from "effect/Cause";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
 import { resolve } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 
@@ -211,7 +215,7 @@ describe("ProjectExtractor", () => {
 
   it("decodes the kind-discriminated module schema and rejects malformed nodes", async () => {
     const result = await extractFixture({ tsconfigPath }, inputPath);
-    const decoded = Schema.decodeUnknownSync(ModuleNodeSchema)(result.module);
+    const decoded = Schema.decodeSync(ModuleNodeSchema)(result.module);
 
     expect(decoded).toEqual(result.module);
     expect(() =>

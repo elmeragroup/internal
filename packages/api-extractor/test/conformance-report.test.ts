@@ -1,5 +1,5 @@
-import { Effect } from "effect";
-import type { Schema } from "effect";
+import * as Effect from "effect/Effect";
+import type * as Schema from "effect/Schema";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { cpSync, readFileSync, rmSync, writeFileSync } from "node:fs";

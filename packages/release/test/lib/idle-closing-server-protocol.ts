@@ -1,4 +1,4 @@
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 
 /** Plain HTTP, or TLS with a PEM key and certificate, where the server prefers HTTP/2. */
 export const ServerTransport = Schema.Union([
@@ -20,8 +20,7 @@ export const ServerOptions = Schema.Struct({
 export type ServerOptions = typeof ServerOptions.Type;
 
 /** The one message the server thread posts, once it listens. */
-export const ServerListening = Schema.Struct({
-  _tag: Schema.Literal("ServerListening"),
+export const ServerListening = Schema.TaggedStruct("ServerListening", {
   port: Schema.Number,
 });
 /** Decoded shape of {@link ServerListening}. */

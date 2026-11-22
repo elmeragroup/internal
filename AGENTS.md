@@ -30,9 +30,17 @@ The whole workspace compiles with `tsrs`, a Rust port of the TypeScript 7 compil
 TypeScript 7.1: type-check scripts, builds, declaration emit, evidence scripts, and the runtime
 `tsrs/*` API. The `typescript` package is not a dependency. Type-aware Oxlint also runs on tsrs: the
 lint scripts set `OXLINT_TSGOLINT_PATH=node_modules/.bin/tsrs-lint`, so run Oxlint through
-`pnpm lint` or with that variable set. The workspace is supported on macOS
-arm64/x64 and Linux x64/arm64 (glibc and musl). tsrs also ships Windows x64 and arm64 binaries, but Windows is
-not supported: extraction path identity is not Windows-aware yet.
+`pnpm lint` or with that variable set. `pnpm lint` runs `lint:oxlint`, then `lint:effect`: the
+Effect diagnostics of `@effect/tsgo` over the whole workspace (they fire only on Effect values),
+through the Effect-patched Oxlint and `.oxlintrc.effect.json`. `tooling/typescript/effect.json`
+decides each Effect rule, error or off with its reason, and `test/effect-lint-config.test.ts` holds
+the two configs equal. The type-check stays on stock tsrs. A rule turned off for a later redesign
+says which change re-enables it.
+
+The published package runs on macOS arm64/x64 and Linux x64/arm64 (glibc and musl). Development
+needs macOS or glibc Linux: `@effect/tsgo` ships no musl build, so `lint:effect` fails there with
+"Linux musl is not supported by the packaged Oxlint integration." tsrs also ships Windows x64 and
+arm64 binaries, but Windows is not supported: extraction path identity is not Windows-aware yet.
 
 Run commands from the repository root unless stated otherwise.
 

@@ -1,4 +1,7 @@
-import { Context, Effect, Layer, Schema } from "effect";
+import * as Context from "effect/Context";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Schema from "effect/Schema";
 
 import type {
   BackendCompilerOperations,
@@ -172,7 +175,7 @@ const inspectComponentSources = Effect.fn("ProjectExtractor.inspectComponentSour
         fallback: "extract",
       }),
   });
-  return yield* Schema.decodeUnknownEffect(ComponentSourceResultsSchema)(results).pipe(Effect.orDie);
+  return yield* Schema.decodeEffect(ComponentSourceResultsSchema)(results).pipe(Effect.orDie);
 }, Effect.scoped);
 
 const extractModule = Effect.fn("ProjectExtractor.extractModule")(function* (
@@ -194,7 +197,7 @@ const extractModule = Effect.fn("ProjectExtractor.extractModule")(function* (
     catch: (cause) => classifyThrown(cause, { filePath, operation: "resolveModule", fallback: "extract" }),
   });
   // The resolver violating its own schema is a bug, not user input.
-  const result = yield* Schema.decodeUnknownEffect(ExtractionResultSchema)(resolved).pipe(Effect.orDie);
+  const result = yield* Schema.decodeEffect(ExtractionResultSchema)(resolved).pipe(Effect.orDie);
   const timing = yield* Effect.try({
     try: () => project.getTimingInfo?.() ?? disabledTiming(),
     catch: (cause) => classifyThrown(cause, { filePath, operation: "getTimingInfo" }),

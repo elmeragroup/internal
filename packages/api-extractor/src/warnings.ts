@@ -1,4 +1,4 @@
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 
 /** Every type flag the extractor reports, in display order; `Other` is the unknown-flag sentinel. */
 export const typeFlagNames = [

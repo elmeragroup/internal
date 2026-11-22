@@ -1,5 +1,9 @@
-import { Clock, Duration, Effect, Exit, Fiber } from "effect";
-import { TestClock } from "effect/testing";
+import * as Clock from "effect/Clock";
+import * as Duration from "effect/Duration";
+import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
+import * as Fiber from "effect/Fiber";
+import * as TestClock from "effect/testing/TestClock";
 import { describe, expect, it } from "vitest";
 
 import { ReleaseError } from "../src/errors.ts";

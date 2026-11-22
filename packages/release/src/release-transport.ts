@@ -1,5 +1,5 @@
-import { Effect } from "effect";
-import type { Scope } from "effect";
+import * as Effect from "effect/Effect";
+import type * as Scope from "effect/Scope";
 import { Agent, fetch as undiciFetch } from "undici";
 
 /** One request the engine sends; a subset of `RequestInit` that every fetch implementation accepts. */

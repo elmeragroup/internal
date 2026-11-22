@@ -1,4 +1,4 @@
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
@@ -19,8 +19,6 @@ const TsrsManifest = Schema.Struct({ bin: Schema.Struct({ tsrs: Schema.String })
  */
 export function tsrsLauncherPath(packageDirectory: string): string {
   const manifestPath = createRequire(join(packageDirectory, "package.json")).resolve("tsrs/package.json");
-  const manifest = Schema.decodeUnknownSync(Schema.fromJsonString(TsrsManifest))(
-    readFileSync(manifestPath, "utf8")
-  );
+  const manifest = Schema.decodeSync(Schema.fromJsonString(TsrsManifest))(readFileSync(manifestPath, "utf8"));
   return resolve(dirname(manifestPath), manifest.bin.tsrs);
 }

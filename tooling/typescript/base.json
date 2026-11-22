@@ -1,6 +1,8 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
   "display": "Default",
+  // Every workspace tsconfig gets the Effect language-service options, which `pnpm lint:effect` reads per file.
+  "extends": "./effect.json",
   "compilerOptions": {
     "composite": false,
     "declaration": true,

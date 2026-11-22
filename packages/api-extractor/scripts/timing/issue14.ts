@@ -1,4 +1,4 @@
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 import { join } from "node:path";
 
 import { writeArtifactBatchOrThrow } from "../artifact-batch-writer.ts";
@@ -687,7 +687,7 @@ export async function runIssue14Timing(mode: TimingCheckMode | "write"): Promise
   const measured = await measure();
   if (mode === "write") {
     // Fail before writing when the report violates the schema every reader decodes.
-    const report = decodeReport(Schema.decodeUnknownSync(Schema.Json)(measured));
+    const report = decodeReport(Schema.decodeSync(Schema.Json)(measured));
     await writeArtifactBatchOrThrow(
       {
         outputRoot: fixtureDirectory,

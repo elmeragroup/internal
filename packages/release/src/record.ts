@@ -1,4 +1,4 @@
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 
 import { releaseAssetId } from "./github.ts";
 import type { GitHubReleaseAsset, ReleaseAssetId } from "./github.ts";

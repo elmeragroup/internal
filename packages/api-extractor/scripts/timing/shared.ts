@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import * as Effect from "effect/Effect";
 
 import type { InternalTimedExtraction } from "../../src/internal/project-options.ts";
 import { InternalProjectExtractorTiming, timedProjectExtractorLayer } from "../../src/internal/timing.ts";

@@ -13,6 +13,17 @@ owner decides whether to merge it.
 Follow [Development](README.md#development) to set up the workspace. Read [AGENTS.md](AGENTS.md) for
 the package responsibilities, code conventions and checks.
 
+### Effect diagnostics in the editor
+
+Code that uses Effect values is checked by the Effect language service: `pnpm lint:effect`, part of
+`pnpm lint` and CI, runs its rules over the whole workspace through the Effect-patched Oxlint. The
+committed editor settings keep the stock tsrs and Oxlint, so they show none of these diagnostics. To
+see them while editing, start your editor's TypeScript 7 language server as
+`node_modules/.bin/effect-tsgo tsrs --lsp --stdio`: the Effect-patched build of the installed tsrs,
+which reads `tooling/typescript/effect.json`, the same rules as the gate. Set it in your user
+settings, since the setup is per machine. `effect-tsgo get-exe-path` looks for a `typescript` install, which
+this workspace does not have, and `effect-tsgo setup` rewrites the project's configuration.
+
 <a id="placement"></a>
 
 ## Ask first: where does it belong?

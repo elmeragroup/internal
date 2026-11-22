@@ -1,4 +1,4 @@
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -241,8 +241,8 @@ describe("Issue 14 second IPC timing artifact", () => {
     const liveOutput = timingCommandOutput(report, "enforce-live-budget", "go");
     const portabilityOutput = timingCommandOutput(report, "verify-checkout-portability", "go");
 
-    expect(() => Schema.decodeUnknownSync(TimingCommandOutputSchema)(liveOutput)).not.toThrow();
-    expect(() => Schema.decodeUnknownSync(TimingCommandOutputSchema)(portabilityOutput)).not.toThrow();
+    expect(() => Schema.decodeSync(TimingCommandOutputSchema)(liveOutput)).not.toThrow();
+    expect(() => Schema.decodeSync(TimingCommandOutputSchema)(portabilityOutput)).not.toThrow();
     expect(() =>
       Schema.decodeUnknownSync(TimingCommandOutputSchema)({
         ...liveOutput,

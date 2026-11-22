@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import * as Effect from "effect/Effect";
 
 import { ProjectExtractor } from "../../src/index.ts";
 import type { ExtractionResult, ExtractorOptions, OpenProjectOptions } from "../../src/index.ts";

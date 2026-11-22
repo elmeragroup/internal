@@ -1,4 +1,4 @@
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 import { existsSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 
