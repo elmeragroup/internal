@@ -16,25 +16,42 @@ import { defineRule } from "@oxlint/plugins";
  */
 const DIRECTIVE = /^\s*(?:oxlint|eslint)-(disable(?:-next-line|-line)?)(?=\s|$)/u;
 
-/**
- * An Effect language-service directive, as `@effect/tsgo` reads it: anywhere on a line, the
- * section form (`@effect-diagnostics`, from here on) or the next-line form, then whitespace-separated
- * tokens. It is the upstream pattern (`internal/directives/parser.go`), with RE2's ASCII classes.
+/*
+ * Effect directives, as the pinned `@effect/tsgo` 0.70.0 reads them (`crates/ets_directives/src/parser.rs`,
+ * `collect_effect_directives` and `build_directive_set`; Go twin `internal/directives/parser.go`):
+ *
+ * - It scans every physical line of the source (the text split at `\n`), blind to comments, strings and templates, so
+ *   a directive spelled in a string literal applies as surely as one in a comment.
+ * - It takes the leftmost match of the directive pattern on each line and ignores the rest of the line.
+ * - The match's token run (whitespace-separated runs of `[0-9A-Za-z_:\-*]`) yields every `rule:severity` pair found
+ *   anywhere in it, inside a longer token too. A line whose run holds no pair is no directive.
+ * - The severity is read case-blind: `off`, `skip-file`, `warning`/`warn`, `suggestion`, `message`, `error`; any
+ *   other word reads as `error`. A rule name matches case-blind, and `*` matches every rule.
+ * - A `skip-file` pair holds for the whole file wherever it is written, behind the next-line prefix too. Otherwise the
+ *   next-line form holds for the following line, and the bare form for its own line and every later one, until a later
+ *   bare directive names the rule again.
+ * - ` -- ` means nothing to it: `--` is one more token, and a pair written after it, in the reason, still applies.
+ *
+ * This rule reads the same lines the same way. A relaxing directive outside a comment is reported, since no comment
+ * can carry its reason; one inside a comment needs its relaxing pair before ` -- ` and a reason after it, and takes
+ * the allowed-kinds and one-rule options, a `skip-file` pair counting as the file-wide `disable` kind.
  */
+
+/** The upstream directive pattern, with RE2's ASCII classes. */
 const EFFECT_DIRECTIVE =
   /@effect-diagnostics(-next-line)?[\t\n\f\r ]+([0-9A-Za-z_:\-*]+(?:[\t\n\f\r ]+[0-9A-Za-z_:\-*]+)*)/u;
 
-/**
- * The `rule:severity` pairs `@effect/tsgo` reads from a directive's tokens, a reason's words among
- * them, so a pair written in a reason counts as a rule the directive names.
- */
+/** The upstream `rule:severity` pattern, applied across a directive's whole token run. */
 const EFFECT_RULE_SEVERITY = /([0-9A-Za-z_]+|\*):([0-9A-Za-z_]+(?:-[0-9A-Za-z_]+)?)/gu;
 
 /**
- * The severities below `error`, as `@effect/tsgo` spells them (`etscore/severity.go`, case-blind).
- * Each relaxes a rule below the error a gate configures; `@effect/tsgo` reads any other word as `error`.
+ * The severities below `error` (`etscore/severity.go`). Each relaxes a rule below the error a gate configures;
+ * `skip-file` also makes a directive file-wide.
  */
 const EFFECT_RELAXING = new Set(["off", "skip-file", "warning", "warn", "suggestion", "message"]);
+
+/** The severity that holds for the whole file wherever it is written. */
+const EFFECT_SKIP_FILE = "skip-file";
 
 /** The separator between a directive's rules and its reason. */
 const SEPARATOR = " -- ";
@@ -76,24 +93,35 @@ function optionsOf(context) {
 }
 
 /**
- * One directive found in a comment, in either family, as the policy checks it.
+ * @typedef {object} Location
+ * @property {{ line: number, column: number }} start
+ * @property {{ line: number, column: number }} end
+ */
+
+/**
+ * One directive, in either family, as the policy checks it.
  *
  * @typedef {object} Directive
  * @property {string} directive - The directive as written, for messages.
  * @property {DirectiveKind} kind - Its scope: `disable-next-line` for a next-line directive, `disable`
  *   for one that holds to the end of the file or of its section.
- * @property {(kind: DirectiveKind) => string} spell - How its family writes a directive of a kind.
+ * @property {(kind: DirectiveKind) => string | undefined} spell - How its family writes a directive of a
+ *   kind, or `undefined` for a kind the family has no form for.
  * @property {ReadonlyArray<string>} rules - The rules it names; `*` names every rule.
- * @property {string} reason - The text after its ` -- ` separator.
+ * @property {string} reason - The text after its ` -- ` separator, less any rule the backend still reads there.
+ * @property {boolean} inComment - Whether it is written in a comment, where a reason can follow it.
+ * @property {boolean} rulesAfterReasonOnly - Whether every rule it relaxes is written after ` -- `.
+ * @property {Location} loc - Where to report it.
  */
 
 /**
  * The oxlint or eslint disable directive at the start of a comment.
  *
  * @param {string} text - The comment's text.
+ * @param {Location} loc - The comment's location.
  * @returns {Directive | undefined}
  */
-function oxlintDirective(text) {
+function oxlintDirective(text, loc) {
   const match = DIRECTIVE.exec(text);
   const kind = match?.[1];
   if (match === null || kind === undefined || !isDirectiveKind(kind)) return undefined;
@@ -105,47 +133,80 @@ function oxlintDirective(text) {
     spell: (allowed) => `oxlint-${allowed}`,
     rules: namedRules(separator === -1 ? rest : rest.slice(0, separator)),
     reason: separator === -1 ? "" : rest.slice(separator + SEPARATOR.length),
+    inComment: true,
+    rulesAfterReasonOnly: false,
+    loc,
   };
 }
 
 /**
- * How `@effect/tsgo` writes a directive of a kind; it has no same-line form, so that one is spelled
- * as the next-line form a caller can move it to.
+ * How `@effect/tsgo` writes a directive of a kind; it has no same-line form.
  *
  * @param {DirectiveKind} kind
- * @returns {string}
+ * @returns {string | undefined}
  */
 function spellEffect(kind) {
-  return kind === "disable" ? "@effect-diagnostics" : "@effect-diagnostics-next-line";
+  if (kind === "disable") return "@effect-diagnostics";
+  if (kind === "disable-next-line") return "@effect-diagnostics-next-line";
+  return undefined;
 }
 
 /**
- * The Effect directives in a comment that relax a rule, one per line as `@effect/tsgo` reads them.
- * A directive that only raises rules to errors needs no reason.
+ * The Effect directives in a source that relax a rule, read as `@effect/tsgo` reads them (see above). A directive
+ * that only raises rules to errors needs no reason.
  *
- * @param {string} text - The comment's text.
+ * @param {string} text - The whole source text.
+ * @param {ReadonlyArray<{ start: number, end: number }>} comments - Its comments, as offsets into `text`.
+ * @param {(offset: number) => { line: number, column: number }} locate - Maps an offset to a location.
  * @returns {Directive[]}
  */
-function effectDirectives(text) {
-  return text.split("\n").flatMap((line) => {
+function effectDirectives(text, comments, locate) {
+  /** @type {Directive[]} */
+  const found = [];
+  let lineStart = 0;
+  for (const line of text.split("\n")) {
     const match = EFFECT_DIRECTIVE.exec(line);
     const tokens = match?.[2];
-    if (match === null || tokens === undefined) return [];
-    const pairs = [...tokens.matchAll(EFFECT_RULE_SEVERITY)];
-    const relaxes = pairs.some(([, , severity]) => EFFECT_RELAXING.has(severity?.toLowerCase() ?? ""));
-    if (!relaxes) return [];
-    const rest = line.slice(match.index);
-    const separator = rest.indexOf(SEPARATOR);
-    return [
-      {
-        directive: `@effect-diagnostics${match[1] ?? ""}`,
-        kind: match[1] === undefined ? "disable" : "disable-next-line",
-        spell: spellEffect,
-        rules: pairs.map(([, rule]) => rule ?? ""),
-        reason: separator === -1 ? "" : rest.slice(separator + SEPARATOR.length),
-      },
-    ];
-  });
+    if (match !== null && tokens !== undefined) {
+      const tokensStart = match.index + match[0].length - tokens.length;
+      const pairs = [...tokens.matchAll(EFFECT_RULE_SEVERITY)].map((pair) => ({
+        rule: pair[1] ?? "",
+        severity: (pair[2] ?? "").toLowerCase(),
+        start: tokensStart + pair.index,
+        end: tokensStart + pair.index + pair[0].length,
+      }));
+      const relaxing = pairs.filter(({ severity }) => EFFECT_RELAXING.has(severity));
+      if (relaxing.length > 0) {
+        const start = lineStart + match.index;
+        const comment = comments.find((candidate) => candidate.start <= start && start < candidate.end);
+        const lineEnd = comment === undefined ? line.length : Math.min(line.length, comment.end - lineStart);
+        const separatorAt = line.indexOf(SEPARATOR, match.index);
+        const separator = separatorAt === -1 || separatorAt >= lineEnd ? lineEnd : separatorAt;
+        const afterSeparator = pairs.filter((pair) => pair.start >= separator);
+        let reason = separator === lineEnd ? "" : line.slice(separator + SEPARATOR.length, lineEnd);
+        for (const pair of [...afterSeparator].reverse()) {
+          const at = pair.start - separator - SEPARATOR.length;
+          reason = reason.slice(0, at) + reason.slice(at + pair.end - pair.start);
+        }
+        const next = match[1] ?? "";
+        found.push({
+          directive: `@effect-diagnostics${next}`,
+          kind:
+            next === "" || pairs.some(({ severity }) => severity === EFFECT_SKIP_FILE)
+              ? "disable"
+              : "disable-next-line",
+          spell: spellEffect,
+          rules: pairs.map(({ rule }) => rule),
+          reason,
+          inComment: comment !== undefined,
+          rulesAfterReasonOnly: relaxing.every((pair) => pair.start >= separator),
+          loc: { start: locate(start), end: locate(lineStart + match.index + match[0].length) },
+        });
+      }
+    }
+    lineStart += line.length + 1;
+  }
+  return found;
 }
 
 /**
@@ -185,34 +246,55 @@ export default defineRule({
         "Name exactly one rule, not `*`, in this `{{directive}}` comment, so its reason covers exactly what it silences.",
       forbiddenDirective:
         "`{{directive}}` is not allowed here; use `{{allowed}}` on the line that needs it, naming one rule and a reason.",
+      noAllowedDirective:
+        "`{{directive}}` is not allowed here, and this configuration allows no directive of its kind; fix what it would silence.",
+      outsideComment:
+        "`{{directive}}` is outside a comment, yet `@effect/tsgo` reads every source line and applies it here; write it in a comment with a reason, or spell the text so it no longer reads as a directive (for example `\\x40effect-diagnostics`).",
+      ruleAfterReason:
+        "Write the rule this `{{directive}}` relaxes before ` -- `; `@effect/tsgo` applies a `rule:severity` after the separator too, so it is no reason.",
     },
   },
   create(context) {
     const { directives, rules } = optionsOf(context);
     return {
       Program() {
-        for (const comment of context.sourceCode.getAllComments()) {
-          if (comment.type === "Shebang") continue;
-          const oxlint = oxlintDirective(comment.value);
-          const found = [...(oxlint === undefined ? [] : [oxlint]), ...effectDirectives(comment.value)];
-          for (const { directive, kind, spell, rules: named, reason } of found) {
-            if (!directives.includes(kind)) {
-              context.report({
-                loc: comment.loc,
-                messageId: "forbiddenDirective",
-                data: {
-                  directive,
-                  allowed: [...new Set(directives.map((allowed) => spell(allowed)))].join("`, `"),
-                },
-              });
-              continue;
-            }
-            if (rules === "one" && (named.length !== 1 || named[0] === "*")) {
-              context.report({ loc: comment.loc, messageId: "oneRule", data: { directive } });
-            }
-            if (reason.replace(/[\s*]/gu, "").length < MINIMUM_REASON) {
-              context.report({ loc: comment.loc, messageId: "missingReason", data: { directive } });
-            }
+        const { sourceCode } = context;
+        const comments = sourceCode.getAllComments().filter((comment) => comment.type !== "Shebang");
+        const found = [
+          ...comments.flatMap((comment) => oxlintDirective(comment.value, comment.loc) ?? []),
+          ...effectDirectives(sourceCode.text, comments, (offset) => sourceCode.getLocFromIndex(offset)),
+        ];
+        for (const {
+          directive,
+          kind,
+          spell,
+          rules: named,
+          reason,
+          inComment,
+          rulesAfterReasonOnly,
+          loc,
+        } of found) {
+          if (!inComment) {
+            context.report({ loc, messageId: "outsideComment", data: { directive } });
+            continue;
+          }
+          if (!directives.includes(kind)) {
+            const allowed = [...new Set(directives.flatMap((candidate) => spell(candidate) ?? []))];
+            context.report(
+              allowed.length === 0
+                ? { loc, messageId: "noAllowedDirective", data: { directive } }
+                : { loc, messageId: "forbiddenDirective", data: { directive, allowed: allowed.join("`, `") } }
+            );
+            continue;
+          }
+          if (rulesAfterReasonOnly) {
+            context.report({ loc, messageId: "ruleAfterReason", data: { directive } });
+          }
+          if (rules === "one" && (named.length !== 1 || named[0] === "*")) {
+            context.report({ loc, messageId: "oneRule", data: { directive } });
+          }
+          if (reason.replace(/[\s*]/gu, "").length < MINIMUM_REASON) {
+            context.report({ loc, messageId: "missingReason", data: { directive } });
           }
         }
       },

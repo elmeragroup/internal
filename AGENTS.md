@@ -74,7 +74,9 @@ Fix the underlying issue before adding a lint exception. Every disable carries a
 names the contract it guards (`elmera/require-disable-reason`), and lint reports unused disables as
 errors. Use a `SAFETY:` comment where the assertion rule requires it.
 
-An `@effect-diagnostics` directive that relaxes a rule carries a `--` reason too, under the same rule.
+An `@effect-diagnostics` directive that relaxes a rule sits in a comment and carries a `--` reason
+too, under the same rule; `@effect/tsgo` reads it from strings as well, so spell a quoted one as
+`\x40effect-diagnostics`.
 Only the Effect-patched editor reports an unused one ("directive has no effect"); `lint:effect` cannot.
 `api-extractor` takes next-line disables only, each naming one rule, which lint enforces, and the same
 of Effect directives (`@effect-diagnostics-next-line`, never `*`). No override

@@ -41,11 +41,19 @@ contract must hold; this repository's `test/extractor-lint-policy.test.mjs` reje
 in `packages/api-extractor`.
 
 An `@effect/tsgo` directive that relaxes a rule (`:off`, `:skip-file`, or a severity below `error`)
-needs the same reason, read as `@effect/tsgo` reads the directive: anywhere on a comment line, with
-every `rule:severity` token on that line, a reason's included, counted as a rule it names. The
-section form `@effect-diagnostics` counts as the `disable` kind and `@effect-diagnostics-next-line`
-as `disable-next-line`, and `*` never counts as one rule. A directive that only raises a rule to
-`error` needs no reason.
+needs the same reason. The rule reads directives as `@effect/tsgo` 0.70.0 does (its doc comment
+cites the parser): the leftmost match on every physical source line, comments, strings and
+templates alike, with every `rule:severity` token of the match counted as a rule it names, those
+after `--` included. So:
+
+- A relaxing directive outside a comment is reported, since `@effect/tsgo` applies it there too.
+  To write the text in a string or a test fixture, spell it so no line reads as a directive, such
+  as `"\x40effect-diagnostics"`.
+- The relaxing rule comes before `--`, and a rule written after it does not count as reason.
+- A `skip-file` pair makes the directive file-wide (the `disable` kind) behind either prefix.
+  Otherwise the section form `@effect-diagnostics` counts as `disable` and
+  `@effect-diagnostics-next-line` as `disable-next-line`. `*` never counts as one rule.
+- A directive that only raises a rule to `error` needs no reason.
 
 ## Fixed-path assumptions
 

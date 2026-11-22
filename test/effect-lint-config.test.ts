@@ -1,5 +1,6 @@
+import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, matchesGlob } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseSync } from "oxc-parser";
 import type { Comment, Expression } from "oxc-parser";
@@ -12,7 +13,9 @@ import { asRecord, asRecordArray, asString, readJsonObject } from "../scripts/li
  * The Effect diagnostics are configured twice: tooling/typescript/effect.json, the language-service preset the editor
  * reads, and .oxlintrc.effect.json, the rules `pnpm lint:effect` gates on through the Effect-patched oxlint. Stock oxlint
  * cannot parse a config naming the `effecttsgo` plugin, so the gate cannot live in .oxlintrc.json. These cases hold the
- * two configs to one decision per rule, and the gate to the main pass's scope and the catalog's compiler.
+ * two configs to one decision per rule, and the gate to the main pass's scope and the catalog's compiler. Every key of
+ * either config that can change which rules run, where, or at what severity is pinned here: the gate's `extends`,
+ * `overrides`, `plugins`, `categories`, `options` and `rules`, and the language-service entry's own keys.
  */
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -50,6 +53,9 @@ function parseJsonc(text: string, label: string) {
   return asRecord(JSON.parse(json) as unknown, label);
 }
 
+/** The language-service plugin's name in a tsconfig's `compilerOptions.plugins`. */
+const LANGUAGE_SERVICE = "@effect/language-service";
+
 /** The value of an object literal's property with a string key, if it has one. */
 function propertyValue(object: Expression | undefined, name: string): Expression | undefined {
   if (object?.type !== "ObjectExpression") return undefined;
@@ -61,18 +67,34 @@ function propertyValue(object: Expression | undefined, name: string): Expression
   return undefined;
 }
 
+/** The language-service entry of a tsconfig's plugin list, found by name; anything but exactly one is an error. */
+function languageServiceSyntax(root: Expression): Expression {
+  const plugins = propertyValue(propertyValue(root, "compilerOptions"), "plugins");
+  const entries =
+    plugins?.type === "ArrayExpression"
+      ? plugins.elements.filter((element) => {
+          const name = element?.type === "ObjectExpression" ? propertyValue(element, "name") : undefined;
+          return name?.type === "Literal" && name.value === LANGUAGE_SERVICE;
+        })
+      : [];
+  const [entry, ...others] = entries;
+  if (entry === null || entry === undefined || entry.type === "SpreadElement" || others.length > 0) {
+    throw new Error(`the preset needs exactly one ${LANGUAGE_SERVICE} plugin entry`);
+  }
+  return entry;
+}
+
 /**
  * The preset's `off` rules no comment explains. A comment explains the run of offs that follows it: it starts on a line
- * after the last `error` entry (or the object's opening brace) and ends before the off it explains. Reasons are read from
- * the parsed object's spans and the parser's comment tokens, so a brace or a block comment in a reason changes nothing.
+ * after the last `error` entry (or the object's opening brace), ends before the off it explains, and says something once
+ * its whitespace and block-comment stars are gone. Reasons are read from the parsed object's spans and the parser's
+ * comment tokens, so a brace or a block comment in a reason changes nothing.
  */
 function unexplainedOffs(text: string): ReadonlyArray<string> {
   const { root, comments } = parseJsoncSyntax(text);
-  const plugins = propertyValue(propertyValue(root, "compilerOptions"), "plugins");
-  const plugin = plugins?.type === "ArrayExpression" ? plugins.elements[0] : undefined;
-  const severity =
-    plugin?.type === "ObjectExpression" ? propertyValue(plugin, "diagnosticSeverity") : undefined;
+  const severity = propertyValue(languageServiceSyntax(root), "diagnosticSeverity");
   if (severity?.type !== "ObjectExpression") throw new Error("the preset has no diagnosticSeverity object");
+  const reasons = comments.filter((comment) => comment.value.replace(/[\s*]/gu, "").length > 0);
   const lineOf = (offset: number) => text.slice(0, offset).split("\n").length;
   const unexplained: string[] = [];
   let boundary = severity.start;
@@ -88,7 +110,7 @@ function unexplainedOffs(text: string): ReadonlyArray<string> {
       boundary = property.end;
       continue;
     }
-    const explained = comments.some(
+    const explained = reasons.some(
       (comment) => lineOf(comment.start) > lineOf(boundary) && comment.end <= property.start
     );
     if (!explained) unexplained.push(String(property.key.value));
@@ -98,9 +120,47 @@ function unexplainedOffs(text: string): ReadonlyArray<string> {
 
 const presetText = read("tooling/typescript/effect.json");
 const preset = parseJsonc(presetText, "tooling/typescript/effect.json");
-const [plugin] = asRecordArray(asRecord(preset.compilerOptions, "compilerOptions").plugins, "plugins");
-const severities = Object.entries(asRecord(plugin?.diagnosticSeverity, "diagnosticSeverity"));
+const languageService = asRecordArray(
+  asRecord(preset.compilerOptions, "compilerOptions").plugins,
+  "plugins"
+).filter((entry) => entry.name === LANGUAGE_SERVICE);
+const [plugin] = languageService;
+if (plugin === undefined || languageService.length > 1) {
+  throw new Error(`tooling/typescript/effect.json needs exactly one ${LANGUAGE_SERVICE} plugin entry`);
+}
+const severities = Object.entries(asRecord(plugin.diagnosticSeverity, "diagnosticSeverity"));
 const gate = parseJsonc(read(".oxlintrc.effect.json"), ".oxlintrc.effect.json");
+const tsrs = asString(
+  asRecord(asRecord(parse(read("pnpm-workspace.yaml")), "workspace").catalog, "catalog").tsrs,
+  "tsrs"
+);
+
+/** A tsconfig's `extends` targets, resolved to repository paths: a workspace preset, or a path beside the file. */
+function extendsOf(path: string): ReadonlyArray<string> {
+  const config = parseJsonc(read(path), path);
+  const targets = Array.isArray(config.extends)
+    ? config.extends
+    : config.extends === undefined
+      ? []
+      : [config.extends];
+  return targets.map((target) => {
+    const name = asString(target, `${path} extends`);
+    return name.startsWith("@elmeragroup/typescript-config/")
+      ? join("tooling/typescript", name.slice("@elmeragroup/typescript-config/".length))
+      : join(dirname(path), name);
+  });
+}
+
+/** Every config a tsconfig reads through `extends`, itself first. */
+function extendsChain(path: string): ReadonlyArray<string> {
+  return [path, ...extendsOf(path).flatMap((target) => extendsChain(target))];
+}
+
+/** The hang guard of listing the committed tsconfigs, which takes milliseconds. */
+const GIT_TIMEOUT_MS = 30_000;
+
+/** The hang guard of one patched-oxlint run: it lints one file in well under a second. */
+const PATCHED_OXLINT_TIMEOUT_MS = 60_000;
 
 /** Code-unit order, for comparing two lists of rule names as sets that keep their duplicates. */
 function byCodeUnit(left: string, right: string): number {
@@ -121,10 +181,95 @@ describe("Effect diagnostics", () => {
     expect(new Set(rules.map(([, level]) => level))).toEqual(new Set(["error"]));
   });
 
-  // An override could turn an error off for some paths while the list above still matches the preset, so the gate
-  // takes none: its errors hold for every file it lints, as the preset's do.
-  it("applies its errors to every file, with no override", () => {
-    expect(Object.keys(gate)).not.toContain("overrides");
+  // The rule list above is all the gate may say about rules. `extends` and `overrides` could relax a rule for some
+  // paths, and without type-aware mode, the effecttsgo plugin or the correctness category off, it would run a different
+  // set; a key not listed here is a new decision this test makes someone take.
+  it("is self-contained, applies its errors to every file, and runs only its own rules", () => {
+    expect(Object.keys(gate).sort(byCodeUnit)).toEqual(
+      ["$schema", "categories", "ignorePatterns", "options", "plugins", "rules"].sort(byCodeUnit)
+    );
+    expect(gate.plugins).toEqual(["effecttsgo"]);
+    expect(gate.categories).toEqual({ correctness: "off" });
+    expect(gate.options).toEqual({ typeAware: true });
+  });
+
+  // The patched oxlint's own report, the oracle the config keys above only predict: it activates every rule the gate
+  // lists. A config that parses but activates none (type-aware mode off, say) reports 0.
+  it(
+    "activates every rule it lists in the patched oxlint",
+    () => {
+      const run = spawnSync(
+        join(repoRoot, "node_modules", ".bin", "effect-tsgo"),
+        [
+          `--tsrs-lint=${tsrs}`,
+          "oxlint",
+          "-c",
+          ".oxlintrc.effect.json",
+          "--format=json",
+          "test/effect-lint-config.test.ts",
+        ],
+        { cwd: repoRoot, encoding: "utf8", timeout: PATCHED_OXLINT_TIMEOUT_MS }
+      );
+      if (run.error !== undefined) throw run.error;
+      // SAFETY: JSON.parse is untyped; asRecord is the contract, and a missing count fails the comparison.
+      const report = asRecord(JSON.parse(run.stdout) as unknown, "patched oxlint report");
+
+      expect(report.number_of_rules).toBe(Object.keys(asRecord(gate.rules, "rules")).length);
+    },
+    PATCHED_OXLINT_TIMEOUT_MS
+  );
+
+  // The editor and the gate read the same decisions only while the preset's one language-service entry holds them all:
+  // its own `overrides`, `diagnostics: false` or an exit-code switch would change the editor's rules and not CI's.
+  it("keeps every decision in the one language-service entry's severities", () => {
+    expect(Object.keys(plugin).sort(byCodeUnit)).toEqual(
+      [
+        "allowedUnstableApis",
+        "diagnosticSeverity",
+        "effectFn",
+        "includeSuggestionsInTsc",
+        "name",
+        "namespaceImportPackages",
+      ].sort(byCodeUnit)
+    );
+  });
+
+  // The rules read their options (namespace imports, the unstable allowlist) from each linted file's tsconfig. A tsconfig
+  // that misses the preset, or declares a plugin list of its own (which replaces the preset's), lints its files with
+  // the defaults instead and drops the editor's diagnostics there.
+  it("reaches the preset from every linted tsconfig, and no tsconfig replaces its plugin list", () => {
+    // The committed tsconfigs, the set CI lints. Listing untracked files too walks the whole tree, seconds on a busy
+    // disk, for files the gate sees only once they are committed.
+    const listed = spawnSync("git", ["ls-files", "--cached", "*tsconfig*.json"], {
+      cwd: repoRoot,
+      encoding: "utf8",
+      timeout: GIT_TIMEOUT_MS,
+    });
+    if (listed.error !== undefined) throw listed.error;
+    const ignored = Array.isArray(gate.ignorePatterns)
+      ? gate.ignorePatterns.map((pattern) => asString(pattern, "ignore pattern"))
+      : [];
+    const linted = listed.stdout
+      .split("\n")
+      .filter((path) => path.length > 0)
+      .filter((path) => !ignored.some((pattern) => matchesGlob(path, pattern)));
+    const preset = "tooling/typescript/effect.json";
+    const findings = linted.flatMap((path) => {
+      const chain = extendsChain(path);
+      const replacing = chain.filter((config) => {
+        const options = parseJsonc(read(config), config).compilerOptions;
+        return (
+          config !== preset && options !== undefined && "plugins" in asRecord(options, "compilerOptions")
+        );
+      });
+      return [
+        ...(chain.includes(preset) ? [] : [`${path}: does not reach ${preset}`]),
+        ...replacing.map((config) => `${path}: ${config} declares its own plugins`),
+      ];
+    });
+
+    expect(linted.length).toBeGreaterThan(0);
+    expect(findings).toEqual([]);
   });
 
   // A bump of @effect/tsgo that adds a rule fails here until the preset decides it; oxlint runs only the rules the gate
@@ -154,11 +299,10 @@ describe("Effect diagnostics", () => {
   // effect-tsgo falls back silently to its newest packaged tsrs when the installed one is not supported, so the gate
   // names its tsrs, and that is the catalog's.
   it("lints with the catalog's tsrs", () => {
-    const catalog = asRecord(asRecord(parse(read("pnpm-workspace.yaml")), "workspace").catalog, "catalog");
     const scripts = asRecord(readJsonObject(join(repoRoot, "package.json")).scripts, "scripts");
 
     expect(asString(scripts["lint:effect"], "lint:effect")).toContain(
-      `effect-tsgo --tsrs-lint=${asString(catalog.tsrs, "tsrs")} oxlint `
+      `effect-tsgo --tsrs-lint=${tsrs} oxlint `
     );
   });
 
