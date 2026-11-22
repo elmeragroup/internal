@@ -48,8 +48,8 @@ const DIFFERENTIAL_GLOBS = [
 ];
 /*
  * Hang guards, not time budgets: one oxlint run takes about 0.1 s, but a loaded machine stretches the differential's
- * sixteen sequential runs past Vitest's 5 s default. A hung run fails at its own guard, since a test timeout cannot
- * interrupt a synchronous spawn, and the test's guard covers every run.
+ * sequential runs, two per glob, past Vitest's 5 s default. A hung run fails at its own guard, since a test timeout
+ * cannot interrupt a synchronous spawn, and the test's guard covers every run.
  */
 const OXLINT_RUN_TIMEOUT_MS = 15_000;
 const DIFFERENTIAL_TIMEOUT_MS = DIFFERENTIAL_GLOBS.length * 2 * OXLINT_RUN_TIMEOUT_MS;

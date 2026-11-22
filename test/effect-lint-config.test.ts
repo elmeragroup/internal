@@ -24,33 +24,41 @@ function read(path: string): string {
   return readFileSync(join(repoRoot, path), "utf8");
 }
 
-/** A JSONC config's expression and its comments, with spans that are offsets into the config's own text. */
-type JsoncSyntax = { readonly root: Expression; readonly comments: ReadonlyArray<Comment> };
+/**
+ * A JSONC config parsed as the JavaScript expression `(${text})`. Every span, the expression's and the comments', is an
+ * offset into that `source`, so offsets from either can be compared and read against it without conversion.
+ */
+type JsoncSyntax = {
+  readonly source: string;
+  readonly root: Expression;
+  readonly comments: ReadonlyArray<Comment>;
+};
 
 /**
  * A committed JSONC config parsed as the JavaScript expression it is, so a `//` inside a string stays a string.
  */
 function parseJsoncSyntax(text: string): JsoncSyntax {
-  const result = parseSync("config.js", `(${text})`, { preserveParens: false });
+  const source = `(${text})`;
+  const result = parseSync("config.js", source, { preserveParens: false });
   if (result.errors.length > 0) throw new Error(result.errors.map((error) => error.message).join("\n"));
   const [statement] = result.program.body;
   if (statement?.type !== "ExpressionStatement") throw new Error("the config is not one expression");
-  const shift = <T extends { readonly start: number; readonly end: number }>(node: T): T => ({
-    ...node,
-    start: node.start - 1,
-    end: node.end - 1,
-  });
-  return { root: statement.expression, comments: result.comments.map((comment) => shift(comment)) };
+  return { source, root: statement.expression, comments: result.comments };
 }
 
 /** Parses a committed JSONC config: its comments become spaces, and the rest must be JSON. */
 function parseJsonc(text: string, label: string) {
-  let json = text;
-  for (const { start, end } of parseJsoncSyntax(text).comments) {
-    json = json.slice(0, start) + " ".repeat(end - start) + json.slice(end);
+  const { source, comments } = parseJsoncSyntax(text);
+  let json = "";
+  let copied = 0;
+  for (const { start, end } of comments) {
+    json += source.slice(copied, start) + " ".repeat(end - start);
+    copied = end;
   }
+  json += source.slice(copied);
+  // The parentheses that made the text an expression are not JSON.
   // SAFETY: JSON.parse is untyped; asRecord is the contract.
-  return asRecord(JSON.parse(json) as unknown, label);
+  return asRecord(JSON.parse(json.slice(1, -1)) as unknown, label);
 }
 
 /** The language-service plugin's name in a tsconfig's `compilerOptions.plugins`. */
@@ -67,19 +75,21 @@ function propertyValue(object: Expression | undefined, name: string): Expression
   return undefined;
 }
 
-/** The language-service entry of a tsconfig's plugin list, found by name; anything but exactly one is an error. */
+/**
+ * The language-service entry of a tsconfig's plugin list, found by name. That there is exactly one is checked where
+ * the preset is first read, below.
+ */
 function languageServiceSyntax(root: Expression): Expression {
   const plugins = propertyValue(propertyValue(root, "compilerOptions"), "plugins");
-  const entries =
+  const entry =
     plugins?.type === "ArrayExpression"
-      ? plugins.elements.filter((element) => {
+      ? plugins.elements.find((element) => {
           const name = element?.type === "ObjectExpression" ? propertyValue(element, "name") : undefined;
           return name?.type === "Literal" && name.value === LANGUAGE_SERVICE;
         })
-      : [];
-  const [entry, ...others] = entries;
-  if (entry === null || entry === undefined || entry.type === "SpreadElement" || others.length > 0) {
-    throw new Error(`the preset needs exactly one ${LANGUAGE_SERVICE} plugin entry`);
+      : undefined;
+  if (entry === null || entry === undefined || entry.type === "SpreadElement") {
+    throw new Error(`the preset has no ${LANGUAGE_SERVICE} plugin entry`);
   }
   return entry;
 }
@@ -91,11 +101,11 @@ function languageServiceSyntax(root: Expression): Expression {
  * comment tokens, so a brace or a block comment in a reason changes nothing.
  */
 function unexplainedOffs(text: string): ReadonlyArray<string> {
-  const { root, comments } = parseJsoncSyntax(text);
+  const { source, root, comments } = parseJsoncSyntax(text);
   const severity = propertyValue(languageServiceSyntax(root), "diagnosticSeverity");
   if (severity?.type !== "ObjectExpression") throw new Error("the preset has no diagnosticSeverity object");
   const reasons = comments.filter((comment) => comment.value.replace(/[\s*]/gu, "").length > 0);
-  const lineOf = (offset: number) => text.slice(0, offset).split("\n").length;
+  const lineOf = (offset: number) => source.slice(0, offset).split("\n").length;
   const unexplained: string[] = [];
   let boundary = severity.start;
   for (const property of severity.properties) {
@@ -165,13 +175,11 @@ function extendsChain(path: string): ReadonlyArray<string> {
 /** The hang guard of listing the committed tsconfigs, which takes milliseconds. */
 const GIT_TIMEOUT_MS = 30_000;
 
+/** oxlint's exit status when it ran and reported a diagnostic, as `--deny-warnings` makes a warning. */
+const OXLINT_LINT_FAILURE = 1;
+
 /** The hang guard of one patched-oxlint run: it lints one file in well under a second. */
 const PATCHED_OXLINT_TIMEOUT_MS = 60_000;
-
-/** Code-unit order, for comparing two lists of rule names as sets that keep their duplicates. */
-function byCodeUnit(left: string, right: string): number {
-  return left < right ? -1 : left > right ? 1 : 0;
-}
 
 /** The oxlint name of a language-service rule, as each rule's docs list both: kebab case under `effecttsgo/`. */
 function oxlintName(rule: string): string {
@@ -183,7 +191,7 @@ describe("Effect diagnostics", () => {
     const errors = severities.filter(([, level]) => level === "error").map(([rule]) => oxlintName(rule));
     const rules = Object.entries(asRecord(gate.rules, "rules"));
 
-    expect(rules.map(([rule]) => rule).sort(byCodeUnit)).toEqual(errors.sort(byCodeUnit));
+    expect(rules.map(([rule]) => rule).sort()).toEqual(errors.sort());
     expect(new Set(rules.map(([, level]) => level))).toEqual(new Set(["error"]));
   });
 
@@ -191,8 +199,8 @@ describe("Effect diagnostics", () => {
   // paths, and without type-aware mode, the effecttsgo plugin or the correctness category off, it would run a different
   // set; a key not listed here is a new decision this test makes someone take.
   it("is self-contained, applies its errors to every file, and runs only its own rules", () => {
-    expect(Object.keys(gate).sort(byCodeUnit)).toEqual(
-      ["$schema", "categories", "ignorePatterns", "options", "plugins", "rules"].sort(byCodeUnit)
+    expect(Object.keys(gate).sort()).toEqual(
+      ["$schema", "categories", "ignorePatterns", "options", "plugins", "rules"].sort()
     );
     expect(gate.plugins).toEqual(["effecttsgo"]);
     expect(gate.categories).toEqual({ correctness: "off" });
@@ -217,6 +225,11 @@ describe("Effect diagnostics", () => {
         { cwd: repoRoot, encoding: "utf8", timeout: PATCHED_OXLINT_TIMEOUT_MS }
       );
       if (run.error !== undefined) throw run.error;
+      // oxlint exits 1 when it reports a diagnostic, which still writes the report; any other status, or no report, is
+      // a failure to run, and its stderr says why.
+      if (run.stdout.length === 0 || (run.status !== 0 && run.status !== OXLINT_LINT_FAILURE)) {
+        throw new Error(`effect-tsgo oxlint exited ${String(run.status)}: ${run.stderr}`);
+      }
       // SAFETY: JSON.parse is untyped; asRecord is the contract, and a missing count fails the comparison.
       const report = asRecord(JSON.parse(run.stdout) as unknown, "patched oxlint report");
 
@@ -228,7 +241,7 @@ describe("Effect diagnostics", () => {
   // The editor and the gate read the same decisions only while the preset's one language-service entry holds them all:
   // its own `overrides`, `diagnostics: false` or an exit-code switch would change the editor's rules and not CI's.
   it("keeps every decision in the one language-service entry's severities", () => {
-    expect(Object.keys(plugin).sort(byCodeUnit)).toEqual(
+    expect(Object.keys(plugin).sort()).toEqual(
       [
         "allowedUnstableApis",
         "diagnosticSeverity",
@@ -236,7 +249,7 @@ describe("Effect diagnostics", () => {
         "includeSuggestionsInTsc",
         "name",
         "namespaceImportPackages",
-      ].sort(byCodeUnit)
+      ].sort()
     );
   });
 
@@ -252,6 +265,9 @@ describe("Effect diagnostics", () => {
       timeout: GIT_TIMEOUT_MS,
     });
     if (listed.error !== undefined) throw listed.error;
+    if (listed.status !== 0) {
+      throw new Error(`git ls-files exited ${String(listed.status)}: ${listed.stderr}`);
+    }
     const ignored = Array.isArray(gate.ignorePatterns)
       ? gate.ignorePatterns.map((pattern) => asString(pattern, "ignore pattern"))
       : [];
@@ -259,17 +275,17 @@ describe("Effect diagnostics", () => {
       .split("\n")
       .filter((path) => path.length > 0)
       .filter((path) => !ignored.some((pattern) => matchesGlob(path, pattern)));
-    const preset = "tooling/typescript/effect.json";
+    const presetPath = "tooling/typescript/effect.json";
     const findings = linted.flatMap((path) => {
       const chain = extendsChain(path);
       const replacing = chain.filter((config) => {
         const options = parseJsonc(read(config), config).compilerOptions;
         return (
-          config !== preset && options !== undefined && "plugins" in asRecord(options, "compilerOptions")
+          config !== presetPath && options !== undefined && "plugins" in asRecord(options, "compilerOptions")
         );
       });
       return [
-        ...(chain.includes(preset) ? [] : [`${path}: does not reach ${preset}`]),
+        ...(chain.includes(presetPath) ? [] : [`${path}: does not reach ${presetPath}`]),
         ...replacing.map((config) => `${path}: ${config} declares its own plugins`),
       ];
     });
@@ -296,7 +312,7 @@ describe("Effect diagnostics", () => {
       )
       .map(([name]) => name);
 
-    expect(severities.map(([rule]) => rule).sort(byCodeUnit)).toEqual(current.sort(byCodeUnit));
+    expect(severities.map(([rule]) => rule).sort()).toEqual(current.sort());
     expect(severities.filter(([, level]) => level !== "error" && level !== "off")).toEqual([]);
 
     expect(unexplainedOffs(presetText)).toEqual([]);

@@ -99,7 +99,21 @@ tester.run("elmera/require-disable-reason", requireDisableReason, {
     },
     {
       name: "a rule the reason raises to an error relaxes nothing",
-      code: `// ${EFFECT}-next-line floatingEffect:off -- the fiber is forked; globalDate:error stays on\nconst value = 1;\n`,
+      code: `// ${EFFECT}-next-line floatingEffect:off -- the fiber is forked and globalDate:error stays on\nconst value = 1;\n`,
+    },
+    {
+      name: "a rule the reason raises to an error is no second rule under the strict options",
+      code: `// ${EFFECT}-next-line floatingEffect:off -- the fiber is forked and globalDate:error stays on\nconst value = 1;\n`,
+      options: strict,
+    },
+    {
+      name: "a non-relaxing colon token in the reason stays part of the reason",
+      code: `// ${EFFECT}-next-line globalDate:off -- uses node:fs\nconst value = 1;\n`,
+    },
+    {
+      name: "a non-relaxing colon token in the reason is no second rule under the strict options",
+      code: `// ${EFFECT}-next-line globalDate:off -- uses node:fs synchronously at the boundary\nconst value = 1;\n`,
+      options: strict,
     },
     {
       name: "a file-wide skip where file-wide directives are allowed",

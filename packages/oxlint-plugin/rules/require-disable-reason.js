@@ -35,7 +35,8 @@ const DIRECTIVE = /^\s*(?:oxlint|eslint)-(disable(?:-next-line|-line)?)(?=\s|$)/
  * This rule reads the same lines the same way. A relaxing directive outside a comment is reported, since no comment
  * can carry its reason; one inside a comment writes every pair it relaxes before ` -- ` (one in the reason still
  * applies) and a reason after it, ending where a block comment closes, and takes the allowed-kinds and one-rule options,
- * a `skip-file` pair counting as the file-wide `disable` kind.
+ * a `skip-file` pair counting as the file-wide `disable` kind. A pair after ` -- ` that relaxes nothing, such as
+ * `node:fs`, silences nothing, so it stays part of the reason and names no rule.
  */
 
 /** The upstream directive pattern, with RE2's ASCII classes. */
@@ -100,9 +101,19 @@ function optionsOf(context) {
  */
 
 /**
- * One directive, in either family, as the policy checks it.
+ * A relaxing Effect directive outside every comment, where no reason can follow it.
  *
- * @typedef {object} Directive
+ * @typedef {object} OutsideComment
+ * @property {"outsideComment"} _tag
+ * @property {string} directive - The directive as written, for messages.
+ * @property {Location} loc - Where to report it.
+ */
+
+/**
+ * One directive in a comment, in either family, as the policy checks it.
+ *
+ * @typedef {object} InComment
+ * @property {"inComment"} _tag
  * @property {string} directive - The directive as written, for messages.
  * @property {DirectiveKind} kind - Its scope: `disable-next-line` for a next-line directive, `disable`
  *   for one that holds to the end of the file or of its section.
@@ -110,18 +121,19 @@ function optionsOf(context) {
  *   kind, or `undefined` for a kind the family has no form for.
  * @property {ReadonlyArray<string>} rules - The rules it names; `*` names every rule.
  * @property {string} reason - The text after its ` -- ` separator, less any rule the backend still reads there.
- * @property {boolean} inComment - Whether it is written in a comment, where a reason can follow it.
  * @property {boolean} relaxesInReason - Whether it relaxes a rule written after ` -- `, which `@effect/tsgo` applies.
  * @property {boolean} skipsFile - Whether a `skip-file` pair, rather than its form, makes it file-wide.
  * @property {Location} loc - Where to report it.
  */
+
+/** @typedef {OutsideComment | InComment} Directive */
 
 /**
  * The oxlint or eslint disable directive at the start of a comment.
  *
  * @param {string} text - The comment's text.
  * @param {Location} loc - The comment's location.
- * @returns {Directive | undefined}
+ * @returns {InComment | undefined}
  */
 function oxlintDirective(text, loc) {
   const match = DIRECTIVE.exec(text);
@@ -130,12 +142,12 @@ function oxlintDirective(text, loc) {
   const rest = text.slice(match[0].length);
   const separator = rest.indexOf(SEPARATOR);
   return {
+    _tag: "inComment",
     directive: match[0].trim(),
     kind,
     spell: (allowed) => `oxlint-${allowed}`,
     rules: namedRules(separator === -1 ? rest : rest.slice(0, separator)),
     reason: separator === -1 ? "" : rest.slice(separator + SEPARATOR.length),
-    inComment: true,
     relaxesInReason: false,
     skipsFile: false,
     loc,
@@ -181,32 +193,42 @@ function effectDirectives(text, comments, locate) {
       const relaxing = pairs.filter(({ severity }) => EFFECT_RELAXING.has(severity));
       if (relaxing.length > 0) {
         const start = lineStart + match.index;
-        const comment = comments.find((candidate) => candidate.start <= start && start < candidate.end);
-        // A block comment's closing `*/` ends the reason, so it never counts toward the reason's length.
-        const commentEnd =
-          comment === undefined ? line.length : comment.end - lineStart - (comment.type === "Block" ? 2 : 0);
-        const lineEnd = Math.min(line.length, commentEnd);
-        const separatorAt = line.indexOf(SEPARATOR, match.index);
-        const separator = separatorAt === -1 || separatorAt >= lineEnd ? lineEnd : separatorAt;
-        const afterSeparator = pairs.filter((pair) => pair.start >= separator);
-        let reason = separator === lineEnd ? "" : line.slice(separator + SEPARATOR.length, lineEnd);
-        for (const pair of [...afterSeparator].reverse()) {
-          const at = pair.start - separator - SEPARATOR.length;
-          reason = reason.slice(0, at) + reason.slice(at + pair.end - pair.start);
-        }
+        const loc = { start: locate(start), end: locate(start + match[0].length) };
         const next = match[1] ?? "";
-        const skipsFile = pairs.some(({ severity }) => severity === EFFECT_SKIP_FILE);
-        found.push({
-          directive: `@effect-diagnostics${next}`,
-          kind: next === "" || skipsFile ? "disable" : "disable-next-line",
-          skipsFile,
-          spell: spellEffect,
-          rules: pairs.map(({ rule }) => rule),
-          reason,
-          inComment: comment !== undefined,
-          relaxesInReason: relaxing.some((pair) => pair.start >= separator),
-          loc: { start: locate(start), end: locate(lineStart + match.index + match[0].length) },
-        });
+        const directive = `@effect-diagnostics${next}`;
+        const comment = comments.find((candidate) => candidate.start <= start && start < candidate.end);
+        if (comment === undefined) {
+          found.push({ _tag: "outsideComment", directive, loc });
+        } else {
+          // A block comment's closing `*/` ends the reason, so it never counts toward the reason's length.
+          const lineEnd = Math.min(line.length, comment.end - lineStart - (comment.type === "Block" ? 2 : 0));
+          const separatorAt = line.indexOf(SEPARATOR, match.index);
+          const separator = separatorAt === -1 || separatorAt >= lineEnd ? lineEnd : separatorAt;
+          const beforeSeparator = pairs.filter((pair) => pair.start < separator);
+          // A pair after the separator that relaxes nothing silences nothing (its severity reads as `error`), so it
+          // stays reason prose; a relaxing one still applies, so it is a rule, not reason.
+          const relaxingAfterSeparator = relaxing.filter((pair) => pair.start >= separator);
+          const rules = [...beforeSeparator, ...relaxingAfterSeparator].map(({ rule }) => rule);
+          const relaxesInReason = relaxingAfterSeparator.length > 0;
+          let reason = line.slice(separator + SEPARATOR.length, lineEnd);
+          // Strip from the end so each earlier pair's offset still holds; nothing reads the array after this.
+          for (const pair of relaxingAfterSeparator.reverse()) {
+            const at = pair.start - separator - SEPARATOR.length;
+            reason = reason.slice(0, at) + reason.slice(at + pair.end - pair.start);
+          }
+          const skipsFile = relaxing.some(({ severity }) => severity === EFFECT_SKIP_FILE);
+          found.push({
+            _tag: "inComment",
+            directive,
+            kind: next === "" || skipsFile ? "disable" : "disable-next-line",
+            skipsFile,
+            spell: spellEffect,
+            rules,
+            reason,
+            relaxesInReason,
+            loc,
+          });
+        }
       }
     }
     lineStart += line.length + 1;
@@ -271,27 +293,22 @@ export default defineRule({
           ...comments.flatMap((comment) => oxlintDirective(comment.value, comment.loc) ?? []),
           ...effectDirectives(sourceCode.text, comments, (offset) => sourceCode.getLocFromIndex(offset)),
         ];
-        for (const {
-          directive,
-          kind,
-          spell,
-          rules: named,
-          reason,
-          inComment,
-          relaxesInReason,
-          skipsFile,
-          loc,
-        } of found) {
-          if (!inComment) {
-            context.report({ loc, messageId: "outsideComment", data: { directive } });
+        for (const entry of found) {
+          if (entry._tag === "outsideComment") {
+            context.report({
+              loc: entry.loc,
+              messageId: "outsideComment",
+              data: { directive: entry.directive },
+            });
             continue;
           }
-          if (!directives.includes(kind) && skipsFile && directives.includes("disable-next-line")) {
-            context.report({ loc, messageId: "skipFile", data: { directive } });
-            continue;
-          }
+          const { directive, kind, spell, rules: named, reason, relaxesInReason, skipsFile, loc } = entry;
           if (!directives.includes(kind)) {
-            const allowed = [...new Set(directives.flatMap((candidate) => spell(candidate) ?? []))];
+            if (skipsFile && directives.includes("disable-next-line")) {
+              context.report({ loc, messageId: "skipFile", data: { directive } });
+              continue;
+            }
+            const allowed = directives.flatMap((candidate) => spell(candidate) ?? []);
             context.report(
               allowed.length === 0
                 ? { loc, messageId: "noAllowedDirective", data: { directive } }

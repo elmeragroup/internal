@@ -43,8 +43,9 @@ in `packages/api-extractor`.
 An `@effect/tsgo` directive that relaxes a rule (`:off`, `:skip-file`, or a severity below `error`)
 needs the same reason. The rule reads directives as `@effect/tsgo` 0.70.0 does (its doc comment
 cites the parser): the leftmost match on every physical source line, comments, strings and
-templates alike, with every `rule:severity` token of the match counted as a rule it names, those
-after `--` included. So:
+templates alike. Every `rule:severity` pair before `--` counts as a rule it names, and so does
+every relaxing `rule:severity` pair after `--`, which `@effect/tsgo` still applies; a pair after
+`--` that relaxes nothing, such as `node:fs`, silences nothing and stays reason prose. So:
 
 - A relaxing directive outside a comment is reported, since `@effect/tsgo` applies it there too.
   To write the text in a string or a test fixture, spell it so no line reads as a directive, such

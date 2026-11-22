@@ -27,9 +27,11 @@
         "test/**",
         ".oxlintrc.json",
         ".oxlintrc.effect.json",
-        // test/effect-lint-config.test.ts walks every committed tsconfig's extends chain to the preset.
-        "tsconfig*.json",
-        "packages/**/tsconfig*.json",
+        // test/effect-lint-config.test.ts walks the extends chain of every file `git ls-files "*tsconfig*.json"`
+        // lists. That pathspec's `*` crosses directories, so it names every `.json` path with `tsconfig` in its file
+        // name or in a directory name: these two globs.
+        "**/*tsconfig*.json",
+        "**/*tsconfig*/**/*.json",
         "tooling/typescript/**",
         "packages/api-extractor/**",
         "packages/release/**",
@@ -41,7 +43,10 @@
         ".github/workflows/publish-release.yml",
         ".github/workflows/version-packages.yml",
         "package.json",
-        "pnpm-workspace.yaml"
+        "pnpm-workspace.yaml",
+        // Installed files are never committed, so the globs above never mean them; the lockfile's external-dependency
+        // hash already covers what is installed.
+        "!**/node_modules/**"
       ]
     },
     "build": {

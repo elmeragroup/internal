@@ -3,7 +3,8 @@
   // The workspace's .mjs and .js files (scripts, policy tests, the packed-consumer checks) need the Effect preset's
   // options in lint:effect as much as its .ts files, and only a project that includes them gives them those options.
   "compilerOptions": { "allowJs": true },
-  // Type-aware lint reads every file this program includes. Build output and dependencies are not source, and a build
-  // running beside lint deletes and rewrites them mid-read; the base's own `exclude` resolves against its directory.
-  "exclude": ["**/node_modules", "**/dist", "**/.cache", "**/.turbo", ".ref"]
+  // Type-aware lint reads every file this program includes. Build output is not source, and a build running beside lint
+  // deletes and rewrites it mid-read; the base's own `exclude` resolves against its directory. The `**/*` include
+  // already skips `node_modules` and every dot-directory (.cache, .turbo, .ref), so only `dist` needs naming.
+  "exclude": ["**/dist"]
 }
