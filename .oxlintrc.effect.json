@@ -6,8 +6,8 @@
   // effectFn, the unstable allowlist) from each file's tsconfig, which extends tooling/typescript/effect.json through
   // base.json; this list is that preset's errors, held equal by test/effect-lint-config.test.ts. Nothing else runs
   // here: .oxlintrc.json's pass lints these files too. A suppression is an
-  // `// @effect-diagnostics-next-line <rule>:off` comment with its reason, never an oxlint-disable, which the main pass
-  // would report as unused.
+  // `// @effect-diagnostics-next-line <rule>:off -- <reason>` comment, which elmera/require-disable-reason holds to its
+  // reason in the main pass, never an oxlint-disable, which the main pass would report as unused.
   //
   // It lints the whole workspace, as the main pass does, not a list of the files that import effect: a file that only
   // consumes Effect values (a test running a release operation, a script yielding ProjectExtractor) needs the rules as

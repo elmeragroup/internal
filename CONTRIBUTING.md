@@ -15,8 +15,8 @@ the package responsibilities, code conventions and checks.
 
 ### Effect diagnostics in the editor
 
-Code that uses Effect values is checked by the Effect language service: `pnpm lint:effect`, part of
-`pnpm lint` and CI, runs its rules over the whole workspace through the Effect-patched Oxlint. The
+Code that uses Effect values is checked by the Effect language service: the `lint:effect` pass of
+`pnpm lint` and CI runs its rules over the whole workspace through the Effect-patched Oxlint. The
 committed editor settings keep the stock tsrs and Oxlint, so they show none of these diagnostics. To
 see them while editing, start your editor's TypeScript 7 language server as
 `node_modules/.bin/effect-tsgo tsrs --lsp --stdio`: the Effect-patched build of the installed tsrs,

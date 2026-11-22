@@ -198,7 +198,8 @@ compiler seam in `src/backend/ts7/**`, where facts arrive as untyped primitives 
 before they cross the backend contract.
 
 The `packages/api-extractor/**` override configures `elmera/require-disable-reason` to accept only
-`oxlint-disable-next-line` comments that name one rule and give a `--` reason, so `pnpm lint` fails on
+`oxlint-disable-next-line` comments that name one rule and give a `--` reason, and the same of an
+`@effect-diagnostics-next-line` directive that relaxes a rule, never `*`, so `pnpm lint` fails on
 a file-wide header that names a rule, a same-line disable, several rules in one comment, or a missing
 reason. `pnpm lint` also fails on a disable that stops exempting anything. A directive that names no
 rule, or names the guard, silences the guard itself, so lint cannot catch it.
@@ -271,10 +272,10 @@ From `packages/api-extractor`, create the ignored development references with:
 git clone https://github.com/michaldudak/typescript-api-extractor.git ../../.ref/typescript-api-extractor
 git -C ../../.ref/typescript-api-extractor checkout --detach e145350
 git clone https://github.com/Effect-TS/effect.git ../../.ref/effect
-git -C ../../.ref/effect checkout --detach effect@4.1.3
+git -C ../../.ref/effect checkout --detach effect@4.1.4
 ```
 
-The Effect reference resolves to commit `7865dbbb7b6a91691921dbb4febedf3ab94a348b`. Runtime
+The Effect reference resolves to commit `289a53f7b1fc40049219c6e69022db2fb859c356`. Runtime
 `effect` remains pinned to that release in `pnpm-workspace.yaml`. Timing evidence gates on Node
 major 24 and records the exact patch as an observation, so any `>=24.13.0 <25` runtime can
 run the package tests.

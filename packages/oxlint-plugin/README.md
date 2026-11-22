@@ -24,7 +24,7 @@ shared helpers: `filename-normalizer.js` (POSIX path checks, test-file predicate
 | `no-rac-outside-quarantine`         | React Aria packages are importable only from the `src/react-aria` quarantine                                               |
 | `no-raw-class-map`                  | Class maps and hand-spelled class constants must be `tv()` recipes or `cn()`                                               |
 | `no-tailwind-dark-variant`          | No Tailwind `dark:` variant; the dark axis is token-reserved behind `[data-theme="dark"]`                                  |
-| `require-disable-reason`            | Every lint disable comment gives a `--` reason; options limit directive kinds and require one rule                         |
+| `require-disable-reason`            | Every lint disable comment and relaxing `@effect-diagnostics` directive gives a `--` reason; options limit kinds and rules |
 | `require-icon-button-label`         | Icon-only `*Button` JSX needs a nonempty `aria-label`                                                                      |
 | `restrict-browser-helper-copy`      | Browser suites import the shared harness helpers instead of re-declaring them                                              |
 | `restrict-focus-ring-call`          | `focusRing({…})` calls live in `styles/utils.ts` and `react-aria/link` only                                                |
@@ -39,6 +39,13 @@ or one naming `elmera/require-disable-reason`. Oxlint 1.93 has no switch that ig
 directives, so a lint pass cannot close this. Pair the rule with a check outside lint where the
 contract must hold; this repository's `test/extractor-lint-policy.test.mjs` rejects such directives
 in `packages/api-extractor`.
+
+An `@effect/tsgo` directive that relaxes a rule (`:off`, `:skip-file`, or a severity below `error`)
+needs the same reason, read as `@effect/tsgo` reads the directive: anywhere on a comment line, with
+every `rule:severity` token on that line, a reason's included, counted as a rule it names. The
+section form `@effect-diagnostics` counts as the `disable` kind and `@effect-diagnostics-next-line`
+as `disable-next-line`, and `*` never counts as one rule. A directive that only raises a rule to
+`error` needs no reason.
 
 ## Fixed-path assumptions
 

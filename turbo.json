@@ -46,7 +46,11 @@
       "outputs": ["dist/**"],
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/scripts/build-package.ts"]
     },
+    // `pnpm lint` is `turbo run lint`: the two workspace passes run here, after the builds whose declarations they
+    // read, whether or not the package has a lint script of its own. The root `lint` script is not a turbo task, so it
+    // never runs itself.
     "lint": {
+      "dependsOn": ["//#lint:oxlint", "//#lint:effect"],
       "inputs": [
         "$TURBO_DEFAULT$",
         "packages/oxlint-plugin/**",

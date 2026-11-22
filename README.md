@@ -95,7 +95,8 @@ extractor's evidence scripts. Type-aware linting uses it too. The lint scripts p
 linter built into tsrs with `OXLINT_TSGOLINT_PATH=node_modules/.bin/tsrs-lint`, so the workspace
 does not install `oxlint-tsgolint`. Set that variable when you run `oxlint` directly. The
 workspace's `.vscode/settings.json` sets `oxc.path.tsgolint` to the same launcher for the Oxc
-VS Code extension. `pnpm lint` also runs `pnpm lint:effect`, the Effect diagnostics of
+VS Code extension. `pnpm lint` (`turbo run lint`) builds what the passes read, then runs the
+stock pass and `lint:effect`, the Effect diagnostics of
 [`@effect/tsgo`](https://github.com/Effect-TS/tsgo) through its Effect-patched Oxlint. That package
 ships no musl build, so development needs macOS or glibc-based Linux; consumers of the published
 package keep the platforms above.
